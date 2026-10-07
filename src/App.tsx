@@ -374,7 +374,6 @@ function App() {
       <section className="content">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Local player</p>
             <div className="topbar-title-row">
               <h1>{activePlaylist?.name ?? 'Your Library'}</h1>
               {activePlaylist && (
@@ -512,8 +511,9 @@ function App() {
             />
           </label>
           <div className="library-stats">
-            <span>{visibleTracks.length} songs</span>
-            <span>{formatTime(visibleTracks.reduce((sum, track) => sum + track.duration, 0))}</span>
+            <span>
+              {visibleTracks.length} {visibleTracks.length === 1 ? 'song' : 'songs'} · {formatTime(visibleTracks.reduce((sum, track) => sum + track.duration, 0))}
+            </span>
           </div>
         </section>
 
@@ -855,9 +855,14 @@ function TrackList({
                 e.stopPropagation()
                 onPlay(track.id)
               }}
-              aria-label={currentTrackId === track.id && isPlaying ? `Pause ${cleanDisplayTitle(track.title)}` : `Play ${cleanDisplayTitle(track.title)}`}
+              title={currentTrackId === track.id && isPlaying ? 'Pause' : 'Play'}
+              aria-label={currentTrackId === track.id && isPlaying ? 'Pause' : 'Play'}
             >
-              {currentTrackId === track.id && isPlaying ? <Pause size={16} /> : <Play size={16} />}
+              {currentTrackId === track.id && isPlaying ? (
+                <Pause size={18} fill="currentColor" />
+              ) : (
+                <Play size={18} fill="currentColor" />
+              )}
             </button>
             <div className="mini-cover" style={{ '--cover-accent': track.accent } as CSSProperties}>
               {track.coverUrl ? <img src={track.coverUrl} alt="" /> : <Disc3 size={20} />}
@@ -1119,13 +1124,13 @@ function PlayerBar({
             <Shuffle size={18} />
           </button>
           <button className="control" type="button" onClick={onPrevious} aria-label="Previous track">
-            <SkipBack size={20} />
+            <SkipBack size={20} fill="currentColor" />
           </button>
           <button className="play-button" type="button" onClick={onTogglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}>
-            {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+            {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
           </button>
           <button className="control" type="button" onClick={onNext} aria-label="Next track">
-            <SkipForward size={20} />
+            <SkipForward size={20} fill="currentColor" />
           </button>
           <button className={repeat !== 'off' ? 'control active' : 'control'} type="button" onClick={onRepeat} aria-label="Cycle repeat mode">
             {repeat === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}

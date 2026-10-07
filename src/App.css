@@ -795,16 +795,20 @@ h3 {
 
 .library-stats {
   display: flex;
-  gap: 8px;
+  align-items: center;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   white-space: nowrap;
+  padding: 0 4px;
 }
 
 .library-stats span {
-  padding: 9px 12px;
-  border-radius: 999px;
-  background: var(--panel-strong);
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  color: var(--muted);
 }
 
 .now-copy {
@@ -1525,34 +1529,21 @@ input[type='range']::-webkit-slider-thumb,
 .frosted-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid rgba(255, 255, 255, 0.95);
-  box-shadow:
-    0 0 0 3px rgba(218, 255, 99, 0.45),
-    0 2px 6px rgba(0, 0, 0, 0.55);
+  width: 0;
+  height: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
-  transition:
-    transform 140ms ease,
-    box-shadow 140ms ease;
+  opacity: 0;
 }
 
 input[type='range']:hover::-webkit-slider-thumb,
-.frosted-range:hover::-webkit-slider-thumb {
-  transform: scale(1.18);
-  box-shadow:
-    0 0 0 4.5px rgba(218, 255, 99, 0.65),
-    0 2px 8px rgba(0, 0, 0, 0.65);
-}
-
+.frosted-range:hover::-webkit-slider-thumb,
 input[type='range']:active::-webkit-slider-thumb,
 .frosted-range:active::-webkit-slider-thumb {
-  transform: scale(1.28);
-  box-shadow:
-    0 0 0 6px rgba(218, 255, 99, 0.8),
-    0 3px 10px rgba(0, 0, 0, 0.75);
+  transform: none;
+  box-shadow: none;
 }
 
 input[type='range']::-moz-range-track,
@@ -1574,15 +1565,14 @@ input[type='range']::-moz-range-progress,
 
 input[type='range']::-moz-range-thumb,
 .frosted-range::-moz-range-thumb {
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid rgba(255, 255, 255, 0.95);
-  box-shadow:
-    0 0 0 3px rgba(218, 255, 99, 0.45),
-    0 2px 6px rgba(0, 0, 0, 0.55);
+  appearance: none;
+  width: 0;
+  height: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
+  opacity: 0;
 }
 
 @media (max-width: 980px) {
