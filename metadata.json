@@ -1,0 +1,8 @@
+{
+  "name": "Resonance Music Player",
+  "description": "Modern web music player with local track and cover-art support, playlist management, shuffle, repeat, and audio controls.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
