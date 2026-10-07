@@ -851,11 +851,25 @@ function TrackList({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ delay: Math.min(index * 0.025, 0.18), duration: 0.28 }}
+            onClick={() => onPlay(track.id)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                if (e.target === e.currentTarget) {
+                  e.preventDefault()
+                  onPlay(track.id)
+                }
+              }
+            }}
           >
             <button
               className="track-play"
               type="button"
-              onClick={() => onPlay(track.id)}
+              onClick={(e) => {
+                e.stopPropagation()
+                onPlay(track.id)
+              }}
               aria-label={currentTrackId === track.id && isPlaying ? `Pause ${cleanDisplayTitle(track.title)}` : `Play ${cleanDisplayTitle(track.title)}`}
             >
               {currentTrackId === track.id && isPlaying ? <Pause size={16} /> : <Play size={16} />}
@@ -876,11 +890,14 @@ function TrackList({
               onAddToPlaylist={onAddToPlaylist}
               onRemoveFromPlaylist={onRemoveFromPlaylist}
             />
-            <div className="track-row-btns">
+            <div className="track-row-btns" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 className="track-edit-btn"
-                onClick={() => onEditTrack(track)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onEditTrack(track)
+                }}
                 title={`Rename or edit details for ${cleanDisplayTitle(track.title)}`}
                 aria-label={`Edit ${cleanDisplayTitle(track.title)}`}
               >
@@ -890,7 +907,10 @@ function TrackList({
                 <button
                   type="button"
                   className="track-remove-from-playlist-btn"
-                  onClick={() => onRemoveFromPlaylist(activePlaylistId, track.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onRemoveFromPlaylist(activePlaylistId, track.id)
+                  }}
                   title={`Remove "${cleanDisplayTitle(track.title)}" from ${activePlaylist?.name ?? 'playlist'}`}
                   aria-label={`Remove "${cleanDisplayTitle(track.title)}" from ${activePlaylist?.name ?? 'playlist'}`}
                 >
