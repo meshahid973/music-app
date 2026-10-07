@@ -262,6 +262,32 @@ h3 {
   padding: clamp(18px, 4vw, 34px);
   border-radius: 28px;
   overflow: hidden;
+  background: var(--hero-background, var(--panel));
+  border: 1px solid var(--hero-border, var(--line));
+  box-shadow: 0 20px 50px -12px var(--hero-shadow, rgba(0, 0, 0, 0.5));
+  transition: background 0.45s ease, border-color 0.45s ease, box-shadow 0.45s ease;
+  position: relative;
+}
+
+.hero-player.is-light-theme .hero-track-title {
+  color: #121413;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.hero-player.is-light-theme .hero-track-meta {
+  color: #2e3330;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+}
+
+.hero-player.is-light-theme .hero-track-artist {
+  color: #121413;
+}
+
+.hero-player.is-light-theme .hero-edit-btn {
+  background: rgba(255, 255, 255, 0.82);
+  color: #121413;
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .cover-stage {
@@ -304,21 +330,7 @@ h3 {
 
 /* Platter shadow & subtle glow underneath the CD */
 .cd-platter {
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(200, 255, 95, 0.08) 0%, rgba(0, 0, 0, 0.6) 65%, transparent 75%);
-  box-shadow: 0 24px 44px -10px rgba(0, 0, 0, 0.88), 0 8px 18px rgba(0, 0, 0, 0.65);
-  opacity: 0.65;
-  transition: opacity 0.4s ease, transform 0.4s ease;
-  pointer-events: none;
-}
-
-.cd-platter.active {
-  opacity: 1;
-  transform: scale(1.02);
-  background: radial-gradient(circle, rgba(200, 255, 95, 0.16) 0%, rgba(0, 0, 0, 0.6) 65%, transparent 75%);
-  box-shadow: 0 28px 52px -8px rgba(0, 0, 0, 0.92), 0 0 32px -4px rgba(200, 255, 95, 0.22);
+  display: none !important;
 }
 
 /* The actual physical Compact Disc */
@@ -330,10 +342,7 @@ h3 {
   overflow: hidden;
   aspect-ratio: 1;
   background: #141716;
-  box-shadow:
-    0 16px 36px rgba(0, 0, 0, 0.8),
-    0 2px 8px rgba(0, 0, 0, 0.5),
-    inset 0 0 0 1.5px rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.22);
   transform-origin: 50% 50%;
   will-change: transform;
   transform: translate3d(0, 0, 0);
@@ -581,7 +590,7 @@ h3 {
   width: 44%;
   height: 44%;
   border-radius: 50%;
-  background: var(--panel, #151716);
+  background: var(--hero-bg, var(--panel, #151716));
   box-shadow:
     inset 0 3px 6px rgba(0, 0, 0, 0.98),
     inset 0 -2px 3px rgba(255, 255, 255, 0.4),
@@ -589,6 +598,7 @@ h3 {
     0 0 0 2.5px rgba(255, 255, 255, 0.2);
   z-index: 5;
   pointer-events: none;
+  transition: background 0.45s ease;
 }
 
 .cd-center-hole::after {
@@ -596,8 +606,9 @@ h3 {
   position: absolute;
   inset: 2px;
   border-radius: 50%;
-  background: #0d0f0e;
+  background: var(--hero-bg-deep, #0d0f0e);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9);
+  transition: background 0.45s ease;
 }
 
 /* Outer clear polycarbonate rim */
@@ -686,6 +697,7 @@ h3 {
   color: #ffffff;
   margin: 0;
   word-break: break-word;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .hero-track-sub {
@@ -703,6 +715,7 @@ h3 {
   color: var(--muted);
   font-weight: 500;
   margin: 0;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
 }
 
 .hero-track-artist {

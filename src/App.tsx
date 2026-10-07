@@ -4,7 +4,7 @@ import {
   Check,
   ChevronDown,
   Disc3,
-  FileAudio,
+  FolderOpen,
   Heart,
   Image as ImageIcon,
   ListMusic,
@@ -28,7 +28,16 @@ import type { ChangeEvent, CSSProperties, FormEvent } from 'react'
 import './App.css'
 import { favoritesId, libraryId, useMusicStore } from './store/useMusicStore'
 import type { Playlist, Track } from './types'
-import { buildCoverLookup, cleanDisplayTitle, formatTime, tracksFromFiles } from './utils/library'
+import {
+  cleanDisplayTitle,
+  extractCovers,
+  formatTime,
+  getAverageColor,
+  hslToRgb,
+  isAudioFile,
+  isCoverFile,
+  tracksFromFiles,
+} from './utils/library'
 
 function App() {
   const audioRef = useRef<Howl | null>(null)
@@ -40,6 +49,14 @@ function App() {
   const [seek, setSeek] = useState(0)
   const [newPlaylistName, setNewPlaylistName] = useState('')
   const [editingTrack, setEditingTrack] = useState<Track | null>(null)
+  const [coverColor, setCoverColor] = useState<{
+    background: string
+    heroBg: string
+    heroBgDeep: string
+    borderColor: string
+    shadowColor: string
+    isLight: boolean
+  } | null>(null)
   const {
     tracks,
     playlists,
@@ -70,6 +87,73 @@ function App() {
     () => getVisibleTracks(tracks, activePlaylistId, activePlaylist, query),
     [activePlaylist, activePlaylistId, query, tracks],
   )
+
+  const currentCoverUrl = currentTrack?.coverUrl
+  const currentAccent = currentTrack?.accent
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (currentCoverUrl) {
+      getAverageColor(currentCoverUrl).then(({ r, g, b }) => {
+        if (cancelled) return
+        const avgColor = `rgb(${r}, ${g}, ${b})`
+        const deepR = Math.max(0, Math.round(r * 0.45))
+        const deepG = Math.max(0, Math.round(g * 0.45))
+        const deepB = Math.max(0, Math.round(b * 0.45))
+        const deepColor = `rgb(${deepR}, ${deepG}, ${deepB})`
+        const isLight = 0.299 * r + 0.587 * g + 0.114 * b > 165
+        setCoverColor({
+          background: `linear-gradient(135deg, ${avgColor} 0%, ${deepColor} 100%)`,
+          heroBg: avgColor,
+          heroBgDeep: deepColor,
+          borderColor: `rgba(${r}, ${g}, ${b}, 0.45)`,
+          shadowColor: `rgba(${r}, ${g}, ${b}, 0.3)`,
+          isLight,
+        })
+      })
+    } else {
+      const timer = setTimeout(() => {
+        if (cancelled) return
+        if (currentAccent) {
+          const { r, g, b } = hslToRgb(currentAccent)
+          const avgColor = `rgb(${r}, ${g}, ${b})`
+          const deepR = Math.max(0, Math.round(r * 0.4))
+          const deepG = Math.max(0, Math.round(g * 0.4))
+          const deepB = Math.max(0, Math.round(b * 0.4))
+          const deepColor = `rgb(${deepR}, ${deepG}, ${deepB})`
+          const isLight = 0.299 * r + 0.587 * g + 0.114 * b > 165
+          setCoverColor({
+            background: `linear-gradient(135deg, ${avgColor} 0%, ${deepColor} 100%)`,
+            heroBg: avgColor,
+            heroBgDeep: deepColor,
+            borderColor: `rgba(${r}, ${g}, ${b}, 0.4)`,
+            shadowColor: `rgba(${r}, ${g}, ${b}, 0.25)`,
+            isLight,
+          })
+        } else {
+          setCoverColor(null)
+        }
+      }, 0)
+      return () => {
+        cancelled = true
+        clearTimeout(timer)
+      }
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentCoverUrl, currentAccent])
+
+  const heroTheme = coverColor ?? {
+    background: 'var(--panel)',
+    heroBg: '#151716',
+    heroBgDeep: '#0d0f0e',
+    borderColor: 'var(--line)',
+    shadowColor: 'rgba(0, 0, 0, 0.5)',
+    isLight: false,
+  }
 
   function startProgress() {
     stopProgress()
@@ -144,16 +228,61 @@ function App() {
 
   async function handleMusicFiles(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? [])
-    const coverLookup = buildCoverLookup(files)
+    if (files.length === 0) return
+
+    // If cover files were selected together with music files, add them to the pool
+    const coverFiles = files.filter(isCoverFile)
+    let coverLookup = new Map<string, string>()
+    if (coverFiles.length > 0) {
+      const { lookup, urls } = extractCovers(coverFiles)
+      coverLookup = lookup
+      addCovers(lookup, urls)
+    }
+
     const parsedTracks = await tracksFromFiles(files, coverLookup)
     addTracks(parsedTracks)
     event.target.value = ''
   }
 
-  function handleCoverFiles(event: ChangeEvent<HTMLInputElement>) {
+  function handleCoverFolder(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? [])
-    addCovers(buildCoverLookup(files))
+    if (files.length === 0) return
+    const { lookup, urls } = extractCovers(files)
+    if (urls.length > 0) {
+      addCovers(lookup, urls)
+    }
     event.target.value = ''
+  }
+
+  function handleCoverImages(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? [])
+    if (files.length === 0) return
+    const { lookup, urls } = extractCovers(files)
+    if (urls.length > 0) {
+      addCovers(lookup, urls)
+    }
+    event.target.value = ''
+  }
+
+  async function handleDrop(event: React.DragEvent) {
+    event.preventDefault()
+    const files = Array.from(event.dataTransfer?.files ?? [])
+    if (files.length === 0) return
+
+    const coverFiles = files.filter(isCoverFile)
+    const audioFiles = files.filter(isAudioFile)
+
+    let coverLookup = new Map<string, string>()
+    if (coverFiles.length > 0) {
+      const { lookup, urls } = extractCovers(coverFiles)
+      coverLookup = lookup
+      addCovers(lookup, urls)
+    }
+
+    if (audioFiles.length > 0) {
+      const parsedTracks = await tracksFromFiles(audioFiles, coverLookup)
+      addTracks(parsedTracks)
+    }
   }
 
   function handleCreatePlaylist() {
@@ -228,7 +357,11 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main
+      className="app-shell"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDrop}
+    >
       <Sidebar
         activePlaylistId={activePlaylistId}
         playlists={playlists}
@@ -246,26 +379,46 @@ function App() {
             <h1>{activePlaylist?.name ?? 'Your Library'}</h1>
           </div>
           <div className="toolbar">
-            <label className="icon-button import-button">
+            <label className="icon-button import-button" title="Import audio files into your library">
               <Upload size={18} />
               <span>Add songs</span>
               <input type="file" accept="audio/*" multiple onChange={handleMusicFiles} />
             </label>
-            <label className="icon-button import-button secondary">
-              <FileAudio size={18} />
+            <label className="icon-button import-button secondary" title="Import a folder of cover artwork">
+              <FolderOpen size={18} />
               <span>Cover folder</span>
+              <input
+                type="file"
+                multiple
+                onChange={handleCoverFolder}
+                {...{ webkitdirectory: '', directory: '' }}
+              />
+            </label>
+            <label className="icon-button import-button secondary" title="Import cover images">
+              <ImageIcon size={18} />
+              <span>Add covers</span>
               <input
                 type="file"
                 accept="image/*"
                 multiple
-                onChange={handleCoverFiles}
-                {...{ webkitdirectory: '' }}
+                onChange={handleCoverImages}
               />
             </label>
           </div>
         </header>
 
-        <section className="hero-player">
+        <section
+          className={`hero-player ${heroTheme.isLight ? 'is-light-theme' : ''}`}
+          style={
+            {
+              '--hero-background': heroTheme.background,
+              '--hero-bg': heroTheme.heroBg,
+              '--hero-bg-deep': heroTheme.heroBgDeep,
+              '--hero-border': heroTheme.borderColor,
+              '--hero-shadow': heroTheme.shadowColor,
+            } as CSSProperties
+          }
+        >
           <motion.div
             className="cover-stage"
             layout
@@ -411,9 +564,6 @@ function CdDisc({ track, isPlaying, onTogglePlay }: CdDiscProps) {
         }
       }}
     >
-      {/* Platter glow underneath the CD */}
-      <div className={`cd-platter ${isPlaying ? 'active' : ''}`} />
-
       {/* The physical rotating CD disc */}
       <div className={`cd-disc ${isPlaying ? 'is-playing' : 'is-paused'}`}>
         {/* Base reflective substrate */}
@@ -562,7 +712,7 @@ function TrackList({
       <motion.div className="empty-state" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
         <Disc3 size={42} />
         <h3>Your library is waiting</h3>
-        <p>Add music files, then add a cover-art folder. Covers match songs when filenames are the same.</p>
+        <p>Add music files, then add a cover folder. Covers will automatically be applied to songs in your library.</p>
       </motion.div>
     )
   }

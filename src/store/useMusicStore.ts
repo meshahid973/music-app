@@ -1,10 +1,11 @@
 import { create } from 'zustand'
 import type { Playlist, RepeatMode, Track } from '../types'
-import { attachCovers, uniqueTracks } from '../utils/library'
+import { assignRandomCovers, attachCovers, uniqueTracks } from '../utils/library'
 
 type MusicState = {
   tracks: Track[]
   playlists: Playlist[]
+  coverPool: string[]
   activePlaylistId: string
   currentTrackId?: string
   isPlaying: boolean
@@ -12,7 +13,7 @@ type MusicState = {
   repeat: RepeatMode
   volume: number
   addTracks: (tracks: Track[]) => void
-  addCovers: (covers: Map<string, string>) => void
+  addCovers: (covers: Map<string, string>, extraUrls?: string[]) => void
   createPlaylist: (name: string) => void
   addTrackToPlaylist: (playlistId: string, trackId: string) => void
   setActivePlaylist: (playlistId: string) => void
@@ -43,6 +44,7 @@ export const useMusicStore = create<MusicState>((set) => ({
       createdAt: Date.now() + 1,
     },
   ],
+  coverPool: [],
   activePlaylistId: libraryId,
   isPlaying: false,
   shuffle: false,
@@ -50,16 +52,25 @@ export const useMusicStore = create<MusicState>((set) => ({
   volume: 0.82,
   addTracks: (incoming) =>
     set((state) => {
-      const tracks = [...state.tracks, ...uniqueTracks(state.tracks, incoming)]
+      const processedIncoming =
+        state.coverPool.length > 0
+          ? assignRandomCovers(incoming, state.coverPool)
+          : incoming
+      const tracks = [...state.tracks, ...uniqueTracks(state.tracks, processedIncoming)]
       return {
         tracks,
         currentTrackId: state.currentTrackId ?? tracks[0]?.id,
       }
     }),
-  addCovers: (covers) =>
-    set((state) => ({
-      tracks: attachCovers(state.tracks, covers),
-    })),
+  addCovers: (covers, extraUrls = []) =>
+    set((state) => {
+      const incomingCovers = Array.from(new Set([...Array.from(covers.values()), ...extraUrls]))
+      const updatedPool = Array.from(new Set([...state.coverPool, ...incomingCovers]))
+      return {
+        coverPool: updatedPool,
+        tracks: attachCovers(state.tracks, covers, updatedPool),
+      }
+    }),
   createPlaylist: (name) =>
     set((state) => ({
       playlists: [
