@@ -1,4 +1,5 @@
 import type { CoverLookup, Track } from '../types'
+import { autoDetectTrackMetadata, cleanMusicString, detectSongAndArtist } from './metadata'
 
 const audioExtensions = new Set(['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'])
 const coverExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'avif', 'bmp', 'gif', 'svg'])
@@ -55,14 +56,19 @@ export async function tracksFromFiles(files: File[], covers: CoverLookup) {
   const tracks = await Promise.all(
     audioFiles.map(async (file, index) => {
       const audioUrl = URL.createObjectURL(file)
-      const parsed = parseTrackName(file.name)
+      const detected = await autoDetectTrackMetadata(file.name, file)
       const duration = await readDuration(audioUrl)
 
-      // Direct name matches: by filename, parsed title, or clean title
+      // Direct name matches: by filename, detected title, or clean title
       let coverUrl =
         covers.get(normalizeName(file.name)) ||
-        covers.get(normalizeName(parsed.title)) ||
-        covers.get(normalizeName(cleanDisplayTitle(parsed.title)))
+        covers.get(normalizeName(detected.title)) ||
+        covers.get(normalizeName(cleanDisplayTitle(detected.title)))
+
+      // If no folder cover matched, but file had an embedded ID3 cover, use it
+      if (!coverUrl && detected.coverUrl) {
+        coverUrl = detected.coverUrl
+      }
 
       if (!coverUrl && availableCovers.length > 0) {
         if (poolIndex >= pool.length) {
@@ -75,9 +81,9 @@ export async function tracksFromFiles(files: File[], covers: CoverLookup) {
 
       return {
         id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
-        title: parsed.title,
-        artist: parsed.artist,
-        album: parsed.album,
+        title: detected.title,
+        artist: detected.artist,
+        album: detected.album || 'Local files',
         duration,
         fileName: file.name,
         audioUrl,
@@ -165,17 +171,7 @@ function getExtension(fileName: string) {
 }
 
 export function cleanDisplayTitle(raw: string): string {
-  if (!raw) return ''
-  return raw
-    .replace(/\s*\(\s*(?:official\s*(?:video|audio|music\s*video|lyric\s*video)|audio|video|lyrics?|remastered|hq|hd)\s*\)/gi, '')
-    .replace(/\s*\[\s*(?:official\s*(?:video|audio|music\s*video|lyric\s*video)|audio|video|lyrics?|remastered|hq|hd|\d+\s*k?bps)\s*\]/gi, '')
-    .replace(/\s*-\s*\(\s*\d+\s*k?bps\s*\)/gi, '')
-    .replace(/\s*\(\s*\d+\s*k?bps\s*\)/gi, '')
-    .replace(/\s*-\s*\d+\s*k?bps\s*$/gi, '')
-    .replace(/\s+\d+\s*k?bps\s*$/gi, '')
-    .replace(/\s*[-–—]\s*$/g, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
+  return cleanMusicString(raw)
 }
 
 function normalizeName(fileName: string) {
@@ -187,22 +183,12 @@ function normalizeName(fileName: string) {
     .trim()
 }
 
-function parseTrackName(fileName: string) {
-  const cleanName = fileName.replace(/\.[^/.]+$/, '').replace(/[_]+/g, ' ')
-  const [maybeArtist, ...rest] = cleanName.split(' - ')
-
-  if (rest.length > 0) {
-    return {
-      artist: maybeArtist.trim(),
-      title: cleanDisplayTitle(rest.join(' - ')),
-      album: 'Local files',
-    }
-  }
-
+export function parseTrackName(fileName: string) {
+  const detected = detectSongAndArtist(fileName)
   return {
-    artist: 'Unknown artist',
-    title: cleanDisplayTitle(cleanName),
-    album: 'Local files',
+    title: detected.title,
+    artist: detected.artist,
+    album: detected.album || 'Local files',
   }
 }
 

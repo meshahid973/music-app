@@ -49,6 +49,8 @@ function App() {
   const [seek, setSeek] = useState(0)
   const [newPlaylistName, setNewPlaylistName] = useState('')
   const [editingTrack, setEditingTrack] = useState<Track | null>(null)
+  const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null)
+  const [playlistToRename, setPlaylistToRename] = useState<Playlist | null>(null)
   const [coverColor, setCoverColor] = useState<{
     background: string
     heroBg: string
@@ -69,7 +71,10 @@ function App() {
     addTracks,
     addCovers,
     createPlaylist,
+    deletePlaylist,
+    renamePlaylist,
     addTrackToPlaylist,
+    removeTrackFromPlaylist,
     setActivePlaylist,
     setCurrentTrack,
     setIsPlaying,
@@ -368,6 +373,8 @@ function App() {
         tracks={tracks}
         onSelect={setActivePlaylist}
         onCreate={handleCreatePlaylist}
+        onRenamePlaylist={(playlist) => setPlaylistToRename(playlist)}
+        onDeletePlaylist={(playlist) => setPlaylistToDelete(playlist)}
         playlistName={newPlaylistName}
         setPlaylistName={setNewPlaylistName}
       />
@@ -376,7 +383,31 @@ function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Local player</p>
-            <h1>{activePlaylist?.name ?? 'Your Library'}</h1>
+            <div className="topbar-title-row">
+              <h1>{activePlaylist?.name ?? 'Your Library'}</h1>
+              {activePlaylist && (
+                <div className="playlist-header-actions">
+                  <button
+                    type="button"
+                    className="edit-playlist-header-btn"
+                    onClick={() => setPlaylistToRename(activePlaylist)}
+                    title={`Rename playlist "${activePlaylist.name}"`}
+                  >
+                    <Pencil size={14} />
+                    <span>Rename</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-playlist-header-btn"
+                    onClick={() => setPlaylistToDelete(activePlaylist)}
+                    title={`Delete playlist "${activePlaylist.name}"`}
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <div className="toolbar">
             <label className="icon-button import-button" title="Import audio files into your library">
@@ -506,10 +537,13 @@ function App() {
         <TrackList
           tracks={visibleTracks}
           playlists={playlists}
+          activePlaylistId={activePlaylistId}
+          activePlaylist={activePlaylist}
           currentTrackId={currentTrackId}
           isPlaying={isPlaying}
           onPlay={handleTrackPlay}
           onAddToPlaylist={addTrackToPlaylist}
+          onRemoveFromPlaylist={removeTrackFromPlaylist}
           onEditTrack={setEditingTrack}
         />
       </section>
@@ -536,6 +570,22 @@ function App() {
           isPlaying={isPlaying}
           onClose={() => setEditingTrack(null)}
           onSave={(updates) => updateTrack(editingTrack.id, updates)}
+        />
+      )}
+
+      {playlistToRename && (
+        <RenamePlaylistModal
+          playlist={playlistToRename}
+          onClose={() => setPlaylistToRename(null)}
+          onSave={(newName) => renamePlaylist(playlistToRename.id, newName)}
+        />
+      )}
+
+      {playlistToDelete && (
+        <DeletePlaylistModal
+          playlist={playlistToDelete}
+          onClose={() => setPlaylistToDelete(null)}
+          onConfirm={() => deletePlaylist(playlistToDelete.id)}
         />
       )}
     </main>
@@ -624,6 +674,8 @@ type SidebarProps = {
   setPlaylistName: (name: string) => void
   onSelect: (playlistId: string) => void
   onCreate: () => void
+  onRenamePlaylist: (playlist: Playlist) => void
+  onDeletePlaylist: (playlist: Playlist) => void
 }
 
 function Sidebar({
@@ -634,6 +686,8 @@ function Sidebar({
   setPlaylistName,
   onSelect,
   onCreate,
+  onRenamePlaylist,
+  onDeletePlaylist,
 }: SidebarProps) {
   return (
     <aside className="sidebar">
@@ -658,16 +712,49 @@ function Sidebar({
           <em>{tracks.length}</em>
         </button>
         {playlists.map((playlist) => (
-          <button
+          <div
             key={playlist.id}
-            className={activePlaylistId === playlist.id ? 'nav-item active' : 'nav-item'}
-            type="button"
+            className={`nav-item nav-playlist-item ${activePlaylistId === playlist.id ? 'active' : ''}`}
             onClick={() => onSelect(playlist.id)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onSelect(playlist.id)
+              }
+            }}
           >
             {playlist.id === favoritesId ? <Heart size={18} /> : <ListMusic size={18} />}
-            <span>{playlist.name}</span>
+            <span className="nav-playlist-name">{playlist.name}</span>
             <em>{playlist.trackIds.length}</em>
-          </button>
+            <div className="nav-item-actions">
+              <button
+                type="button"
+                className="nav-action-btn edit"
+                title={`Rename playlist "${playlist.name}"`}
+                aria-label={`Rename playlist "${playlist.name}"`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRenamePlaylist(playlist)
+                }}
+              >
+                <Pencil size={13} />
+              </button>
+              <button
+                type="button"
+                className="nav-action-btn delete"
+                title={`Delete playlist "${playlist.name}"`}
+                aria-label={`Delete playlist "${playlist.name}"`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDeletePlaylist(playlist)
+                }}
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          </div>
         ))}
       </nav>
 
@@ -691,20 +778,26 @@ function Sidebar({
 type TrackListProps = {
   tracks: Track[]
   playlists: Playlist[]
+  activePlaylistId: string
+  activePlaylist?: Playlist
   currentTrackId?: string
   isPlaying: boolean
   onPlay: (trackId: string) => void
   onAddToPlaylist: (playlistId: string, trackId: string) => void
+  onRemoveFromPlaylist: (playlistId: string, trackId: string) => void
   onEditTrack: (track: Track) => void
 }
 
 function TrackList({
   tracks,
   playlists,
+  activePlaylistId,
+  activePlaylist,
   currentTrackId,
   isPlaying,
   onPlay,
   onAddToPlaylist,
+  onRemoveFromPlaylist,
   onEditTrack,
 }: TrackListProps) {
   if (tracks.length === 0) {
@@ -752,16 +845,30 @@ function TrackList({
               trackTitle={cleanDisplayTitle(track.title)}
               playlists={playlists}
               onAddToPlaylist={onAddToPlaylist}
+              onRemoveFromPlaylist={onRemoveFromPlaylist}
             />
-            <button
-              type="button"
-              className="track-edit-btn"
-              onClick={() => onEditTrack(track)}
-              title={`Edit ${cleanDisplayTitle(track.title)} details & cover art`}
-              aria-label={`Edit ${cleanDisplayTitle(track.title)}`}
-            >
-              <Pencil size={15} />
-            </button>
+            <div className="track-row-btns">
+              <button
+                type="button"
+                className="track-edit-btn"
+                onClick={() => onEditTrack(track)}
+                title={`Rename or edit details for ${cleanDisplayTitle(track.title)}`}
+                aria-label={`Edit ${cleanDisplayTitle(track.title)}`}
+              >
+                <Pencil size={15} />
+              </button>
+              {activePlaylistId !== libraryId && (
+                <button
+                  type="button"
+                  className="track-remove-from-playlist-btn"
+                  onClick={() => onRemoveFromPlaylist(activePlaylistId, track.id)}
+                  title={`Remove "${cleanDisplayTitle(track.title)}" from ${activePlaylist?.name ?? 'playlist'}`}
+                  aria-label={`Remove "${cleanDisplayTitle(track.title)}" from ${activePlaylist?.name ?? 'playlist'}`}
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
           </motion.article>
         ))}
       </AnimatePresence>
@@ -774,6 +881,7 @@ type PlaylistDropdownProps = {
   trackTitle: string
   playlists: Playlist[]
   onAddToPlaylist: (playlistId: string, trackId: string) => void
+  onRemoveFromPlaylist: (playlistId: string, trackId: string) => void
 }
 
 function PlaylistDropdown({
@@ -781,6 +889,7 @@ function PlaylistDropdown({
   trackTitle,
   playlists,
   onAddToPlaylist,
+  onRemoveFromPlaylist,
 }: PlaylistDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -799,9 +908,12 @@ function PlaylistDropdown({
     }
   }, [isOpen])
 
-  function handleSelect(playlistId: string) {
-    onAddToPlaylist(playlistId, trackId)
-    setIsOpen(false)
+  function handleToggle(playlist: Playlist) {
+    if (playlist.trackIds.includes(trackId)) {
+      onRemoveFromPlaylist(playlist.id, trackId)
+    } else {
+      onAddToPlaylist(playlist.id, trackId)
+    }
   }
 
   return (
@@ -815,7 +927,7 @@ function PlaylistDropdown({
         }}
         aria-haspopup="true"
         aria-expanded={isOpen}
-        aria-label={`Add ${trackTitle} to playlist`}
+        aria-label={`Manage playlists for ${trackTitle}`}
       >
         <span>Add to</span>
         <ChevronDown size={14} className={`dropdown-chevron ${isOpen ? 'open' : ''}`} />
@@ -823,7 +935,7 @@ function PlaylistDropdown({
 
       {isOpen && (
         <div className="playlist-menu" role="menu">
-          <div className="playlist-menu-header">Add to Playlist</div>
+          <div className="playlist-menu-header">Add or Remove from Playlist</div>
           {playlists.map((playlist) => {
             const isAlreadyIn = playlist.trackIds.includes(trackId)
             return (
@@ -833,9 +945,10 @@ function PlaylistDropdown({
                 className={`playlist-menu-item ${isAlreadyIn ? 'is-added' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation()
-                  handleSelect(playlist.id)
+                  handleToggle(playlist)
                 }}
                 role="menuitem"
+                title={isAlreadyIn ? `Remove from ${playlist.name}` : `Add to ${playlist.name}`}
               >
                 <div className="playlist-item-label">
                   {playlist.id === favoritesId ? (
@@ -1144,6 +1257,174 @@ function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackModalPro
             </button>
             <button type="submit" className="btn-primary">
               Save Changes
+            </button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+type DeletePlaylistModalProps = {
+  playlist: Playlist
+  onClose: () => void
+  onConfirm: () => void
+}
+
+function DeletePlaylistModal({ playlist, onClose, onConfirm }: DeletePlaylistModalProps) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  return (
+    <div
+      className="modal-backdrop"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-playlist-title"
+    >
+      <div className="modal-card modal-card-sm" onClick={(e) => e.stopPropagation()}>
+        <header className="modal-header">
+          <div className="delete-modal-title-group">
+            <div className="delete-modal-icon-badge">
+              <Trash2 size={18} />
+            </div>
+            <div>
+              <h3 id="delete-playlist-title">Delete Playlist</h3>
+              <p className="delete-modal-subtitle">This action cannot be undone.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="modal-close-btn"
+            onClick={onClose}
+            aria-label="Close dialog"
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="modal-body delete-modal-body">
+          <p>
+            Are you sure you want to delete <strong>{playlist.name}</strong>?
+          </p>
+          <p className="delete-modal-note">
+            The {playlist.trackIds.length} {playlist.trackIds.length === 1 ? 'song' : 'songs'} in this playlist will remain in your library.
+          </p>
+        </div>
+
+        <footer className="modal-footer">
+          <button type="button" className="btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn-danger"
+            onClick={() => {
+              onConfirm()
+              onClose()
+            }}
+            autoFocus
+          >
+            <Trash2 size={15} />
+            <span>Delete playlist</span>
+          </button>
+        </footer>
+      </div>
+    </div>
+  )
+}
+
+type RenamePlaylistModalProps = {
+  playlist: Playlist
+  onClose: () => void
+  onSave: (newName: string) => void
+}
+
+function RenamePlaylistModal({ playlist, onClose, onSave }: RenamePlaylistModalProps) {
+  const [name, setName] = useState(playlist.name)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    const trimmed = name.trim()
+    if (trimmed) {
+      onSave(trimmed)
+      onClose()
+    }
+  }
+
+  return (
+    <div
+      className="modal-backdrop"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="rename-playlist-title"
+    >
+      <div className="modal-card modal-card-sm" onClick={(e) => e.stopPropagation()}>
+        <header className="modal-header">
+          <div className="delete-modal-title-group">
+            <div className="rename-modal-icon-badge">
+              <Pencil size={18} />
+            </div>
+            <div>
+              <h3 id="rename-playlist-title">Rename Playlist</h3>
+              <p className="delete-modal-subtitle">Update playlist display name</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="modal-close-btn"
+            onClick={onClose}
+            aria-label="Close dialog"
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <form onSubmit={handleSubmit} className="modal-body">
+          <div className="form-group">
+            <label htmlFor="rename-input">Playlist Name</label>
+            <input
+              ref={inputRef}
+              id="rename-input"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter new name"
+              required
+            />
+          </div>
+
+          <footer className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary" disabled={!name.trim()}>
+              Save Name
             </button>
           </footer>
         </form>

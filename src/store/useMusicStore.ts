@@ -15,7 +15,10 @@ type MusicState = {
   addTracks: (tracks: Track[]) => void
   addCovers: (covers: Map<string, string>, extraUrls?: string[]) => void
   createPlaylist: (name: string) => void
+  deletePlaylist: (playlistId: string) => void
+  renamePlaylist: (playlistId: string, name: string) => void
   addTrackToPlaylist: (playlistId: string, trackId: string) => void
+  removeTrackFromPlaylist: (playlistId: string, trackId: string) => void
   setActivePlaylist: (playlistId: string) => void
   setCurrentTrack: (trackId: string) => void
   setIsPlaying: (isPlaying: boolean) => void
@@ -83,11 +86,33 @@ export const useMusicStore = create<MusicState>((set) => ({
         },
       ],
     })),
+  deletePlaylist: (playlistId) =>
+    set((state) => ({
+      playlists: state.playlists.filter((playlist) => playlist.id !== playlistId),
+      activePlaylistId:
+        state.activePlaylistId === playlistId ? libraryId : state.activePlaylistId,
+    })),
+  renamePlaylist: (playlistId, name) =>
+    set((state) => ({
+      playlists: state.playlists.map((playlist) =>
+        playlist.id === playlistId
+          ? { ...playlist, name: name.trim() || playlist.name }
+          : playlist,
+      ),
+    })),
   addTrackToPlaylist: (playlistId, trackId) =>
     set((state) => ({
       playlists: state.playlists.map((playlist) =>
         playlist.id === playlistId && !playlist.trackIds.includes(trackId)
           ? { ...playlist, trackIds: [...playlist.trackIds, trackId] }
+          : playlist,
+      ),
+    })),
+  removeTrackFromPlaylist: (playlistId, trackId) =>
+    set((state) => ({
+      playlists: state.playlists.map((playlist) =>
+        playlist.id === playlistId
+          ? { ...playlist, trackIds: playlist.trackIds.filter((id) => id !== trackId) }
           : playlist,
       ),
     })),
