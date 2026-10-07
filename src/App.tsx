@@ -259,16 +259,6 @@ function App() {
     event.target.value = ''
   }
 
-  function handleCoverImages(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? [])
-    if (files.length === 0) return
-    const { lookup, urls } = extractCovers(files)
-    if (urls.length > 0) {
-      addCovers(lookup, urls)
-    }
-    event.target.value = ''
-  }
-
   async function handleDrop(event: React.DragEvent) {
     event.preventDefault()
     const files = Array.from(event.dataTransfer?.files ?? [])
@@ -377,6 +367,8 @@ function App() {
         onDeletePlaylist={(playlist) => setPlaylistToDelete(playlist)}
         playlistName={newPlaylistName}
         setPlaylistName={setNewPlaylistName}
+        onAddSongs={handleMusicFiles}
+        onAddCoverFolder={handleCoverFolder}
       />
 
       <section className="content">
@@ -408,33 +400,6 @@ function App() {
                 </div>
               )}
             </div>
-          </div>
-          <div className="toolbar">
-            <label className="icon-button import-button" title="Import audio files into your library">
-              <Upload size={18} />
-              <span>Add songs</span>
-              <input type="file" accept="audio/*" multiple onChange={handleMusicFiles} />
-            </label>
-            <label className="icon-button import-button secondary" title="Import a folder of cover artwork">
-              <FolderOpen size={18} />
-              <span>Cover folder</span>
-              <input
-                type="file"
-                multiple
-                onChange={handleCoverFolder}
-                {...{ webkitdirectory: '', directory: '' }}
-              />
-            </label>
-            <label className="icon-button import-button secondary" title="Import cover images">
-              <ImageIcon size={18} />
-              <span>Add covers</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleCoverImages}
-              />
-            </label>
           </div>
         </header>
 
@@ -502,17 +467,6 @@ function App() {
                       'Import songs, then add cover images or edit track details.'
                     )}
                   </p>
-                  {currentTrack && (
-                    <button
-                      type="button"
-                      className="hero-edit-btn"
-                      onClick={() => setEditingTrack(currentTrack)}
-                      title="Edit song title, artist, or cover art"
-                    >
-                      <Pencil size={13} />
-                      <span>Edit details</span>
-                    </button>
-                  )}
                 </div>
               </motion.div>
             </AnimatePresence>
@@ -580,6 +534,7 @@ function App() {
       <PlayerBar
         currentTrack={currentTrack}
         isPlaying={isPlaying}
+        audioRef={audioRef}
         seek={seek}
         shuffle={shuffle}
         repeat={repeat}
@@ -705,6 +660,8 @@ type SidebarProps = {
   onCreate: () => void
   onRenamePlaylist: (playlist: Playlist) => void
   onDeletePlaylist: (playlist: Playlist) => void
+  onAddSongs: (e: ChangeEvent<HTMLInputElement>) => void
+  onAddCoverFolder: (e: ChangeEvent<HTMLInputElement>) => void
 }
 
 function Sidebar({
@@ -717,6 +674,8 @@ function Sidebar({
   onCreate,
   onRenamePlaylist,
   onDeletePlaylist,
+  onAddSongs,
+  onAddCoverFolder,
 }: SidebarProps) {
   return (
     <aside className="sidebar">
@@ -785,21 +744,47 @@ function Sidebar({
             </div>
           </div>
         ))}
-      </nav>
-
-      <div className="playlist-form">
-        <input
-          value={playlistName}
-          onChange={(event) => setPlaylistName(event.target.value)}
-          placeholder="New playlist"
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') onCreate()
+        <form
+          className="nav-item playlist-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            onCreate()
           }}
-        />
-        <button type="button" aria-label="Create playlist" onClick={onCreate}>
-          <Plus size={18} />
-        </button>
-      </div>
+        >
+          <ListMusic size={18} className="playlist-form-icon" />
+          <input
+            value={playlistName}
+            onChange={(event) => setPlaylistName(event.target.value)}
+            placeholder="New playlist"
+            aria-label="New playlist name"
+          />
+          <button
+            type="submit"
+            aria-label="Create playlist"
+            className="playlist-add-btn"
+            title="Create playlist"
+          >
+            <Plus size={15} strokeWidth={2.5} />
+          </button>
+        </form>
+
+        <label className="nav-item import-nav-item" title="Import audio files into your library">
+          <Upload size={18} />
+          <span>Add songs</span>
+          <input type="file" accept="audio/*" multiple onChange={onAddSongs} />
+        </label>
+
+        <label className="nav-item import-nav-item" title="Import a folder of cover artwork">
+          <FolderOpen size={18} />
+          <span>Cover folder</span>
+          <input
+            type="file"
+            multiple
+            onChange={onAddCoverFolder}
+            {...{ webkitdirectory: '', directory: '' }}
+          />
+        </label>
+      </nav>
     </aside>
   )
 }
@@ -1020,6 +1005,7 @@ function PlaylistDropdown({
 type PlayerBarProps = {
   currentTrack?: Track
   isPlaying: boolean
+  audioRef: React.RefObject<Howl | null>
   seek: number
   shuffle: boolean
   repeat: string
@@ -1036,6 +1022,7 @@ type PlayerBarProps = {
 function PlayerBar({
   currentTrack,
   isPlaying,
+  audioRef,
   seek,
   shuffle,
   repeat,
@@ -1048,6 +1035,72 @@ function PlayerBar({
   onRepeat,
   onVolume,
 }: PlayerBarProps) {
+  const isDraggingRef = useRef(false)
+  const rangeInputRef = useRef<HTMLInputElement>(null)
+  const timeLabelRef = useRef<HTMLSpanElement>(null)
+  const rafRef = useRef<number | null>(null)
+
+  const duration = currentTrack?.duration ?? 0
+
+  // 60fps continuous animation frame for seamless, smooth progression
+  useEffect(() => {
+    if (!isPlaying) {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+      return
+    }
+
+    let lastSec = -1
+
+    const loop = () => {
+      const howl = audioRef.current
+      if (howl && isPlaying && !isDraggingRef.current) {
+        const pos = howl.seek()
+        if (typeof pos === 'number' && !Number.isNaN(pos)) {
+          const clampedPos = duration > 0 ? Math.min(pos, duration) : pos
+          const pct = duration > 0 ? (clampedPos / duration) * 100 : 0
+
+          if (rangeInputRef.current) {
+            rangeInputRef.current.value = String(clampedPos)
+            rangeInputRef.current.style.setProperty('--progress-pct', `${pct}%`)
+          }
+
+          const currentSec = Math.floor(clampedPos)
+          if (currentSec !== lastSec) {
+            lastSec = currentSec
+            if (timeLabelRef.current) {
+              timeLabelRef.current.textContent = formatTime(clampedPos)
+            }
+          }
+        }
+      }
+      rafRef.current = requestAnimationFrame(loop)
+    }
+
+    rafRef.current = requestAnimationFrame(loop)
+
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
+  }, [isPlaying, audioRef, duration])
+
+  // Sync on track switch, pause, or external seek
+  useEffect(() => {
+    if (rangeInputRef.current && !isDraggingRef.current) {
+      const pct = duration > 0 ? (Math.min(seek, duration) / duration) * 100 : 0
+      rangeInputRef.current.value = String(seek)
+      rangeInputRef.current.style.setProperty('--progress-pct', `${pct}%`)
+    }
+    if (timeLabelRef.current && !isDraggingRef.current) {
+      timeLabelRef.current.textContent = formatTime(seek)
+    }
+  }, [seek, duration, currentTrack?.id])
+
   return (
     <footer className="player-bar">
       <div className="player-track">
@@ -1079,17 +1132,46 @@ function PlayerBar({
           </button>
         </div>
         <div className="progress-line">
-          <span>{formatTime(seek)}</span>
+          <span ref={timeLabelRef}>{formatTime(seek)}</span>
           <input
+            ref={rangeInputRef}
             type="range"
+            className="frosted-range"
             min="0"
-            max={Math.max(currentTrack?.duration ?? 0, 1)}
-            step="1"
-            value={Math.min(seek, currentTrack?.duration ?? 0)}
-            onChange={(event) => onSeek(Number(event.target.value))}
+            max={Math.max(duration, 1)}
+            step="any"
+            defaultValue={seek}
+            onPointerDown={() => {
+              isDraggingRef.current = true
+            }}
+            onInput={(event) => {
+              const val = Number(event.currentTarget.value)
+              const pct = duration > 0 ? (val / duration) * 100 : 0
+              if (rangeInputRef.current) {
+                rangeInputRef.current.style.setProperty('--progress-pct', `${pct}%`)
+              }
+              if (timeLabelRef.current) {
+                timeLabelRef.current.textContent = formatTime(val)
+              }
+            }}
+            onChange={(event) => {
+              const val = Number(event.target.value)
+              isDraggingRef.current = false
+              onSeek(val)
+            }}
+            onPointerUp={(event) => {
+              isDraggingRef.current = false
+              const val = Number(event.currentTarget.value)
+              onSeek(val)
+            }}
+            style={
+              {
+                '--progress-pct': `${duration > 0 ? (Math.min(seek, duration) / duration) * 100 : 0}%`,
+              } as CSSProperties
+            }
             aria-label="Playback progress"
           />
-          <span>{formatTime(currentTrack?.duration ?? 0)}</span>
+          <span>{formatTime(duration)}</span>
         </div>
       </div>
 
@@ -1097,11 +1179,17 @@ function PlayerBar({
         <Volume2 size={18} />
         <input
           type="range"
+          className="frosted-range"
           min="0"
           max="1"
-          step="0.01"
+          step="0.005"
           value={volume}
           onChange={(event) => onVolume(Number(event.target.value))}
+          style={
+            {
+              '--progress-pct': `${Math.max(0, Math.min(volume, 1)) * 100}%`,
+            } as CSSProperties
+          }
           aria-label="Volume"
         />
       </label>
