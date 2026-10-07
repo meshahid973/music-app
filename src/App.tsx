@@ -517,6 +517,35 @@ function App() {
               </motion.div>
             </AnimatePresence>
           </div>
+
+          <AnimatePresence mode="wait">
+            {currentTrack?.coverUrl && (
+              <motion.div
+                key={currentTrack.coverUrl}
+                className="hero-banner-cover-wrap"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+                aria-hidden="true"
+              >
+                <div className="hero-banner-ambient">
+                  <img
+                    src={currentTrack.coverUrl}
+                    alt=""
+                    className="hero-banner-ambient-img"
+                  />
+                </div>
+                <div className="hero-banner-cover">
+                  <img
+                    src={currentTrack.coverUrl}
+                    alt=""
+                    className="hero-banner-cover-img"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </section>
 
         <section className="library-tools">

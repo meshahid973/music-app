@@ -299,8 +299,97 @@ h3 {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
-.cover-stage {
-  perspective: 1200px;
+.hero-banner-cover-wrap {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: 28px;
+}
+
+.hero-banner-ambient {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  width: clamp(450px, 58%, 760px);
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.08) 12%,
+    rgba(0, 0, 0, 0.35) 28%,
+    rgba(0, 0, 0, 0.72) 48%,
+    #000 70%,
+    #000 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.08) 12%,
+    rgba(0, 0, 0, 0.35) 28%,
+    rgba(0, 0, 0, 0.72) 48%,
+    #000 70%,
+    #000 100%
+  );
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.hero-banner-ambient-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: right center;
+  filter: blur(28px) saturate(1.18);
+  opacity: 0.75;
+  transform: scale(1.08);
+  display: block;
+}
+
+.hero-banner-cover {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  pointer-events: none;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.08) 8%,
+    rgba(0, 0, 0, 0.3) 18%,
+    rgba(0, 0, 0, 0.7) 30%,
+    #000 42%,
+    #000 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.08) 8%,
+    rgba(0, 0, 0, 0.3) 18%,
+    rgba(0, 0, 0, 0.7) 30%,
+    #000 42%,
+    #000 100%
+  );
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.hero-banner-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .cover-stage {
@@ -308,6 +397,8 @@ h3 {
   display: flex;
   justify-content: center;
   align-items: center;
+  position: relative;
+  z-index: 2;
 }
 
 .cd-stage-motion {
@@ -689,6 +780,8 @@ h3 {
   flex-direction: column;
   justify-content: center;
   min-width: 0;
+  position: relative;
+  z-index: 2;
 }
 
 .hero-track-details {
@@ -1389,6 +1482,11 @@ input[type='range'] {
 
   .hero-player {
     grid-template-columns: 1fr;
+  }
+
+  .hero-banner-cover-wrap,
+  .hero-banner-cover {
+    display: none;
   }
 
   .cd-wrapper {
