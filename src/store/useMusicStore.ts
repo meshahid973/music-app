@@ -21,6 +21,7 @@ type MusicState = {
   toggleShuffle: () => void
   cycleRepeat: () => void
   setVolume: (volume: number) => void
+  updateTrack: (trackId: string, updates: Partial<Track>) => void
 }
 
 export const libraryId = 'library'
@@ -88,4 +89,10 @@ export const useMusicStore = create<MusicState>((set) => ({
       repeat: state.repeat === 'off' ? 'all' : state.repeat === 'all' ? 'one' : 'off',
     })),
   setVolume: (volume) => set({ volume }),
+  updateTrack: (trackId, updates) =>
+    set((state) => ({
+      tracks: state.tracks.map((track) =>
+        track.id === trackId ? { ...track, ...updates } : track,
+      ),
+    })),
 }))

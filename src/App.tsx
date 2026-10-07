@@ -1,11 +1,15 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Howl, Howler } from 'howler'
 import {
+  Check,
+  ChevronDown,
   Disc3,
   FileAudio,
   Heart,
+  Image as ImageIcon,
   ListMusic,
   Pause,
+  Pencil,
   Play,
   Plus,
   Repeat,
@@ -14,16 +18,17 @@ import {
   Shuffle,
   SkipBack,
   SkipForward,
-  Sparkles,
+  Trash2,
   Upload,
   Volume2,
+  X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, CSSProperties } from 'react'
+import type { ChangeEvent, CSSProperties, FormEvent } from 'react'
 import './App.css'
 import { favoritesId, libraryId, useMusicStore } from './store/useMusicStore'
 import type { Playlist, Track } from './types'
-import { buildCoverLookup, formatTime, tracksFromFiles } from './utils/library'
+import { buildCoverLookup, cleanDisplayTitle, formatTime, tracksFromFiles } from './utils/library'
 
 function App() {
   const audioRef = useRef<Howl | null>(null)
@@ -34,6 +39,7 @@ function App() {
   const [query, setQuery] = useState('')
   const [seek, setSeek] = useState(0)
   const [newPlaylistName, setNewPlaylistName] = useState('')
+  const [editingTrack, setEditingTrack] = useState<Track | null>(null)
   const {
     tracks,
     playlists,
@@ -53,6 +59,7 @@ function App() {
     toggleShuffle,
     cycleRepeat,
     setVolume,
+    updateTrack,
   } = useMusicStore()
 
   const activePlaylist = playlists.find((playlist) => playlist.id === activePlaylistId)
@@ -195,6 +202,14 @@ function App() {
     moveTrack(1)
   }
 
+  function handleTrackPlay(trackId: string) {
+    if (currentTrackId === trackId) {
+      setIsPlaying(!isPlaying)
+    } else {
+      setCurrentTrack(trackId)
+    }
+  }
+
   useEffect(() => {
     playNextRef.current = playNext
   })
@@ -259,39 +274,62 @@ function App() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentTrack?.id ?? 'empty'}
-                className="big-cover"
-                initial={{ opacity: 0, rotate: -4, scale: 0.94 }}
-                animate={{ opacity: 1, rotate: isPlaying ? 2 : 0, scale: 1 }}
-                exit={{ opacity: 0, rotate: 4, scale: 0.92 }}
-                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                className="cd-stage-motion"
+                initial={{ opacity: 0, scale: 0.93 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.93 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               >
-                {currentTrack?.coverUrl ? (
-                  <img src={currentTrack.coverUrl} alt={`${currentTrack.title} cover art`} />
-                ) : (
-                  <div className="generated-cover" style={{ '--cover-accent': currentTrack?.accent } as CSSProperties}>
-                    <Disc3 size={74} />
-                    <span>{currentTrack?.title.slice(0, 2) ?? 'LM'}</span>
-                  </div>
-                )}
+                <CdDisc
+                  track={currentTrack}
+                  isPlaying={isPlaying}
+                  onTogglePlay={togglePlay}
+                />
               </motion.div>
             </AnimatePresence>
           </motion.div>
 
           <div className="now-copy">
-            <p className="eyebrow">
-              <Sparkles size={15} />
-              Now playing
-            </p>
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentTrack?.id ?? 'no-track'}
-                initial={{ opacity: 0, y: 14 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -14 }}
-                transition={{ duration: 0.28 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.24 }}
+                className="hero-track-details"
               >
-                <h2>{currentTrack?.title ?? 'Drop in your first track'}</h2>
-                <p>{currentTrack ? `${currentTrack.artist} · ${currentTrack.album}` : 'Import songs, then add cover images with matching filenames.'}</p>
+                <h2 className="hero-track-title">
+                  {currentTrack ? cleanDisplayTitle(currentTrack.title) : 'Drop in your first track'}
+                </h2>
+                <div className="hero-track-sub">
+                  <p className="hero-track-meta">
+                    {currentTrack ? (
+                      <>
+                        <span className="hero-track-artist">{currentTrack.artist}</span>
+                        {currentTrack.album && (
+                          <>
+                            <span className="hero-meta-dot">·</span>
+                            <span className="hero-track-album">{currentTrack.album}</span>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      'Import songs, then add cover images or edit track details.'
+                    )}
+                  </p>
+                  {currentTrack && (
+                    <button
+                      type="button"
+                      className="hero-edit-btn"
+                      onClick={() => setEditingTrack(currentTrack)}
+                      title="Edit song title, artist, or cover art"
+                    >
+                      <Pencil size={13} />
+                      <span>Edit details</span>
+                    </button>
+                  )}
+                </div>
               </motion.div>
             </AnimatePresence>
           </div>
@@ -317,8 +355,9 @@ function App() {
           playlists={playlists}
           currentTrackId={currentTrackId}
           isPlaying={isPlaying}
-          onPlay={setCurrentTrack}
+          onPlay={handleTrackPlay}
           onAddToPlaylist={addTrackToPlaylist}
+          onEditTrack={setEditingTrack}
         />
       </section>
 
@@ -337,7 +376,93 @@ function App() {
         onRepeat={cycleRepeat}
         onVolume={setVolume}
       />
+
+      {editingTrack && (
+        <EditTrackModal
+          track={editingTrack}
+          isPlaying={isPlaying}
+          onClose={() => setEditingTrack(null)}
+          onSave={(updates) => updateTrack(editingTrack.id, updates)}
+        />
+      )}
     </main>
+  )
+}
+
+type CdDiscProps = {
+  track?: Track
+  isPlaying: boolean
+  onTogglePlay: () => void
+}
+
+function CdDisc({ track, isPlaying, onTogglePlay }: CdDiscProps) {
+  return (
+    <div
+      className="cd-wrapper"
+      onClick={onTogglePlay}
+      role="button"
+      tabIndex={0}
+      title={track ? `${isPlaying ? 'Pause' : 'Play'} - ${cleanDisplayTitle(track.title)}` : 'No track loaded'}
+      aria-label={track ? `${cleanDisplayTitle(track.title)} CD - ${isPlaying ? 'Pause' : 'Play'}` : 'CD player'}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onTogglePlay()
+        }
+      }}
+    >
+      {/* Platter glow underneath the CD */}
+      <div className={`cd-platter ${isPlaying ? 'active' : ''}`} />
+
+      {/* The physical rotating CD disc */}
+      <div className={`cd-disc ${isPlaying ? 'is-playing' : 'is-paused'}`}>
+        {/* Base reflective substrate */}
+        <div className="cd-base" />
+
+        {/* Cover Art Layer with circular CD mask */}
+        {track?.coverUrl ? (
+          <div className="cd-artwork-layer">
+            <img src={track.coverUrl} alt={`${track.title} cover art`} className="cd-artwork-img" />
+          </div>
+        ) : (
+          <div
+            className="cd-artwork-layer cd-generated-artwork"
+            style={{ '--cover-accent': track?.accent ?? 'var(--lime)' } as CSSProperties}
+          >
+            <div className="cd-generated-pattern" />
+            <div className="cd-generated-content">
+              <Disc3 size={36} className="cd-generated-icon" />
+              <strong className="cd-generated-title">{track ? cleanDisplayTitle(track.title) : 'No Track Selected'}</strong>
+              <span className="cd-generated-artist">{track?.artist ?? 'Resonance Audio'}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Concentric microgrooves & laser data tracks */}
+        <div className="cd-grooves" />
+
+        {/* Iridescent rainbow optical diffraction spectral sheen */}
+        <div className="cd-spectral-sheen" />
+
+        {/* Dynamic gloss reflection */}
+        <div className="cd-surface-glare" />
+
+        {/* Center Polycarbonate Clamping Hub (Clear plastic ring) */}
+        <div className="cd-hub-area">
+          <div className="cd-hub-mirror-band" />
+          <div className="cd-hub-text">
+            <span>COMPACT DISC DIGITAL AUDIO</span>
+          </div>
+          <div className="cd-hub-inner-ridge" />
+
+          {/* Authentic Center Spindle Hole (hole in the middle) */}
+          <div className="cd-center-hole" />
+        </div>
+
+        {/* Outer clear polycarbonate rim */}
+        <div className="cd-outer-rim" />
+      </div>
+    </div>
   )
 }
 
@@ -420,6 +545,7 @@ type TrackListProps = {
   isPlaying: boolean
   onPlay: (trackId: string) => void
   onAddToPlaylist: (playlistId: string, trackId: string) => void
+  onEditTrack: (track: Track) => void
 }
 
 function TrackList({
@@ -429,6 +555,7 @@ function TrackList({
   isPlaying,
   onPlay,
   onAddToPlaylist,
+  onEditTrack,
 }: TrackListProps) {
   if (tracks.length === 0) {
     return (
@@ -453,38 +580,128 @@ function TrackList({
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ delay: Math.min(index * 0.025, 0.18), duration: 0.28 }}
           >
-            <button className="track-play" type="button" onClick={() => onPlay(track.id)} aria-label={`Play ${track.title}`}>
+            <button
+              className="track-play"
+              type="button"
+              onClick={() => onPlay(track.id)}
+              aria-label={currentTrackId === track.id && isPlaying ? `Pause ${cleanDisplayTitle(track.title)}` : `Play ${cleanDisplayTitle(track.title)}`}
+            >
               {currentTrackId === track.id && isPlaying ? <Pause size={16} /> : <Play size={16} />}
             </button>
             <div className="mini-cover" style={{ '--cover-accent': track.accent } as CSSProperties}>
               {track.coverUrl ? <img src={track.coverUrl} alt="" /> : <Disc3 size={20} />}
             </div>
             <div className="track-meta">
-              <strong>{track.title}</strong>
+              <strong>{cleanDisplayTitle(track.title)}</strong>
               <span>{track.artist}</span>
             </div>
             <span className="track-album">{track.album}</span>
             <span className="track-time">{formatTime(track.duration)}</span>
-            <select
-              aria-label={`Add ${track.title} to playlist`}
-              defaultValue=""
-              onChange={(event) => {
-                if (!event.target.value) return
-                onAddToPlaylist(event.target.value, track.id)
-                event.target.value = ''
-              }}
+            <PlaylistDropdown
+              trackId={track.id}
+              trackTitle={cleanDisplayTitle(track.title)}
+              playlists={playlists}
+              onAddToPlaylist={onAddToPlaylist}
+            />
+            <button
+              type="button"
+              className="track-edit-btn"
+              onClick={() => onEditTrack(track)}
+              title={`Edit ${cleanDisplayTitle(track.title)} details & cover art`}
+              aria-label={`Edit ${cleanDisplayTitle(track.title)}`}
             >
-              <option value="">Add to</option>
-              {playlists.map((playlist) => (
-                <option key={playlist.id} value={playlist.id}>
-                  {playlist.name}
-                </option>
-              ))}
-            </select>
+              <Pencil size={15} />
+            </button>
           </motion.article>
         ))}
       </AnimatePresence>
     </motion.div>
+  )
+}
+
+type PlaylistDropdownProps = {
+  trackId: string
+  trackTitle: string
+  playlists: Playlist[]
+  onAddToPlaylist: (playlistId: string, trackId: string) => void
+}
+
+function PlaylistDropdown({
+  trackId,
+  trackTitle,
+  playlists,
+  onAddToPlaylist,
+}: PlaylistDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
+
+  function handleSelect(playlistId: string) {
+    onAddToPlaylist(playlistId, trackId)
+    setIsOpen(false)
+  }
+
+  return (
+    <div className="playlist-dropdown-wrapper" ref={dropdownRef}>
+      <button
+        type="button"
+        className={`playlist-dropdown-trigger ${isOpen ? 'active' : ''}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          setIsOpen(!isOpen)
+        }}
+        aria-haspopup="true"
+        aria-expanded={isOpen}
+        aria-label={`Add ${trackTitle} to playlist`}
+      >
+        <span>Add to</span>
+        <ChevronDown size={14} className={`dropdown-chevron ${isOpen ? 'open' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="playlist-menu" role="menu">
+          <div className="playlist-menu-header">Add to Playlist</div>
+          {playlists.map((playlist) => {
+            const isAlreadyIn = playlist.trackIds.includes(trackId)
+            return (
+              <button
+                key={playlist.id}
+                type="button"
+                className={`playlist-menu-item ${isAlreadyIn ? 'is-added' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleSelect(playlist.id)
+                }}
+                role="menuitem"
+              >
+                <div className="playlist-item-label">
+                  {playlist.id === favoritesId ? (
+                    <Heart size={14} className="playlist-icon heart" />
+                  ) : (
+                    <ListMusic size={14} className="playlist-icon" />
+                  )}
+                  <span>{playlist.name}</span>
+                </div>
+                {isAlreadyIn && <Check size={14} className="playlist-check" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -526,7 +743,7 @@ function PlayerBar({
           {currentTrack?.coverUrl ? <img src={currentTrack.coverUrl} alt="" /> : <Disc3 size={22} />}
         </div>
         <div>
-          <strong>{currentTrack?.title ?? 'No track selected'}</strong>
+          <strong>{currentTrack ? cleanDisplayTitle(currentTrack.title) : 'No track selected'}</strong>
           <span>{currentTrack?.artist ?? 'Choose a song to start'}</span>
         </div>
       </div>
@@ -598,6 +815,190 @@ function getVisibleTracks(
     [track.title, track.artist, track.album, track.fileName].some((value) =>
       value.toLowerCase().includes(normalizedQuery),
     ),
+  )
+}
+
+type EditTrackModalProps = {
+  track: Track
+  isPlaying: boolean
+  onClose: () => void
+  onSave: (updates: Partial<Track>) => void
+}
+
+function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackModalProps) {
+  const [title, setTitle] = useState(cleanDisplayTitle(track.title))
+  const [artist, setArtist] = useState(track.artist)
+  const [album, setAlbum] = useState(track.album)
+  const [coverUrl, setCoverUrl] = useState<string | undefined>(track.coverUrl)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string
+      setCoverUrl(dataUrl)
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ''
+  }
+
+  function handleRemoveCover() {
+    setCoverUrl(undefined)
+  }
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    onSave({
+      title: title.trim() || track.title,
+      artist: artist.trim() || track.artist,
+      album: album.trim() || track.album,
+      coverUrl,
+    })
+    onClose()
+  }
+
+  return (
+    <div
+      className="modal-backdrop"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-modal-title"
+    >
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <header className="modal-header">
+          <h3 id="edit-modal-title">Edit Track Details</h3>
+          <button
+            type="button"
+            className="modal-close-btn"
+            onClick={onClose}
+            aria-label="Close edit dialog"
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <form onSubmit={handleSubmit} className="modal-body">
+          {/* Cover Art Upload & CD Preview */}
+          <div className="cover-upload-section">
+            <div className="cover-preview-box">
+              {coverUrl ? (
+                <img src={coverUrl} alt="Cover preview" />
+              ) : (
+                <div className="cover-preview-empty">
+                  <ImageIcon size={26} />
+                  <span>No cover</span>
+                </div>
+              )}
+            </div>
+
+            <div className="cover-preview-cd">
+              <div
+                className={`cd-disc ${isPlaying ? 'is-playing' : 'is-paused'}`}
+                style={{ width: 84, height: 84 }}
+              >
+                <div className="cd-base" />
+                {coverUrl ? (
+                  <div className="cd-artwork-layer">
+                    <img src={coverUrl} alt="Cover CD preview" className="cd-artwork-img" />
+                  </div>
+                ) : (
+                  <div
+                    className="cd-artwork-layer cd-generated-artwork"
+                    style={{ '--cover-accent': track.accent } as CSSProperties}
+                  >
+                    <div className="cd-generated-pattern" />
+                    <Disc3 size={20} color="#0b0c0b" />
+                  </div>
+                )}
+                <div className="cd-grooves" />
+                <div className="cd-spectral-sheen" />
+                <div className="cd-surface-glare" />
+                <div className="cd-hub-area">
+                  <div className="cd-hub-inner-ridge" />
+                  <div className="cd-center-hole" />
+                </div>
+                <div className="cd-outer-rim" />
+              </div>
+            </div>
+
+            <div className="cover-upload-controls">
+              <p>Upload artwork to display on the spinning CD disc.</p>
+              <div className="cover-upload-actions">
+                <label className="upload-file-btn">
+                  <Upload size={14} />
+                  <span>{coverUrl ? 'Replace Art' : 'Upload Art'}</span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                  />
+                </label>
+                {coverUrl && (
+                  <button
+                    type="button"
+                    className="remove-cover-btn"
+                    onClick={handleRemoveCover}
+                    title="Remove custom artwork"
+                  >
+                    <Trash2 size={14} />
+                    <span>Remove</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="edit-title">Song Title</label>
+            <input
+              id="edit-title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Lover Is a Day"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="edit-artist">Artist</label>
+            <input
+              id="edit-artist"
+              type="text"
+              value={artist}
+              onChange={(e) => setArtist(e.target.value)}
+              placeholder="e.g. Cuco"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="edit-album">Album</label>
+            <input
+              id="edit-album"
+              type="text"
+              value={album}
+              onChange={(e) => setAlbum(e.target.value)}
+              placeholder="e.g. Local files"
+            />
+          </div>
+
+          <footer className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary">
+              Save Changes
+            </button>
+          </footer>
+        </form>
+      </div>
+    </div>
   )
 }
 

@@ -67,6 +67,20 @@ function getExtension(fileName: string) {
   return fileName.split('.').pop()?.toLowerCase() ?? ''
 }
 
+export function cleanDisplayTitle(raw: string): string {
+  if (!raw) return ''
+  return raw
+    .replace(/\s*\(\s*(?:official\s*(?:video|audio|music\s*video|lyric\s*video)|audio|video|lyrics?|remastered|hq|hd)\s*\)/gi, '')
+    .replace(/\s*\[\s*(?:official\s*(?:video|audio|music\s*video|lyric\s*video)|audio|video|lyrics?|remastered|hq|hd|\d+\s*k?bps)\s*\]/gi, '')
+    .replace(/\s*-\s*\(\s*\d+\s*k?bps\s*\)/gi, '')
+    .replace(/\s*\(\s*\d+\s*k?bps\s*\)/gi, '')
+    .replace(/\s*-\s*\d+\s*k?bps\s*$/gi, '')
+    .replace(/\s+\d+\s*k?bps\s*$/gi, '')
+    .replace(/\s*[-–—]\s*$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 function normalizeName(fileName: string) {
   return fileName
     .replace(/\.[^/.]+$/, '')
@@ -83,14 +97,14 @@ function parseTrackName(fileName: string) {
   if (rest.length > 0) {
     return {
       artist: maybeArtist.trim(),
-      title: rest.join(' - ').trim(),
+      title: cleanDisplayTitle(rest.join(' - ')),
       album: 'Local files',
     }
   }
 
   return {
     artist: 'Unknown artist',
-    title: cleanName.trim(),
+    title: cleanDisplayTitle(cleanName),
     album: 'Local files',
   }
 }
