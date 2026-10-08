@@ -1,32 +1,33 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Howl, Howler } from 'howler'
-import {
-  Check,
-  ChevronDown,
-  Disc3,
-  FolderOpen,
-  FolderPlus,
-  Heart,
-  Image as ImageIcon,
-  ListMusic,
-  Pause,
-  Pencil,
-  Play,
-  Plus,
-  Repeat,
-  Repeat1,
-  Search,
-  Shuffle,
-  SkipBack,
-  SkipForward,
-  Trash2,
-  Upload,
-  Volume2,
-  X,
-} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, FormEvent } from 'react'
 import './App.css'
+import {
+  AudioLinesFilled,
+  CheckFilled,
+  ChevronDownFilled,
+  DiscFilled,
+  FolderImageFilled,
+  FolderMusicFilled,
+  HeartFilled,
+  ImageFilled,
+  PauseFilled,
+  PencilFilled,
+  PlayFilled,
+  PlaylistFilled,
+  PlusFilled,
+  RepeatFilled,
+  RepeatOneFilled,
+  SearchFilled,
+  ShuffleFilled,
+  SkipBackFilled,
+  SkipForwardFilled,
+  TrashFilled,
+  UploadFilled,
+  VolumeFilled,
+  CloseFilled,
+} from './components/icons'
 import { favoritesId, libraryId, useMusicStore } from './store/useMusicStore'
 import type { Playlist, Track } from './types'
 import {
@@ -427,7 +428,7 @@ function App() {
                       onClick={() => setPlaylistToRename(activePlaylist)}
                       title={`Rename playlist "${activePlaylist.name}"`}
                     >
-                      <Pencil size={14} />
+                      <PencilFilled size={14} />
                       <span>Rename</span>
                     </button>
                     <button
@@ -436,7 +437,7 @@ function App() {
                       onClick={() => setPlaylistToDelete(activePlaylist)}
                       title={`Delete playlist "${activePlaylist.name}"`}
                     >
-                      <Trash2 size={14} />
+                      <TrashFilled size={14} />
                       <span>Delete</span>
                     </button>
                   </div>
@@ -547,7 +548,7 @@ function App() {
 
         <section className="library-tools">
           <label className="search-box">
-            <Search size={18} />
+            <SearchFilled size={18} />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -662,7 +663,7 @@ function CdDisc({ track, isPlaying, onTogglePlay }: CdDiscProps) {
           >
             <div className="cd-generated-pattern" />
             <div className="cd-generated-content">
-              <Disc3 size={36} className="cd-generated-icon" />
+              <DiscFilled size={36} className="cd-generated-icon" />
               <strong className="cd-generated-title">{track ? cleanDisplayTitle(track.title) : 'No Track Selected'}</strong>
               <span className="cd-generated-artist">{track?.artist ?? 'Resonance Audio'}</span>
             </div>
@@ -730,7 +731,7 @@ function Sidebar({
     <aside className="sidebar">
       <div className="brand">
         <div className="brand-mark">
-          <ListMusic size={22} />
+          <AudioLinesFilled size={22} />
         </div>
         <div>
           <strong>Resonance</strong>
@@ -744,7 +745,7 @@ function Sidebar({
           type="button"
           onClick={() => onSelect(libraryId)}
         >
-          <Disc3 size={18} />
+          <DiscFilled size={18} />
           <span>All Songs</span>
           <em>{tracks.length}</em>
         </button>
@@ -762,7 +763,7 @@ function Sidebar({
               }
             }}
           >
-            {playlist.id === favoritesId ? <Heart size={18} /> : <ListMusic size={18} />}
+            {playlist.id === favoritesId ? <HeartFilled size={18} /> : <PlaylistFilled size={18} />}
             <span className="nav-playlist-name">{playlist.name}</span>
             <em>{playlist.trackIds.length}</em>
             <div className="nav-item-actions">
@@ -776,7 +777,7 @@ function Sidebar({
                   onRenamePlaylist(playlist)
                 }}
               >
-                <Pencil size={13} />
+                <PencilFilled size={13} />
               </button>
               <button
                 type="button"
@@ -788,7 +789,7 @@ function Sidebar({
                   onDeletePlaylist(playlist)
                 }}
               >
-                <Trash2 size={13} />
+                <TrashFilled size={13} />
               </button>
             </div>
           </div>
@@ -800,7 +801,7 @@ function Sidebar({
             onCreate()
           }}
         >
-          <ListMusic size={18} className="playlist-form-icon" />
+          <PlaylistFilled size={18} className="playlist-form-icon" />
           <input
             value={playlistName}
             onChange={(event) => setPlaylistName(event.target.value)}
@@ -813,18 +814,18 @@ function Sidebar({
             className="playlist-add-btn"
             title="Create playlist"
           >
-            <Plus size={15} strokeWidth={2.5} />
+            <PlusFilled size={14} />
           </button>
         </form>
 
         <label className="nav-item import-nav-item" title="Manually select audio files (current mode)">
-          <Upload size={18} />
+          <UploadFilled size={18} />
           <span>Add songs</span>
           <input type="file" accept="audio/*" multiple onChange={onAddSongs} />
         </label>
 
         <label className="nav-item import-nav-item" title="Import an entire music folder">
-          <FolderPlus size={18} />
+          <FolderMusicFilled size={18} />
           <span>Music folder</span>
           <input
             type="file"
@@ -835,7 +836,7 @@ function Sidebar({
         </label>
 
         <label className="nav-item import-nav-item" title="Import a folder of cover artwork">
-          <FolderOpen size={18} />
+          <FolderImageFilled size={18} />
           <span>Cover folder</span>
           <input
             type="file"
@@ -883,20 +884,20 @@ function TrackList({
   if (tracks.length === 0) {
     return (
       <motion.div className="empty-state" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-        <Disc3 size={42} />
+        <DiscFilled size={42} />
         <h3>Your library is waiting</h3>
         <p>Add songs manually or import an entire music folder. Covers will automatically be applied to songs in your library.</p>
         <div className="empty-state-actions">
           {onAddSongs && (
             <label className="empty-state-btn" title="Manually select audio files">
-              <Upload size={15} />
+              <UploadFilled size={15} />
               <span>Add songs</span>
               <input type="file" accept="audio/*" multiple onChange={onAddSongs} />
             </label>
           )}
           {onAddMusicFolder && (
             <label className="empty-state-btn" title="Import an entire music folder">
-              <FolderPlus size={15} />
+              <FolderMusicFilled size={15} />
               <span>Music folder</span>
               <input
                 type="file"
@@ -908,7 +909,7 @@ function TrackList({
           )}
           {onAddCoverFolder && (
             <label className="empty-state-btn subtle" title="Import a folder of cover artwork">
-              <FolderOpen size={15} />
+              <FolderImageFilled size={15} />
               <span>Cover folder</span>
               <input
                 type="file"
@@ -963,13 +964,13 @@ function TrackList({
               aria-label={currentTrackId === track.id && isPlaying ? 'Pause' : 'Play'}
             >
               {currentTrackId === track.id && isPlaying ? (
-                <Pause size={18} fill="currentColor" />
+                <PauseFilled size={18} />
               ) : (
-                <Play size={18} fill="currentColor" />
+                <PlayFilled size={18} />
               )}
             </button>
             <div className="mini-cover" style={{ '--cover-accent': track.accent } as CSSProperties}>
-              {track.coverUrl ? <img src={track.coverUrl} alt="" /> : <Disc3 size={20} />}
+              {track.coverUrl ? <img src={track.coverUrl} alt="" /> : <DiscFilled size={20} />}
             </div>
             <div className="track-meta">
               <strong>{cleanDisplayTitle(track.title)}</strong>
@@ -995,7 +996,7 @@ function TrackList({
                 title={`Rename or edit details for ${cleanDisplayTitle(track.title)}`}
                 aria-label={`Edit ${cleanDisplayTitle(track.title)}`}
               >
-                <Pencil size={15} />
+                <PencilFilled size={15} />
               </button>
               {activePlaylistId !== libraryId && (
                 <button
@@ -1008,7 +1009,7 @@ function TrackList({
                   title={`Remove "${cleanDisplayTitle(track.title)}" from ${activePlaylist?.name ?? 'playlist'}`}
                   aria-label={`Remove "${cleanDisplayTitle(track.title)}" from ${activePlaylist?.name ?? 'playlist'}`}
                 >
-                  <X size={15} />
+                  <CloseFilled size={15} />
                 </button>
               )}
             </div>
@@ -1073,7 +1074,7 @@ function PlaylistDropdown({
         aria-label={`Manage playlists for ${trackTitle}`}
       >
         <span>Add to</span>
-        <ChevronDown size={14} className={`dropdown-chevron ${isOpen ? 'open' : ''}`} />
+        <ChevronDownFilled size={14} className={`dropdown-chevron ${isOpen ? 'open' : ''}`} />
       </button>
 
       {isOpen && (
@@ -1095,13 +1096,13 @@ function PlaylistDropdown({
               >
                 <div className="playlist-item-label">
                   {playlist.id === favoritesId ? (
-                    <Heart size={14} className="playlist-icon heart" />
+                    <HeartFilled size={14} className="playlist-icon heart" />
                   ) : (
-                    <ListMusic size={14} className="playlist-icon" />
+                    <PlaylistFilled size={14} className="playlist-icon" />
                   )}
                   <span>{playlist.name}</span>
                 </div>
-                {isAlreadyIn && <Check size={14} className="playlist-check" />}
+                {isAlreadyIn && <CheckFilled size={14} className="playlist-check" />}
               </button>
             )
           })}
@@ -1214,7 +1215,7 @@ function PlayerBar({
     <footer className="player-bar">
       <div className="player-track">
         <div className="mini-cover large" style={{ '--cover-accent': currentTrack?.accent } as CSSProperties}>
-          {currentTrack?.coverUrl ? <img src={currentTrack.coverUrl} alt="" /> : <Disc3 size={22} />}
+          {currentTrack?.coverUrl ? <img src={currentTrack.coverUrl} alt="" /> : <DiscFilled size={22} />}
         </div>
         <div>
           <strong>{currentTrack ? cleanDisplayTitle(currentTrack.title) : 'No track selected'}</strong>
@@ -1225,19 +1226,19 @@ function PlayerBar({
       <div className="transport">
         <div className="transport-buttons">
           <button className={shuffle ? 'control active' : 'control'} type="button" onClick={onShuffle} aria-label="Toggle shuffle">
-            <Shuffle size={18} />
+            <ShuffleFilled size={18} />
           </button>
           <button className="control" type="button" onClick={onPrevious} aria-label="Previous track">
-            <SkipBack size={20} fill="currentColor" />
+            <SkipBackFilled size={20} />
           </button>
           <button className="play-button" type="button" onClick={onTogglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}>
-            {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
+            {isPlaying ? <PauseFilled size={24} /> : <PlayFilled size={24} />}
           </button>
           <button className="control" type="button" onClick={onNext} aria-label="Next track">
-            <SkipForward size={20} fill="currentColor" />
+            <SkipForwardFilled size={20} />
           </button>
           <button className={repeat !== 'off' ? 'control active' : 'control'} type="button" onClick={onRepeat} aria-label="Cycle repeat mode">
-            {repeat === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
+            {repeat === 'one' ? <RepeatOneFilled size={18} /> : <RepeatFilled size={18} />}
           </button>
         </div>
         <div className="progress-line">
@@ -1285,7 +1286,7 @@ function PlayerBar({
       </div>
 
       <label className="volume">
-        <Volume2 size={18} />
+        <VolumeFilled size={18} />
         <input
           type="range"
           className="frosted-range"
@@ -1386,7 +1387,7 @@ function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackModalPro
             onClick={onClose}
             aria-label="Close edit dialog"
           >
-            <X size={18} />
+            <CloseFilled size={18} />
           </button>
         </header>
 
@@ -1398,7 +1399,7 @@ function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackModalPro
                 <img src={coverUrl} alt="Cover preview" />
               ) : (
                 <div className="cover-preview-empty">
-                  <ImageIcon size={26} />
+                  <ImageFilled size={26} />
                   <span>No cover</span>
                 </div>
               )}
@@ -1420,7 +1421,7 @@ function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackModalPro
                     style={{ '--cover-accent': track.accent } as CSSProperties}
                   >
                     <div className="cd-generated-pattern" />
-                    <Disc3 size={20} color="#0b0c0b" />
+                    <DiscFilled size={20} color="#0b0c0b" />
                   </div>
                 )}
                 <div className="cd-grooves" />
@@ -1438,7 +1439,7 @@ function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackModalPro
               <p>Upload artwork to display on the spinning CD disc.</p>
               <div className="cover-upload-actions">
                 <label className="upload-file-btn">
-                  <Upload size={14} />
+                  <UploadFilled size={14} />
                   <span>{coverUrl ? 'Replace Art' : 'Upload Art'}</span>
                   <input
                     ref={fileInputRef}
@@ -1454,7 +1455,7 @@ function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackModalPro
                     onClick={handleRemoveCover}
                     title="Remove custom artwork"
                   >
-                    <Trash2 size={14} />
+                    <TrashFilled size={14} />
                     <span>Remove</span>
                   </button>
                 )}
@@ -1540,7 +1541,7 @@ function DeletePlaylistModal({ playlist, onClose, onConfirm }: DeletePlaylistMod
         <header className="modal-header">
           <div className="delete-modal-title-group">
             <div className="delete-modal-icon-badge">
-              <Trash2 size={18} />
+              <TrashFilled size={18} />
             </div>
             <div>
               <h3 id="delete-playlist-title">Delete Playlist</h3>
@@ -1553,7 +1554,7 @@ function DeletePlaylistModal({ playlist, onClose, onConfirm }: DeletePlaylistMod
             onClick={onClose}
             aria-label="Close dialog"
           >
-            <X size={18} />
+            <CloseFilled size={18} />
           </button>
         </header>
 
@@ -1579,7 +1580,7 @@ function DeletePlaylistModal({ playlist, onClose, onConfirm }: DeletePlaylistMod
             }}
             autoFocus
           >
-            <Trash2 size={15} />
+            <TrashFilled size={15} />
             <span>Delete playlist</span>
           </button>
         </footer>
@@ -1634,7 +1635,7 @@ function RenamePlaylistModal({ playlist, onClose, onSave }: RenamePlaylistModalP
         <header className="modal-header">
           <div className="delete-modal-title-group">
             <div className="rename-modal-icon-badge">
-              <Pencil size={18} />
+              <PencilFilled size={18} />
             </div>
             <div>
               <h3 id="rename-playlist-title">Rename Playlist</h3>
@@ -1647,7 +1648,7 @@ function RenamePlaylistModal({ playlist, onClose, onSave }: RenamePlaylistModalP
             onClick={onClose}
             aria-label="Close dialog"
           >
-            <X size={18} />
+            <CloseFilled size={18} />
           </button>
         </header>
 

@@ -431,8 +431,10 @@ function colorFromString(value: string) {
     hash = value.charCodeAt(index) + ((hash << 5) - hash)
   }
 
-  const hue = Math.abs(hash) % 360
-  return `hsl(${hue} 74% 58%)`
+  // Generate subtle, refined neutral palette (slate, graphite, champagne, silver, mist, warm stone)
+  const neutralHues = [215, 220, 225, 200, 240, 210, 35, 45, 195]
+  const hue = neutralHues[Math.abs(hash) % neutralHues.length]
+  return `hsl(${hue} 14% 62%)`
 }
 
 const colorCache = new Map<string, { r: number; g: number; b: number; css: string }>()

@@ -1,16 +1,18 @@
 .app-shell {
-  --bg: #080909;
-  --panel: #151716;
-  --panel-strong: #20231f;
-  --panel-soft: #242722;
-  --line: #30352f;
-  --line-strong: #50584e;
-  --text: #f7f3ea;
-  --muted: #a6aaa5;
-  --faint: #696e69;
-  --lime: #c8ff5f;
-  --coral: #ff8a66;
-  --cyan: #72e8ff;
+  --bg: #090a0a;
+  --panel: #141516;
+  --panel-strong: #1e2022;
+  --panel-soft: #232528;
+  --line: #2d3034;
+  --line-strong: #454950;
+  --text: #f4f5f6;
+  --muted: #a3a8b0;
+  --faint: #676c75;
+  --lime: #e6eaee;
+  --neutral-accent: #f2f4f7;
+  --neutral-accent-dim: #d1d5db;
+  --coral: #f87171;
+  --cyan: #94a3b8;
   min-height: 100vh;
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
@@ -1563,8 +1565,8 @@ h3 {
 }
 
 .control.active {
-  color: #101110;
-  background: var(--cyan);
+  color: #0b0c0e;
+  background: var(--neutral-accent);
 }
 
 .play-button {
@@ -1604,8 +1606,8 @@ input[type='range'],
   cursor: pointer;
   background: linear-gradient(
     to right,
-    var(--lime, #daff63) 0%,
-    var(--lime, #daff63) var(--progress-pct, 0%),
+    var(--neutral-accent, #f4f5f6) 0%,
+    var(--neutral-accent, #f4f5f6) var(--progress-pct, 0%),
     rgba(255, 255, 255, 0.12) var(--progress-pct, 0%),
     rgba(255, 255, 255, 0.12) 100%
   );
@@ -1627,7 +1629,7 @@ input[type='range']:hover,
   border-color: rgba(255, 255, 255, 0.26);
   box-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.4),
-    0 0 12px rgba(218, 255, 99, 0.18);
+    0 0 12px rgba(244, 245, 246, 0.18);
 }
 
 input[type='range']::-webkit-slider-thumb,
@@ -1665,7 +1667,7 @@ input[type='range']::-moz-range-progress,
 .frosted-range::-moz-range-progress {
   height: 8px;
   border-radius: 999px;
-  background: var(--lime, #daff63);
+  background: var(--neutral-accent, #f4f5f6);
 }
 
 input[type='range']::-moz-range-thumb,
@@ -1896,9 +1898,9 @@ input[type='range']::-moz-range-thumb,
 }
 
 .nav-action-btn.edit:hover {
-  color: var(--lime);
-  background: rgba(218, 255, 99, 0.16);
-  border-color: rgba(218, 255, 99, 0.38);
+  color: var(--neutral-accent);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
   transform: scale(1.12);
 }
 
@@ -1953,9 +1955,9 @@ input[type='range']::-moz-range-thumb,
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: rgba(218, 255, 99, 0.15);
-  color: var(--lime);
-  border: 1px solid rgba(218, 255, 99, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--neutral-accent);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   flex-shrink: 0;
 }
 
