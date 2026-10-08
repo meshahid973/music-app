@@ -333,7 +333,15 @@ function App() {
   }
 
   function playPrevious() { moveTrack(-1) }
-  function playNext(automatic = false) { moveTrack(1, automatic) }
+  function playNext(automatic = false) {
+    if (automatic && repeat === 'one') {
+      audioRef.current?.seek(0)
+      audioRef.current?.play()
+      startProgress()
+      return
+    }
+    moveTrack(1, automatic)
+  }
 
   function handleTrackPlay(trackId: string) {
     if (currentTrackId === trackId) {

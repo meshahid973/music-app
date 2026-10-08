@@ -1,4 +1,4 @@
-import { objectUrlForBlob } from './objectUrls'
+import { objectUrlForBlob } from './objectUrls.ts'
 
 /**
  * Ultra-lightweight audio metadata extractor and smart filename parser.
@@ -145,9 +145,8 @@ export function detectSongAndArtist(rawFileNameOrTitle: string): {
 }
 
 /**
- * Ultra-lightweight native ID3v2 reader.
- * Reads only the first 64KB of the audio file in pure JS, extracting TIT2, TPE1, TALB, and APIC cover.
- * Takes ~1ms, zero npm packages.
+ * Bounded ID3v2.2–2.4 reader with support for title, artist, album, and cover-art frames.
+ * Reads only the tag (up to 4MB) and does not load the audio stream.
  */
 export async function readID3Metadata(file: File): Promise<{
   title?: string

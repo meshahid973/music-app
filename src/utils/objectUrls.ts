@@ -1,4 +1,4 @@
-import { trackIdForFile } from './trackIdentity'
+import { trackIdForFile } from './trackIdentity.ts'
 
 const cachedFileUrls = new Map<string, string>()
 const ownedUrls = new Set<string>()

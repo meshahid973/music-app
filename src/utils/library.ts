@@ -1,7 +1,7 @@
 import type { CoverLookup, Track } from '../types'
-import { autoDetectTrackMetadata, cleanMusicString, detectSongAndArtist } from './metadata'
-import { objectUrlForFile } from './objectUrls'
-import { trackIdForFile } from './trackIdentity'
+import { autoDetectTrackMetadata, cleanMusicString, detectSongAndArtist } from './metadata.ts'
+import { objectUrlForFile } from './objectUrls.ts'
+import { trackIdForFile } from './trackIdentity.ts'
 
 const audioExtensions = new Set(['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'opus', 'webm', 'wma', 'alac', 'aiff'])
 const coverExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'avif', 'bmp', 'gif', 'svg'])

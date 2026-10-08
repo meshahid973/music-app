@@ -1,32 +1,37 @@
-# React + TypeScript + Vite
+# Resonance Music Player
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A local-first browser music player built with React 19, TypeScript, Vite, Zustand, Howler.js and Framer Motion.
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Install Node.js 22.12 or later (Node.js 24 LTS recommended) and npm.
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+git clone https://github.com/todouro/music-app.git
+cd music-app
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Open http://localhost:3000. The Vite server is localhost-only by default; to test from another device on a trusted network, explicitly opt in with `npm run dev -- --host 0.0.0.0` and configure allowed hosts deliberately.
+
+```bash
+npm test
+npm run lint
+npm run build
+npm run preview
+```
+
+## Using Resonance
+
+Import local audio files from **Add songs** or choose a **Music folder**. The app extracts supported ID3 tags and can match album art by filename or folder. Add tracks to playlists and Favorites, search your library, and use the player controls to shuffle or repeat songs.
+
+Playlists and player preferences are stored in your browser's localStorage. **For privacy and browser-security reasons, audio files themselves are not persisted or uploaded.** After refreshing, re-import the same local files to restore playable tracks and associate them with saved playlists. Music stays on your device.
+
+Some audio extensions may be recognized but cannot play if the browser lacks a suitable decoder. There is no backend, cloud sync, or account system.
+
+## Contributing
+
+Please work on a feature branch and submit a focused pull request to the upstream project. Run `npm test`, `npm run lint`, and `npm run build` before proposing changes. Test keyboard and pointer operation when modifying playback UI.
+
+The elastic volume control is an adaptation of the [React Bits Elastic Slider](https://reactbits.dev/components/elastic-slider), implemented with the existing Framer Motion dependency and a native accessible range input.
