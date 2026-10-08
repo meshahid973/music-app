@@ -5,6 +5,7 @@ import {
   ChevronDown,
   Disc3,
   FolderOpen,
+  FolderPlus,
   Heart,
   Image as ImageIcon,
   ListMusic,
@@ -237,15 +238,45 @@ function App() {
 
     // If cover files were selected together with music files, add them to the pool
     const coverFiles = files.filter(isCoverFile)
-    let coverLookup = new Map<string, string>()
+    const storeLookup = useMusicStore.getState().coverLookup
+    const combinedLookup = new Map(storeLookup)
+
     if (coverFiles.length > 0) {
       const { lookup, urls } = extractCovers(coverFiles)
-      coverLookup = lookup
+      for (const [k, v] of lookup.entries()) {
+        combinedLookup.set(k, v)
+      }
       addCovers(lookup, urls)
     }
 
-    const parsedTracks = await tracksFromFiles(files, coverLookup)
-    addTracks(parsedTracks)
+    const parsedTracks = await tracksFromFiles(files, combinedLookup)
+    if (parsedTracks.length > 0) {
+      addTracks(parsedTracks)
+    }
+    event.target.value = ''
+  }
+
+  async function handleMusicFolder(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? [])
+    if (files.length === 0) return
+
+    // If cover files were found inside the music folder (or album subdirectories), add them to the pool
+    const coverFiles = files.filter(isCoverFile)
+    const storeLookup = useMusicStore.getState().coverLookup
+    const combinedLookup = new Map(storeLookup)
+
+    if (coverFiles.length > 0) {
+      const { lookup, urls } = extractCovers(coverFiles)
+      for (const [k, v] of lookup.entries()) {
+        combinedLookup.set(k, v)
+      }
+      addCovers(lookup, urls)
+    }
+
+    const parsedTracks = await tracksFromFiles(files, combinedLookup)
+    if (parsedTracks.length > 0) {
+      addTracks(parsedTracks)
+    }
     event.target.value = ''
   }
 
@@ -266,16 +297,19 @@ function App() {
 
     const coverFiles = files.filter(isCoverFile)
     const audioFiles = files.filter(isAudioFile)
+    const storeLookup = useMusicStore.getState().coverLookup
+    const combinedLookup = new Map(storeLookup)
 
-    let coverLookup = new Map<string, string>()
     if (coverFiles.length > 0) {
       const { lookup, urls } = extractCovers(coverFiles)
-      coverLookup = lookup
+      for (const [k, v] of lookup.entries()) {
+        combinedLookup.set(k, v)
+      }
       addCovers(lookup, urls)
     }
 
     if (audioFiles.length > 0) {
-      const parsedTracks = await tracksFromFiles(audioFiles, coverLookup)
+      const parsedTracks = await tracksFromFiles(audioFiles, combinedLookup)
       addTracks(parsedTracks)
     }
   }
@@ -368,37 +402,47 @@ function App() {
         playlistName={newPlaylistName}
         setPlaylistName={setNewPlaylistName}
         onAddSongs={handleMusicFiles}
+        onAddMusicFolder={handleMusicFolder}
         onAddCoverFolder={handleCoverFolder}
       />
 
       <section className="content">
         <header className="topbar">
           <div>
-            <div className="topbar-title-row">
-              <h1>{activePlaylist?.name ?? 'Your Library'}</h1>
-              {activePlaylist && (
-                <div className="playlist-header-actions">
-                  <button
-                    type="button"
-                    className="edit-playlist-header-btn"
-                    onClick={() => setPlaylistToRename(activePlaylist)}
-                    title={`Rename playlist "${activePlaylist.name}"`}
-                  >
-                    <Pencil size={14} />
-                    <span>Rename</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="delete-playlist-header-btn"
-                    onClick={() => setPlaylistToDelete(activePlaylist)}
-                    title={`Delete playlist "${activePlaylist.name}"`}
-                  >
-                    <Trash2 size={14} />
-                    <span>Delete</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={activePlaylistId}
+                className="topbar-title-row"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2, ease: [0.25, 1, 0.5, 1] }}
+              >
+                <h1>{activePlaylist?.name ?? 'Your Library'}</h1>
+                {activePlaylist && (
+                  <div className="playlist-header-actions">
+                    <button
+                      type="button"
+                      className="edit-playlist-header-btn"
+                      onClick={() => setPlaylistToRename(activePlaylist)}
+                      title={`Rename playlist "${activePlaylist.name}"`}
+                    >
+                      <Pencil size={14} />
+                      <span>Rename</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="delete-playlist-header-btn"
+                      onClick={() => setPlaylistToDelete(activePlaylist)}
+                      title={`Delete playlist "${activePlaylist.name}"`}
+                    >
+                      <Trash2 size={14} />
+                      <span>Delete</span>
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </header>
 
@@ -528,6 +572,9 @@ function App() {
           onAddToPlaylist={addTrackToPlaylist}
           onRemoveFromPlaylist={removeTrackFromPlaylist}
           onEditTrack={setEditingTrack}
+          onAddSongs={handleMusicFiles}
+          onAddMusicFolder={handleMusicFolder}
+          onAddCoverFolder={handleCoverFolder}
         />
       </section>
 
@@ -661,6 +708,7 @@ type SidebarProps = {
   onRenamePlaylist: (playlist: Playlist) => void
   onDeletePlaylist: (playlist: Playlist) => void
   onAddSongs: (e: ChangeEvent<HTMLInputElement>) => void
+  onAddMusicFolder: (e: ChangeEvent<HTMLInputElement>) => void
   onAddCoverFolder: (e: ChangeEvent<HTMLInputElement>) => void
 }
 
@@ -675,6 +723,7 @@ function Sidebar({
   onRenamePlaylist,
   onDeletePlaylist,
   onAddSongs,
+  onAddMusicFolder,
   onAddCoverFolder,
 }: SidebarProps) {
   return (
@@ -768,10 +817,21 @@ function Sidebar({
           </button>
         </form>
 
-        <label className="nav-item import-nav-item" title="Import audio files into your library">
+        <label className="nav-item import-nav-item" title="Manually select audio files (current mode)">
           <Upload size={18} />
           <span>Add songs</span>
           <input type="file" accept="audio/*" multiple onChange={onAddSongs} />
+        </label>
+
+        <label className="nav-item import-nav-item" title="Import an entire music folder">
+          <FolderPlus size={18} />
+          <span>Music folder</span>
+          <input
+            type="file"
+            multiple
+            onChange={onAddMusicFolder}
+            {...{ webkitdirectory: '', directory: '' }}
+          />
         </label>
 
         <label className="nav-item import-nav-item" title="Import a folder of cover artwork">
@@ -800,6 +860,9 @@ type TrackListProps = {
   onAddToPlaylist: (playlistId: string, trackId: string) => void
   onRemoveFromPlaylist: (playlistId: string, trackId: string) => void
   onEditTrack: (track: Track) => void
+  onAddSongs?: (e: ChangeEvent<HTMLInputElement>) => void
+  onAddMusicFolder?: (e: ChangeEvent<HTMLInputElement>) => void
+  onAddCoverFolder?: (e: ChangeEvent<HTMLInputElement>) => void
 }
 
 function TrackList({
@@ -813,29 +876,70 @@ function TrackList({
   onAddToPlaylist,
   onRemoveFromPlaylist,
   onEditTrack,
+  onAddSongs,
+  onAddMusicFolder,
+  onAddCoverFolder,
 }: TrackListProps) {
   if (tracks.length === 0) {
     return (
       <motion.div className="empty-state" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
         <Disc3 size={42} />
         <h3>Your library is waiting</h3>
-        <p>Add music files, then add a cover folder. Covers will automatically be applied to songs in your library.</p>
+        <p>Add songs manually or import an entire music folder. Covers will automatically be applied to songs in your library.</p>
+        <div className="empty-state-actions">
+          {onAddSongs && (
+            <label className="empty-state-btn" title="Manually select audio files">
+              <Upload size={15} />
+              <span>Add songs</span>
+              <input type="file" accept="audio/*" multiple onChange={onAddSongs} />
+            </label>
+          )}
+          {onAddMusicFolder && (
+            <label className="empty-state-btn" title="Import an entire music folder">
+              <FolderPlus size={15} />
+              <span>Music folder</span>
+              <input
+                type="file"
+                multiple
+                onChange={onAddMusicFolder}
+                {...{ webkitdirectory: '', directory: '' }}
+              />
+            </label>
+          )}
+          {onAddCoverFolder && (
+            <label className="empty-state-btn subtle" title="Import a folder of cover artwork">
+              <FolderOpen size={15} />
+              <span>Cover folder</span>
+              <input
+                type="file"
+                multiple
+                onChange={onAddCoverFolder}
+                {...{ webkitdirectory: '', directory: '' }}
+              />
+            </label>
+          )}
+        </div>
       </motion.div>
     )
   }
 
   return (
-    <motion.div className="track-list" layout>
-      <AnimatePresence initial={false}>
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={activePlaylistId}
+        className="track-list"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      >
         {tracks.map((track, index) => (
           <motion.article
             className={currentTrackId === track.id ? 'track-row active' : 'track-row'}
             key={track.id}
-            layout
-            initial={{ opacity: 0, y: 18 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ delay: Math.min(index * 0.025, 0.18), duration: 0.28 }}
+            transition={{ delay: Math.min(index * 0.018, 0.14), duration: 0.22, ease: 'easeOut' }}
             onClick={() => onPlay(track.id)}
             role="button"
             tabIndex={0}
@@ -910,8 +1014,8 @@ function TrackList({
             </div>
           </motion.article>
         ))}
-      </AnimatePresence>
-    </motion.div>
+      </motion.div>
+    </AnimatePresence>
   )
 }
 

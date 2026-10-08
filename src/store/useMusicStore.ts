@@ -1,11 +1,12 @@
 import { create } from 'zustand'
 import type { Playlist, RepeatMode, Track } from '../types'
-import { assignRandomCovers, attachCovers, uniqueTracks } from '../utils/library'
+import { assignCoversToTracks, syncTracksWithCovers, uniqueTracks } from '../utils/library'
 
 type MusicState = {
   tracks: Track[]
   playlists: Playlist[]
   coverPool: string[]
+  coverLookup: Map<string, string>
   activePlaylistId: string
   currentTrackId?: string
   isPlaying: boolean
@@ -48,6 +49,7 @@ export const useMusicStore = create<MusicState>((set) => ({
     },
   ],
   coverPool: [],
+  coverLookup: new Map<string, string>(),
   activePlaylistId: libraryId,
   isPlaying: false,
   shuffle: false,
@@ -55,10 +57,12 @@ export const useMusicStore = create<MusicState>((set) => ({
   volume: 0.82,
   addTracks: (incoming) =>
     set((state) => {
-      const processedIncoming =
-        state.coverPool.length > 0
-          ? assignRandomCovers(incoming, state.coverPool)
-          : incoming
+      const processedIncoming = assignCoversToTracks(
+        state.tracks,
+        incoming,
+        state.coverPool,
+        state.coverLookup,
+      )
       const tracks = [...state.tracks, ...uniqueTracks(state.tracks, processedIncoming)]
       return {
         tracks,
@@ -67,11 +71,16 @@ export const useMusicStore = create<MusicState>((set) => ({
     }),
   addCovers: (covers, extraUrls = []) =>
     set((state) => {
+      const mergedLookup = new Map(state.coverLookup)
+      for (const [key, value] of covers.entries()) {
+        mergedLookup.set(key, value)
+      }
       const incomingCovers = Array.from(new Set([...Array.from(covers.values()), ...extraUrls]))
       const updatedPool = Array.from(new Set([...state.coverPool, ...incomingCovers]))
       return {
+        coverLookup: mergedLookup,
         coverPool: updatedPool,
-        tracks: attachCovers(state.tracks, covers, updatedPool),
+        tracks: syncTracksWithCovers(state.tracks, mergedLookup, updatedPool),
       }
     }),
   createPlaylist: (name) =>
@@ -128,7 +137,13 @@ export const useMusicStore = create<MusicState>((set) => ({
   updateTrack: (trackId, updates) =>
     set((state) => ({
       tracks: state.tracks.map((track) =>
-        track.id === trackId ? { ...track, ...updates } : track,
+        track.id === trackId
+          ? {
+              ...track,
+              ...updates,
+              coverSource: updates.coverUrl !== undefined ? 'custom' : track.coverSource,
+            }
+          : track,
       ),
     })),
 }))

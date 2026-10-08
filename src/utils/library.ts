@@ -1,11 +1,11 @@
 import type { CoverLookup, Track } from '../types'
 import { autoDetectTrackMetadata, cleanMusicString, detectSongAndArtist } from './metadata'
 
-const audioExtensions = new Set(['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'])
+const audioExtensions = new Set(['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'opus', 'webm', 'wma', 'alac', 'aiff'])
 const coverExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'avif', 'bmp', 'gif', 'svg'])
 
 export function isAudioFile(file: File) {
-  return audioExtensions.has(getExtension(file.name))
+  return audioExtensions.has(getExtension(file.name)) || file.type.startsWith('audio/')
 }
 
 export function isCoverFile(file: File) {
@@ -49,9 +49,6 @@ export function buildCoverLookup(files: File[]) {
 
 export async function tracksFromFiles(files: File[], covers: CoverLookup) {
   const audioFiles = files.filter(isAudioFile)
-  const availableCovers = Array.from(covers.values())
-  let pool = [...availableCovers].sort(() => Math.random() - 0.5)
-  let poolIndex = 0
 
   const tracks = await Promise.all(
     audioFiles.map(async (file, index) => {
@@ -64,30 +61,54 @@ export async function tracksFromFiles(files: File[], covers: CoverLookup) {
         covers.get(normalizeName(file.name)) ||
         covers.get(normalizeName(detected.title)) ||
         covers.get(normalizeName(cleanDisplayTitle(detected.title)))
+      let coverSource: Track['coverSource'] = coverUrl ? 'direct' : undefined
+
+      // Check parent folder name if relative path exists (e.g. Album folder artwork)
+      if (!coverUrl && file.webkitRelativePath) {
+        const parts = file.webkitRelativePath.split('/').filter(Boolean)
+        if (parts.length > 1) {
+          const parentFolder = normalizeName(parts[parts.length - 2])
+          if (parentFolder && covers.has(parentFolder)) {
+            coverUrl = covers.get(parentFolder)
+            coverSource = 'direct'
+          }
+        }
+      }
+
+      // Check album name match in covers
+      if (!coverUrl && detected.album) {
+        const normAlbum = normalizeName(detected.album)
+        if (normAlbum && covers.has(normAlbum)) {
+          coverUrl = covers.get(normAlbum)
+          coverSource = 'direct'
+        }
+      }
 
       // If no folder cover matched, but file had an embedded ID3 cover, use it
       if (!coverUrl && detected.coverUrl) {
         coverUrl = detected.coverUrl
+        coverSource = 'embedded'
       }
 
-      if (!coverUrl && availableCovers.length > 0) {
-        if (poolIndex >= pool.length) {
-          pool = [...availableCovers].sort(() => Math.random() - 0.5)
-          poolIndex = 0
+      // If album name is missing or "Local files", but file came from folder structure, infer album from folder
+      let album = detected.album
+      if ((!album || album === 'Local files') && file.webkitRelativePath) {
+        const parts = file.webkitRelativePath.split('/').filter(Boolean)
+        if (parts.length > 1) {
+          album = parts[parts.length - 2]
         }
-        coverUrl = pool[poolIndex] || availableCovers[Math.floor(Math.random() * availableCovers.length)]
-        poolIndex += 1
       }
 
       return {
         id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
         title: detected.title,
         artist: detected.artist,
-        album: detected.album || 'Local files',
+        album: album || 'Local files',
         duration,
         fileName: file.name,
         audioUrl,
         coverUrl,
+        coverSource,
         accent: colorFromString(file.name),
       } satisfies Track
     }),
@@ -96,62 +117,265 @@ export async function tracksFromFiles(files: File[], covers: CoverLookup) {
   return tracks
 }
 
-export function attachCovers(tracks: Track[], covers: CoverLookup, existingPool: string[] = []) {
-  const newCovers = Array.from(covers.values())
-  const allCovers = Array.from(new Set([...existingPool, ...newCovers]))
-  if (allCovers.length === 0) return tracks
+export function findDirectCoverMatch(
+  track: { fileName: string; title: string; album?: string },
+  covers: CoverLookup,
+): string | undefined {
+  const normFile = normalizeName(track.fileName)
+  if (normFile && covers.has(normFile)) return covers.get(normFile)
 
-  let pool = [...allCovers].sort(() => Math.random() - 0.5)
-  let poolIndex = 0
+  const normTitle = normalizeName(track.title)
+  if (normTitle && covers.has(normTitle)) return covers.get(normTitle)
 
-  return tracks.map((track) => {
-    // 1. Exact name match has priority if the track does not already have an assigned cover art
-    if (!track.coverUrl) {
-      const directMatch =
-        covers.get(normalizeName(track.fileName)) ||
-        covers.get(normalizeName(track.title)) ||
-        covers.get(normalizeName(cleanDisplayTitle(track.title)))
+  const normCleanTitle = normalizeName(cleanDisplayTitle(track.title))
+  if (normCleanTitle && covers.has(normCleanTitle)) return covers.get(normCleanTitle)
 
-      if (directMatch) {
-        return { ...track, coverUrl: directMatch }
-      }
+  if (track.album && track.album !== 'Local files') {
+    const normAlbum = normalizeName(track.album)
+    if (normAlbum && covers.has(normAlbum)) return covers.get(normAlbum)
+  }
+
+  return undefined
+}
+
+/**
+ * Assigns covers to incoming tracks while guaranteeing:
+ * 1. Direct matches (from covers map or embedded ID3) take highest priority.
+ * 2. Unused covers in coverPool are always preferred first to avoid repeats whenever possible.
+ * 3. Only when all covers in coverPool have been used at least once are covers recycled,
+ *    and they are distributed evenly (least-used covers first).
+ */
+export function assignCoversToTracks(
+  existingTracks: Track[],
+  incomingTracks: Track[],
+  coverPool: string[],
+  covers: CoverLookup = new Map(),
+): Track[] {
+  const allAvailableCovers = Array.from(new Set([...coverPool, ...Array.from(covers.values())]))
+
+  // Build usage count map across all existing tracks in the library
+  const usageCounts = new Map<string, number>()
+  for (const url of allAvailableCovers) {
+    usageCounts.set(url, 0)
+  }
+  for (const track of existingTracks) {
+    if (track.coverUrl && usageCounts.has(track.coverUrl)) {
+      usageCounts.set(track.coverUrl, (usageCounts.get(track.coverUrl) || 0) + 1)
     }
+  }
 
-    // 2. Keep existing cover if song already has one assigned
-    if (track.coverUrl) {
+  return incomingTracks.map((track) => {
+    // 1. If track already has an embedded ID3 cover, direct cover, or manually specified cover
+    if (track.coverUrl && track.coverSource !== 'pool') {
+      if (usageCounts.has(track.coverUrl)) {
+        usageCounts.set(track.coverUrl, (usageCounts.get(track.coverUrl) || 0) + 1)
+      }
       return track
     }
 
-    // 3. Otherwise, assign random cover from the pool (covers may be repeated for multiple songs if no other option)
-    if (poolIndex >= pool.length) {
-      pool = [...allCovers].sort(() => Math.random() - 0.5)
-      poolIndex = 0
+    // 2. Direct match lookup
+    const directMatch = findDirectCoverMatch(track, covers)
+    if (directMatch) {
+      if (usageCounts.has(directMatch)) {
+        usageCounts.set(directMatch, (usageCounts.get(directMatch) || 0) + 1)
+      }
+      return {
+        ...track,
+        coverUrl: directMatch,
+        coverSource: 'direct' as const,
+      }
     }
-    const randomCover = pool[poolIndex] || allCovers[Math.floor(Math.random() * allCovers.length)]
-    poolIndex += 1
+
+    // If track already has a coverUrl from pool, and no change needed, keep it
+    if (track.coverUrl) {
+      if (usageCounts.has(track.coverUrl)) {
+        usageCounts.set(track.coverUrl, (usageCounts.get(track.coverUrl) || 0) + 1)
+      }
+      return track
+    }
+
+    // 3. Pool assignment: pick from unused covers if available
+    if (allAvailableCovers.length === 0) {
+      return track
+    }
+
+    const unusedCovers = allAvailableCovers.filter((url) => (usageCounts.get(url) || 0) === 0)
+    let selectedCover: string
+
+    if (unusedCovers.length > 0) {
+      // Pick randomly among unused covers for pleasant variety
+      const randomIndex = Math.floor(Math.random() * unusedCovers.length)
+      selectedCover = unusedCovers[randomIndex]
+    } else {
+      // All covers have been used at least once; pick from least-used
+      let minUsage = Infinity
+      for (const url of allAvailableCovers) {
+        const count = usageCounts.get(url) || 0
+        if (count < minUsage) {
+          minUsage = count
+        }
+      }
+      const leastUsedCovers = allAvailableCovers.filter(
+        (url) => (usageCounts.get(url) || 0) === minUsage,
+      )
+      const randomIndex = Math.floor(Math.random() * leastUsedCovers.length)
+      selectedCover = leastUsedCovers[randomIndex]
+    }
+
+    // Record usage
+    usageCounts.set(selectedCover, (usageCounts.get(selectedCover) || 0) + 1)
 
     return {
       ...track,
-      coverUrl: randomCover,
+      coverUrl: selectedCover,
+      coverSource: 'pool' as const,
     }
   })
 }
 
-export function assignRandomCovers(tracks: Track[], coverPool: string[]): Track[] {
-  if (coverPool.length === 0) return tracks
-  let shuffled = [...coverPool].sort(() => Math.random() - 0.5)
-  let index = 0
+/**
+ * Called when new covers are added to the library (e.g. Cover folder imported).
+ * 1. Resolves direct matches for tracks that don't have a direct/embedded/custom cover.
+ * 2. Assigns covers to any tracks without covers from unused covers in the pool.
+ * 3. Resolves duplicates: if any tracks are sharing the same fallback pool cover
+ *    and unused covers are now available, reassigns the duplicates to fresh unused covers!
+ */
+export function syncTracksWithCovers(
+  tracks: Track[],
+  covers: CoverLookup,
+  coverPool: string[],
+): Track[] {
+  if (tracks.length === 0) return tracks
 
-  return tracks.map((track) => {
-    if (track.coverUrl) return track
-    if (index >= shuffled.length) {
-      shuffled = [...coverPool].sort(() => Math.random() - 0.5)
-      index = 0
+  const allAvailableCovers = Array.from(new Set([...coverPool, ...Array.from(covers.values())]))
+  if (allAvailableCovers.length === 0) return tracks
+
+  // Track usage counts of all covers in pool
+  const usageCounts = new Map<string, number>()
+  for (const url of allAvailableCovers) {
+    usageCounts.set(url, 0)
+  }
+
+  // Count usage of protected covers (direct, embedded, custom)
+  for (const track of tracks) {
+    if (
+      track.coverUrl &&
+      (track.coverSource === 'direct' ||
+        track.coverSource === 'embedded' ||
+        track.coverSource === 'custom')
+    ) {
+      if (usageCounts.has(track.coverUrl)) {
+        usageCounts.set(track.coverUrl, (usageCounts.get(track.coverUrl) || 0) + 1)
+      }
     }
-    const coverUrl = shuffled[index] || coverPool[Math.floor(Math.random() * coverPool.length)]
-    index += 1
-    return { ...track, coverUrl }
+  }
+
+  // First pass: match any direct covers for tracks that don't have direct/embedded/custom covers
+  const step1Tracks = tracks.map((track) => {
+    if (
+      track.coverSource === 'direct' ||
+      track.coverSource === 'embedded' ||
+      track.coverSource === 'custom'
+    ) {
+      return track
+    }
+
+    const directMatch = findDirectCoverMatch(track, covers)
+    if (directMatch) {
+      if (usageCounts.has(directMatch)) {
+        usageCounts.set(directMatch, (usageCounts.get(directMatch) || 0) + 1)
+      }
+      return {
+        ...track,
+        coverUrl: directMatch,
+        coverSource: 'direct' as const,
+      }
+    }
+
+    return track
   })
+
+  // Second pass: count usage of remaining tracks
+  const seenPoolCovers = new Set<string>()
+  const finalTracks: Track[] = []
+
+  for (const track of step1Tracks) {
+    // If track already has a protected cover, keep it
+    if (
+      track.coverSource === 'direct' ||
+      track.coverSource === 'embedded' ||
+      track.coverSource === 'custom'
+    ) {
+      finalTracks.push(track)
+      continue
+    }
+
+    // Check if track has a coverUrl that is unique so far
+    const currentCover = track.coverUrl
+    const isDuplicate = currentCover ? seenPoolCovers.has(currentCover) : true
+    const unusedCovers = allAvailableCovers.filter((url) => (usageCounts.get(url) || 0) === 0)
+
+    if (currentCover && !isDuplicate && (!track.coverSource || track.coverSource === 'pool')) {
+      // Unique cover, keep it and record
+      seenPoolCovers.add(currentCover)
+      usageCounts.set(currentCover, (usageCounts.get(currentCover) || 0) + 1)
+      finalTracks.push({
+        ...track,
+        coverSource: 'pool',
+      })
+      continue
+    }
+
+    // If no cover OR this is a duplicate cover and we have unused covers available:
+    if (unusedCovers.length > 0) {
+      const randomIndex = Math.floor(Math.random() * unusedCovers.length)
+      const selectedCover = unusedCovers[randomIndex]
+      usageCounts.set(selectedCover, (usageCounts.get(selectedCover) || 0) + 1)
+      seenPoolCovers.add(selectedCover)
+      finalTracks.push({
+        ...track,
+        coverUrl: selectedCover,
+        coverSource: 'pool',
+      })
+    } else if (currentCover) {
+      // No unused covers available, keep current duplicate
+      seenPoolCovers.add(currentCover)
+      usageCounts.set(currentCover, (usageCounts.get(currentCover) || 0) + 1)
+      finalTracks.push(track)
+    } else {
+      // Pick from least-used
+      let minUsage = Infinity
+      for (const url of allAvailableCovers) {
+        const count = usageCounts.get(url) || 0
+        if (count < minUsage) {
+          minUsage = count
+        }
+      }
+      const leastUsedCovers = allAvailableCovers.filter(
+        (url) => (usageCounts.get(url) || 0) === minUsage,
+      )
+      const randomIndex = Math.floor(Math.random() * leastUsedCovers.length)
+      const selectedCover = leastUsedCovers[randomIndex]
+      usageCounts.set(selectedCover, (usageCounts.get(selectedCover) || 0) + 1)
+      seenPoolCovers.add(selectedCover)
+      finalTracks.push({
+        ...track,
+        coverUrl: selectedCover,
+        coverSource: 'pool',
+      })
+    }
+  }
+
+  return finalTracks
+}
+
+export function attachCovers(tracks: Track[], covers: CoverLookup, existingPool: string[] = []) {
+  const mergedPool = Array.from(new Set([...existingPool, ...Array.from(covers.values())]))
+  return syncTracksWithCovers(tracks, covers, mergedPool)
+}
+
+export function assignRandomCovers(tracks: Track[], coverPool: string[]): Track[] {
+  return assignCoversToTracks([], tracks, coverPool)
 }
 
 export function formatTime(totalSeconds: number) {
