@@ -1591,7 +1591,8 @@ h3 {
 }
 
 .volume {
-  grid-template-columns: auto minmax(0, 1fr);
+  display: block;
+  min-width: 0;
   color: var(--muted);
 }
 
