@@ -1,5 +1,7 @@
 import type { CoverLookup, Track } from '../types'
-import { autoDetectTrackMetadata, cleanMusicString, detectSongAndArtist } from './metadata'
+import { autoDetectTrackMetadata, cleanMusicString, detectSongAndArtist } from './metadata.ts'
+import { objectUrlForFile } from './objectUrls.ts'
+import { trackIdForFile } from './trackIdentity.ts'
 
 const audioExtensions = new Set(['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'opus', 'webm', 'wma', 'alac', 'aiff'])
 const coverExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'avif', 'bmp', 'gif', 'svg'])
@@ -18,7 +20,7 @@ export function extractCovers(files: File[]): { lookup: CoverLookup; urls: strin
   const urls: string[] = []
 
   for (const file of coverFiles) {
-    const url = URL.createObjectURL(file)
+    const url = objectUrlForFile(file)
     urls.push(url)
 
     // Match by base filename without extension
@@ -47,12 +49,18 @@ export function buildCoverLookup(files: File[]) {
   return extractCovers(files).lookup
 }
 
-export async function tracksFromFiles(files: File[], covers: CoverLookup) {
-  const audioFiles = files.filter(isAudioFile)
+export async function tracksFromFiles(files: File[], covers: CoverLookup, existingIds: ReadonlySet<string> = new Set()) {
+  const seen = new Set(existingIds)
+  const audioFiles = files.filter(isAudioFile).filter((file) => {
+    const id = trackIdForFile(file)
+    if (seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
 
   const tracks = await Promise.all(
-    audioFiles.map(async (file, index) => {
-      const audioUrl = URL.createObjectURL(file)
+    audioFiles.map(async (file) => {
+      const audioUrl = objectUrlForFile(file)
       const detected = await autoDetectTrackMetadata(file.name, file)
       const duration = await readDuration(audioUrl)
 
@@ -100,7 +108,7 @@ export async function tracksFromFiles(files: File[], covers: CoverLookup) {
       }
 
       return {
-        id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
+        id: trackIdForFile(file),
         title: detected.title,
         artist: detected.artist,
         album: album || 'Local files',
@@ -387,7 +395,11 @@ export function formatTime(totalSeconds: number) {
 
 export function uniqueTracks(existing: Track[], incoming: Track[]) {
   const seen = new Set(existing.map((track) => track.id))
-  return incoming.filter((track) => !seen.has(track.id))
+  return incoming.filter((track) => {
+    if (seen.has(track.id)) return false
+    seen.add(track.id)
+    return true
+  })
 }
 
 function getExtension(fileName: string) {
@@ -418,10 +430,23 @@ export function parseTrackName(fileName: string) {
 
 function readDuration(audioUrl: string) {
   return new Promise<number>((resolve) => {
-    const audio = new Audio(audioUrl)
+    const audio = new Audio()
+    let finished = false
+    const finish = (duration: number) => {
+      if (finished) return
+      finished = true
+      clearTimeout(timer)
+      audio.onloadedmetadata = null
+      audio.onerror = null
+      audio.removeAttribute('src')
+      audio.load()
+      resolve(Number.isFinite(duration) ? duration : 0)
+    }
+    const timer = setTimeout(() => finish(0), 10000)
     audio.preload = 'metadata'
-    audio.onloadedmetadata = () => resolve(audio.duration)
-    audio.onerror = () => resolve(0)
+    audio.onloadedmetadata = () => finish(audio.duration)
+    audio.onerror = () => finish(0)
+    audio.src = audioUrl
   })
 }
 

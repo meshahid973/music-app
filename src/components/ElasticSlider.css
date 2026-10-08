@@ -1,0 +1,17 @@
+.elastic-volume { width:100%; display:flex; align-items:center; gap:9px; color:var(--muted); min-height:42px; }
+.elastic-volume-icon { flex:none; display:grid; place-items:center; color:var(--text); opacity:.76; }
+.elastic-volume-control { min-width:65px; flex:1; position:relative; height:34px; display:flex; align-items:center; }
+.elastic-volume-rail { width:100%; height:6px; background:var(--line-strong); border-radius:999px; overflow:hidden; pointer-events:none; transform-origin:center; }
+.elastic-volume-fill { height:100%; display:block; border-radius:inherit; background:var(--neutral-accent); }
+.elastic-volume-control input { position:absolute; inset:0; width:100%; height:100%; margin:0; cursor:pointer; opacity:0; touch-action:none; }
+/* The volume slider must never show the browser's rectangular focus ring when clicked or dragged. */
+.elastic-volume-control input:is(:focus, :focus-visible, :active) {
+  outline: none;
+  box-shadow: none;
+}
+/* Keyboard focus stays perceivable through a brighter rail, without drawing a border. */
+.elastic-volume-control:has(input:focus-visible) .elastic-volume-rail {
+  filter: brightness(1.4);
+}
+.elastic-volume-value { font-size:11px; font-variant-numeric:tabular-nums; width:38px; flex:none; text-align:right; }
+@media (prefers-reduced-motion:reduce) { .elastic-volume-rail,.elastic-volume-icon { transition:none; } }

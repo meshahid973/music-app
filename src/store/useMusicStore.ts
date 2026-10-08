@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { Playlist, RepeatMode, Track } from '../types'
 import { assignCoversToTracks, syncTracksWithCovers, uniqueTracks } from '../utils/library'
 
@@ -32,7 +33,7 @@ type MusicState = {
 export const libraryId = 'library'
 export const favoritesId = 'favorites'
 
-export const useMusicStore = create<MusicState>((set) => ({
+export const useMusicStore = create<MusicState>()(persist((set) => ({
   tracks: [],
   playlists: [
     {
@@ -59,11 +60,11 @@ export const useMusicStore = create<MusicState>((set) => ({
     set((state) => {
       const processedIncoming = assignCoversToTracks(
         state.tracks,
-        incoming,
+        uniqueTracks(state.tracks, incoming),
         state.coverPool,
         state.coverLookup,
       )
-      const tracks = [...state.tracks, ...uniqueTracks(state.tracks, processedIncoming)]
+      const tracks = [...state.tracks, ...processedIncoming]
       return {
         tracks,
         currentTrackId: state.currentTrackId ?? tracks[0]?.id,
@@ -88,7 +89,7 @@ export const useMusicStore = create<MusicState>((set) => ({
       playlists: [
         ...state.playlists,
         {
-          id: `${name}-${Date.now()}`,
+          id: crypto.randomUUID(),
           name,
           trackIds: [],
           createdAt: Date.now(),
@@ -146,4 +147,15 @@ export const useMusicStore = create<MusicState>((set) => ({
           : track,
       ),
     })),
+}), {
+  name: 'resonance-playlists-v1',
+  version: 1,
+  // Never persist audio or cover object URLs: they expire when the document unloads.
+  partialize: (state) => ({
+    playlists: state.playlists,
+    activePlaylistId: state.activePlaylistId,
+    volume: state.volume,
+    shuffle: state.shuffle,
+    repeat: state.repeat,
+  }),
 }))

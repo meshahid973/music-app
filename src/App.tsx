@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Howl, Howler } from 'howler'
+import { Howl } from 'howler'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, FormEvent } from 'react'
 import './App.css'
@@ -25,10 +25,12 @@ import {
   SkipForwardFilled,
   TrashFilled,
   UploadFilled,
-  VolumeFilled,
   CloseFilled,
 } from './components/icons'
 import { favoritesId, libraryId, useMusicStore } from './store/useMusicStore'
+import ElasticSlider from './components/ElasticSlider'
+import { PlaybackQueue } from './utils/queue'
+import { revokeOwnedObjectUrls } from './utils/objectUrls'
 import type { Playlist, Track } from './types'
 import {
   cleanDisplayTitle,
@@ -44,9 +46,10 @@ import {
 function App() {
   const audioRef = useRef<Howl | null>(null)
   const progressTimer = useRef<number | null>(null)
-  const isPlayingRef = useRef(false)
   const volumeRef = useRef(0.82)
   const playNextRef = useRef<() => void>(() => {})
+  const queueRef = useRef(new PlaybackQueue())
+  const lastPlaylistIdRef = useRef<string | null>(null)
   const [query, setQuery] = useState('')
   const [seek, setSeek] = useState(0)
   const [newPlaylistName, setNewPlaylistName] = useState('')
@@ -180,54 +183,73 @@ function App() {
   }
 
   useEffect(() => {
-    Howler.volume(volume)
     volumeRef.current = volume
   }, [volume])
 
+  useEffect(() => () => revokeOwnedObjectUrls(), [])
+
   useEffect(() => {
-    isPlayingRef.current = isPlaying
-  }, [isPlaying])
+    const playlistTrackIds = activePlaylistId === libraryId
+      ? tracks.map((track) => track.id)
+      : activePlaylist?.trackIds ?? []
+
+    if (!playlistTrackIds.length) return
+
+    const currentIdInPlaylist = currentTrackId ? playlistTrackIds.includes(currentTrackId) : false
+
+    if (lastPlaylistIdRef.current !== activePlaylistId) {
+      lastPlaylistIdRef.current = activePlaylistId
+      if (!currentTrackId || !currentIdInPlaylist) {
+        const fallbackTrackId = playlistTrackIds[0]
+        queueRef.current.start(playlistTrackIds, fallbackTrackId)
+        if (currentTrackId !== fallbackTrackId) setCurrentTrack(fallbackTrackId)
+        return
+      }
+      queueRef.current.start(playlistTrackIds, currentTrackId)
+      return
+    }
+
+    if (!currentTrackId && queueRef.current.size === 0) {
+      queueRef.current.start(playlistTrackIds, playlistTrackIds[0])
+    }
+  }, [activePlaylist, activePlaylistId, currentTrackId, setCurrentTrack, tracks])
 
   useEffect(() => {
     audioRef.current?.stop()
     audioRef.current?.unload()
-
+    audioRef.current = null
     if (!currentAudioUrl) return
-
     const howl = new Howl({
       src: [currentAudioUrl],
       html5: true,
       volume: volumeRef.current,
       onend: () => playNextRef.current(),
       onload: () => setSeek(0),
+      onloaderror: () => setIsPlaying(false),
+      onplayerror: () => setIsPlaying(false),
     })
-
     audioRef.current = howl
-
-    if (isPlayingRef.current) {
-      howl.play()
-      startProgress()
-    }
-
+    setSeek(0)
     return () => {
       howl.stop()
       howl.unload()
+      if (audioRef.current === howl) audioRef.current = null
       stopProgress()
     }
-  }, [currentAudioUrl, currentId])
+  }, [currentAudioUrl, currentId, setIsPlaying])
 
   useEffect(() => {
     const howl = audioRef.current
     if (!howl) return
-
     if (isPlaying) {
-      howl.play()
+      if (!howl.playing()) howl.play()
       startProgress()
     } else {
       howl.pause()
       stopProgress()
     }
-  }, [isPlaying])
+    return () => stopProgress()
+  }, [isPlaying, currentAudioUrl])
 
   useEffect(() => {
     audioRef.current?.volume(volume)
@@ -250,7 +272,7 @@ function App() {
       addCovers(lookup, urls)
     }
 
-    const parsedTracks = await tracksFromFiles(files, combinedLookup)
+    const parsedTracks = await tracksFromFiles(files, combinedLookup, new Set(useMusicStore.getState().tracks.map((track) => track.id)))
     if (parsedTracks.length > 0) {
       addTracks(parsedTracks)
     }
@@ -274,7 +296,7 @@ function App() {
       addCovers(lookup, urls)
     }
 
-    const parsedTracks = await tracksFromFiles(files, combinedLookup)
+    const parsedTracks = await tracksFromFiles(files, combinedLookup, new Set(useMusicStore.getState().tracks.map((track) => track.id)))
     if (parsedTracks.length > 0) {
       addTracks(parsedTracks)
     }
@@ -310,7 +332,7 @@ function App() {
     }
 
     if (audioFiles.length > 0) {
-      const parsedTracks = await tracksFromFiles(audioFiles, combinedLookup)
+      const parsedTracks = await tracksFromFiles(audioFiles, combinedLookup, new Set(useMusicStore.getState().tracks.map((track) => track.id)))
       addTracks(parsedTracks)
     }
   }
@@ -322,59 +344,42 @@ function App() {
     setNewPlaylistName('')
   }
 
-  function moveTrack(direction: 1 | -1) {
-    if (visibleTracks.length === 0) return
-    if (shuffle && direction === 1) {
-      const randomTrack = visibleTracks[Math.floor(Math.random() * visibleTracks.length)]
-      setCurrentTrack(randomTrack.id)
-      return
-    }
-
-    const currentIndex = Math.max(
-      0,
-      visibleTracks.findIndex((track) => track.id === currentTrackId),
-    )
-    const nextIndex = currentIndex + direction
-
-    if (nextIndex < 0 || nextIndex >= visibleTracks.length) {
-      if (repeat === 'all') {
-        setCurrentTrack(visibleTracks[direction === 1 ? 0 : visibleTracks.length - 1].id)
-      } else {
-        setIsPlaying(false)
-      }
-      return
-    }
-
-    setCurrentTrack(visibleTracks[nextIndex].id)
+  function moveTrack(direction: 1 | -1, automatic = false) {
+    if (!currentTrackId) return
+    const nextId = direction === 1
+      ? queueRef.current.next(currentTrackId, shuffle, repeat, automatic)
+      : queueRef.current.previous(currentTrackId, shuffle, repeat)
+    if (nextId) setCurrentTrack(nextId)
+    else setIsPlaying(false)
   }
 
-  function playPrevious() {
-    moveTrack(-1)
-  }
-
-  function playNext() {
-    if (repeat === 'one') {
+  function playPrevious() { moveTrack(-1) }
+  function playNext(automatic = false) {
+    if (automatic && repeat === 'one') {
       audioRef.current?.seek(0)
       audioRef.current?.play()
+      startProgress()
       return
     }
-    moveTrack(1)
+    moveTrack(1, automatic)
   }
 
   function handleTrackPlay(trackId: string) {
     if (currentTrackId === trackId) {
       setIsPlaying(!isPlaying)
     } else {
+      queueRef.current.start(visibleTracks.map((track) => track.id), trackId)
       setCurrentTrack(trackId)
     }
   }
 
   useEffect(() => {
-    playNextRef.current = playNext
+    playNextRef.current = () => playNext(true)
   })
 
   function togglePlay() {
     if (!currentTrack && visibleTracks[0]) {
+      queueRef.current.start(visibleTracks.map((track) => track.id), visibleTracks[0].id)
       setCurrentTrack(visibleTracks[0].id)
       return
     }
@@ -1285,24 +1290,9 @@ function PlayerBar({
         </div>
       </div>
 
-      <label className="volume">
-        <VolumeFilled size={18} />
-        <input
-          type="range"
-          className="frosted-range"
-          min="0"
-          max="1"
-          step="0.005"
-          value={volume}
-          onChange={(event) => onVolume(Number(event.target.value))}
-          style={
-            {
-              '--progress-pct': `${Math.max(0, Math.min(volume, 1)) * 100}%`,
-            } as CSSProperties
-          }
-          aria-label="Volume"
-        />
-      </label>
+      <div className="volume">
+        <ElasticSlider value={volume} onChange={onVolume} />
+      </div>
     </footer>
   )
 }
