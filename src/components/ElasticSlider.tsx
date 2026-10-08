@@ -14,6 +14,7 @@ const MAX_OVERFLOW = 45
 export default function ElasticSlider({ value, onChange }: ElasticSliderProps) {
   const sliderRef = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
+  const [isDragging, setIsDragging] = useState(false)
   const [overflow, setOverflow] = useState(0)
   const [region, setRegion] = useState<'left' | 'middle' | 'right'>('middle')
   const [hovered, setHovered] = useState(false)
@@ -38,6 +39,7 @@ export default function ElasticSlider({ value, onChange }: ElasticSliderProps) {
   }
   const release = () => {
     dragging.current = false
+    setIsDragging(false)
     setOverflow(0)
     setRegion('middle')
   }
@@ -53,7 +55,7 @@ export default function ElasticSlider({ value, onChange }: ElasticSliderProps) {
       </motion.div>
       <div ref={sliderRef} className="elastic-volume-control">
         <motion.div className="elastic-volume-rail"
-          animate={{ scaleX: 1 + overflow / 160, scaleY: overflow ? 0.82 : hovered || dragging.current ? 1.6 : 1 }}
+          animate={{ scaleX: 1 + overflow / 160, scaleY: overflow ? 0.82 : hovered || isDragging ? 1.6 : 1 }}
           transition={{ type: 'spring', stiffness: 320, damping: 21 }}>
           <span className="elastic-volume-fill" style={{ width: `${percent}%` }} />
         </motion.div>
@@ -62,6 +64,7 @@ export default function ElasticSlider({ value, onChange }: ElasticSliderProps) {
           onChange={event => onChange(Math.max(0, Math.min(1, Number(event.target.value))))}
           onPointerDown={(event) => {
             dragging.current = true
+            setIsDragging(true)
             event.currentTarget.setPointerCapture(event.pointerId)
             onChange(pointerValue(event.clientX))
           }}

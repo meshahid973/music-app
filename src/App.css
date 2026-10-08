@@ -375,29 +375,38 @@ h3 {
 
 .hero-banner-ambient {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  height: 100%;
-  width: clamp(450px, 58%, 760px);
+  top: -15%;
+  right: -5%;
+  bottom: -15%;
+  height: 130%;
+  width: clamp(520px, 72%, 920px);
   overflow: hidden;
   pointer-events: none;
+  /* Ultra-smooth multi-stop ease-out mask fade */
   -webkit-mask-image: linear-gradient(
     to right,
     transparent 0%,
-    rgba(0, 0, 0, 0.08) 12%,
-    rgba(0, 0, 0, 0.35) 28%,
-    rgba(0, 0, 0, 0.72) 48%,
-    #000 70%,
+    rgba(0, 0, 0, 0.01) 12%,
+    rgba(0, 0, 0, 0.04) 22%,
+    rgba(0, 0, 0, 0.10) 32%,
+    rgba(0, 0, 0, 0.22) 44%,
+    rgba(0, 0, 0, 0.40) 56%,
+    rgba(0, 0, 0, 0.62) 68%,
+    rgba(0, 0, 0, 0.84) 80%,
+    rgba(0, 0, 0, 0.96) 90%,
     #000 100%
   );
   mask-image: linear-gradient(
     to right,
     transparent 0%,
-    rgba(0, 0, 0, 0.08) 12%,
-    rgba(0, 0, 0, 0.35) 28%,
-    rgba(0, 0, 0, 0.72) 48%,
-    #000 70%,
+    rgba(0, 0, 0, 0.01) 12%,
+    rgba(0, 0, 0, 0.04) 22%,
+    rgba(0, 0, 0, 0.10) 32%,
+    rgba(0, 0, 0, 0.22) 44%,
+    rgba(0, 0, 0, 0.40) 56%,
+    rgba(0, 0, 0, 0.62) 68%,
+    rgba(0, 0, 0, 0.84) 80%,
+    rgba(0, 0, 0, 0.96) 90%,
     #000 100%
   );
   -webkit-mask-size: 100% 100%;
@@ -411,9 +420,9 @@ h3 {
   height: 100%;
   object-fit: cover;
   object-position: right center;
-  filter: blur(28px) saturate(1.18);
-  opacity: 0.75;
-  transform: scale(1.08);
+  filter: blur(48px) saturate(1.12);
+  opacity: 0.62;
+  transform: scale(1.15);
   display: block;
 }
 
@@ -426,22 +435,31 @@ h3 {
   aspect-ratio: 1 / 1;
   pointer-events: none;
   overflow: hidden;
+  /* Keep the main subject crisp (full opacity from 38% to 100%) and feather the edge out gradually across the left */
   -webkit-mask-image: linear-gradient(
     to right,
     transparent 0%,
-    rgba(0, 0, 0, 0.08) 8%,
-    rgba(0, 0, 0, 0.3) 18%,
-    rgba(0, 0, 0, 0.7) 30%,
-    #000 42%,
+    rgba(0, 0, 0, 0.02) 6%,
+    rgba(0, 0, 0, 0.08) 12%,
+    rgba(0, 0, 0, 0.18) 18%,
+    rgba(0, 0, 0, 0.35) 24%,
+    rgba(0, 0, 0, 0.58) 30%,
+    rgba(0, 0, 0, 0.82) 36%,
+    rgba(0, 0, 0, 0.96) 42%,
+    #000 48%,
     #000 100%
   );
   mask-image: linear-gradient(
     to right,
     transparent 0%,
-    rgba(0, 0, 0, 0.08) 8%,
-    rgba(0, 0, 0, 0.3) 18%,
-    rgba(0, 0, 0, 0.7) 30%,
-    #000 42%,
+    rgba(0, 0, 0, 0.02) 6%,
+    rgba(0, 0, 0, 0.08) 12%,
+    rgba(0, 0, 0, 0.18) 18%,
+    rgba(0, 0, 0, 0.35) 24%,
+    rgba(0, 0, 0, 0.58) 30%,
+    rgba(0, 0, 0, 0.82) 36%,
+    rgba(0, 0, 0, 0.96) 42%,
+    #000 48%,
     #000 100%
   );
   -webkit-mask-size: 100% 100%;

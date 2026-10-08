@@ -219,33 +219,76 @@ function App() {
     audioRef.current?.unload()
     audioRef.current = null
     if (!currentAudioUrl) return
+
+    const shouldAutoplay = useMusicStore.getState().isPlaying
     const howl = new Howl({
       src: [currentAudioUrl],
+      format: ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'webm'],
       html5: true,
+      autoplay: shouldAutoplay,
       volume: volumeRef.current,
       onend: () => playNextRef.current(),
-      onload: () => setSeek(0),
-      onloaderror: () => setIsPlaying(false),
-      onplayerror: () => setIsPlaying(false),
+      onload: () => {
+        setSeek(0)
+        if (useMusicStore.getState().isPlaying && !howl.playing()) {
+          try {
+            howl.play()
+            startProgress()
+          } catch {
+            // ignore
+          }
+        }
+      },
+      onplay: () => {
+        startProgress()
+      },
+      onpause: () => {
+        stopProgress()
+      },
+      onstop: () => {
+        stopProgress()
+      },
+      onloaderror: (_id, err) => {
+        console.warn('Audio load error:', err)
+      },
+      onplayerror: (_id, err) => {
+        console.warn('Audio play error:', err)
+        howl.once('unlock', () => {
+          try {
+            howl.play()
+          } catch {
+            // ignore
+          }
+        })
+      },
     })
     audioRef.current = howl
-    setSeek(0)
     return () => {
       howl.stop()
       howl.unload()
       if (audioRef.current === howl) audioRef.current = null
       stopProgress()
     }
-  }, [currentAudioUrl, currentId, setIsPlaying])
+  }, [currentAudioUrl, currentId])
 
   useEffect(() => {
     const howl = audioRef.current
     if (!howl) return
     if (isPlaying) {
-      if (!howl.playing()) howl.play()
-      startProgress()
+      if (!howl.playing()) {
+        try {
+          howl.play()
+          startProgress()
+        } catch {
+          // ignore
+        }
+      }
     } else {
-      howl.pause()
+      try {
+        howl.pause()
+      } catch {
+        // ignore
+      }
       stopProgress()
     }
     return () => stopProgress()
@@ -349,8 +392,12 @@ function App() {
     const nextId = direction === 1
       ? queueRef.current.next(currentTrackId, shuffle, repeat, automatic)
       : queueRef.current.previous(currentTrackId, shuffle, repeat)
-    if (nextId) setCurrentTrack(nextId)
-    else setIsPlaying(false)
+    if (nextId) {
+      setCurrentTrack(nextId)
+      setIsPlaying(true)
+    } else {
+      setIsPlaying(false)
+    }
   }
 
   function playPrevious() { moveTrack(-1) }
@@ -370,6 +417,7 @@ function App() {
     } else {
       queueRef.current.start(visibleTracks.map((track) => track.id), trackId)
       setCurrentTrack(trackId)
+      setIsPlaying(true)
     }
   }
 
@@ -381,6 +429,7 @@ function App() {
     if (!currentTrack && visibleTracks[0]) {
       queueRef.current.start(visibleTracks.map((track) => track.id), visibleTracks[0].id)
       setCurrentTrack(visibleTracks[0].id)
+      setIsPlaying(true)
       return
     }
     setIsPlaying(!isPlaying)
