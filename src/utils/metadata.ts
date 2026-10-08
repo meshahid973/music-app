@@ -1,3 +1,5 @@
+import { objectUrlForBlob } from './objectUrls'
+
 /**
  * Ultra-lightweight audio metadata extractor and smart filename parser.
  * Zero external dependencies (< 3KB compiled), lightning fast (< 2ms).
@@ -154,30 +156,22 @@ export async function readID3Metadata(file: File): Promise<{
   coverUrl?: string
 } | null> {
   try {
-    // Only slice first 64KB
-    const slice = file.slice(0, 65536)
-    const buffer = await slice.arrayBuffer()
-    const bytes = new Uint8Array(buffer)
-    const view = new DataView(buffer)
-
-    // Check 'ID3' marker
-    if (bytes[0] !== 0x49 || bytes[1] !== 0x44 || bytes[2] !== 0x33) {
-      return null
-    }
-
-    const version = view.getUint8(3)
+    const initial = new Uint8Array(await file.slice(0, 10).arrayBuffer())
+    if (initial.length < 10 || initial[0] !== 0x49 || initial[1] !== 0x44 || initial[2] !== 0x33) return null
+    const version = initial[3]
     if (version < 2 || version > 4) return null
 
-    // 4 synchsafe bytes for tag size
-    const tagSize =
-      ((bytes[6] & 0x7f) << 21) |
-      ((bytes[7] & 0x7f) << 14) |
-      ((bytes[8] & 0x7f) << 7) |
-      (bytes[9] & 0x7f)
+    const synchsafe = (b: Uint8Array, i: number) =>
+      ((b[i] & 0x7f) << 21) | ((b[i + 1] & 0x7f) << 14) |
+      ((b[i + 2] & 0x7f) << 7) | (b[i + 3] & 0x7f)
 
+    const tagSize = synchsafe(initial, 6)
+    // Read the declared tag, including reasonably sized cover art, without loading whole audio files.
+    const size = Math.min(file.size, 10 + tagSize, 4 * 1024 * 1024)
+    const bytes = new Uint8Array(await file.slice(0, size).arrayBuffer())
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    const limit = bytes.length
     let offset = 10
-    const limit = Math.min(buffer.byteLength, 10 + tagSize)
-
     let title: string | undefined
     let artist: string | undefined
     let album: string | undefined
@@ -185,84 +179,66 @@ export async function readID3Metadata(file: File): Promise<{
 
     const decodeText = (encoding: number, data: Uint8Array): string => {
       try {
-        let decoder: TextDecoder
-        if (encoding === 1 || encoding === 2) {
-          decoder = new TextDecoder('utf-16')
-        } else if (encoding === 3) {
-          decoder = new TextDecoder('utf-8')
-        } else {
-          decoder = new TextDecoder('iso-8859-1')
-        }
-        return decoder.decode(data).replace(/\0/g, '').trim()
+        const codec = encoding === 1 ? 'utf-16' : encoding === 2 ? 'utf-16be' :
+          encoding === 3 ? 'utf-8' : 'iso-8859-1'
+        return new TextDecoder(codec).decode(data).replace(/\0/g, '').trim()
       } catch {
         return ''
       }
     }
 
-    while (offset + 10 <= limit) {
-      if (bytes[offset] === 0) break // Padding reached
+    while (offset + (version === 2 ? 6 : 10) <= limit) {
+      const headerSize = version === 2 ? 6 : 10
+      const idSize = version === 2 ? 3 : 4
+      if (bytes[offset] === 0) break
+      const id = String.fromCharCode(...bytes.subarray(offset, offset + idSize))
+      if (!/^[A-Z0-9]+$/.test(id)) break
+      const frameSize = version === 2
+        ? (bytes[offset + 3] << 16) | (bytes[offset + 4] << 8) | bytes[offset + 5]
+        : version === 4 ? synchsafe(bytes, offset + 4) : view.getUint32(offset + 4)
+      const start = offset + headerSize
+      const end = start + frameSize
+      if (frameSize <= 0 || end > limit) break
 
-      const frameId = String.fromCharCode(
-        bytes[offset],
-        bytes[offset + 1],
-        bytes[offset + 2],
-        bytes[offset + 3]
-      )
+      const encoding = bytes[start]
+      const content = bytes.subarray(start + 1, end)
+      if ((id === 'TIT2' || id === 'TT2') && !title) title = decodeText(encoding, content)
+      if ((id === 'TPE1' || id === 'TP1') && !artist) artist = decodeText(encoding, content)
+      if ((id === 'TALB' || id === 'TAL') && !album) album = decodeText(encoding, content)
 
-      let frameSize = 0
-      if (version === 4) {
-        frameSize =
-          ((bytes[offset + 4] & 0x7f) << 21) |
-          ((bytes[offset + 5] & 0x7f) << 14) |
-          ((bytes[offset + 6] & 0x7f) << 7) |
-          (bytes[offset + 7] & 0x7f)
-      } else {
-        frameSize = view.getUint32(offset + 4)
-      }
-
-      if (frameSize <= 0 || offset + 10 + frameSize > buffer.byteLength) {
-        break
-      }
-
-      const frameDataOffset = offset + 10
-      const encoding = bytes[frameDataOffset]
-
-      if (frameId === 'TIT2' && !title) {
-        const textBytes = bytes.subarray(frameDataOffset + 1, frameDataOffset + frameSize)
-        title = decodeText(encoding, textBytes)
-      } else if (frameId === 'TPE1' && !artist) {
-        const textBytes = bytes.subarray(frameDataOffset + 1, frameDataOffset + frameSize)
-        artist = decodeText(encoding, textBytes)
-      } else if (frameId === 'TALB' && !album) {
-        const textBytes = bytes.subarray(frameDataOffset + 1, frameDataOffset + frameSize)
-        album = decodeText(encoding, textBytes)
-      } else if (frameId === 'APIC' && !coverUrl) {
-        try {
-          let mimeEnd = frameDataOffset + 1
-          while (mimeEnd < frameDataOffset + frameSize && bytes[mimeEnd] !== 0) mimeEnd++
-          const mime = new TextDecoder('ascii').decode(bytes.subarray(frameDataOffset + 1, mimeEnd)) || 'image/jpeg'
-          let descEnd = mimeEnd + 2
-          while (descEnd < frameDataOffset + frameSize && bytes[descEnd] !== 0) descEnd++
-          const imgBytes = bytes.subarray(descEnd + 1, frameDataOffset + frameSize)
-          if (imgBytes.length > 64) {
-            const blob = new Blob([imgBytes], { type: mime })
-            coverUrl = URL.createObjectURL(blob)
-          }
-        } catch {
-          // ignore cover extraction error
+      if ((id === 'APIC' || id === 'PIC') && !coverUrl && frameSize > 8) {
+        const pictureFormat = id === 'PIC'
+          ? String.fromCharCode(...bytes.subarray(start + 1, start + 4)).toLowerCase()
+          : ''
+        let cursor = start + 1
+        let mime = 'image/jpeg'
+        if (id === 'PIC') {
+          mime = pictureFormat === 'png' ? 'image/png' : 'image/jpeg'
+          cursor += 3
+        } else {
+          const mimeStart = cursor
+          while (cursor < end && bytes[cursor] !== 0) cursor++
+          mime = new TextDecoder('ascii').decode(bytes.subarray(mimeStart, cursor)) || mime
+          cursor++
+        }
+        cursor++ // picture type
+        if (encoding === 1 || encoding === 2) {
+          while (cursor + 1 < end && (bytes[cursor] !== 0 || bytes[cursor + 1] !== 0)) cursor += 2
+          cursor += 2
+        } else {
+          while (cursor < end && bytes[cursor] !== 0) cursor++
+          cursor++
+        }
+        if (cursor + 64 < end && /^image\/(jpeg|png|webp|gif)$/i.test(mime)) {
+          coverUrl = objectUrlForBlob(new Blob([Uint8Array.from(bytes.subarray(cursor, end))], { type: mime }))
         }
       }
-
-      offset += 10 + frameSize
+      offset = end
     }
-
-    if (title || artist || album || coverUrl) {
-      return { title, artist, album, coverUrl }
-    }
+    return title || artist || album || coverUrl ? { title, artist, album, coverUrl } : null
   } catch {
-    // Fail gracefully
+    return null
   }
-  return null
 }
 
 /**
