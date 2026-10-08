@@ -8,9 +8,13 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint src",
     "preview": "vite preview",
+    "tauri": "tauri",
     "test": "node --experimental-strip-types --test tests/*.test.mjs"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.12.1",
+    "@tauri-apps/plugin-dialog": "^2.8.1",
+    "@tauri-apps/plugin-fs": "^2.6.0",
     "clsx": "^2.1.1",
     "framer-motion": "^14.0.0",
     "howler": "^2.2.4",
@@ -20,6 +24,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.12.1",
     "@types/howler": "^2.2.13",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",

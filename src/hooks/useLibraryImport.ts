@@ -6,10 +6,69 @@ import {
   isCoverFile,
   tracksFromFiles,
 } from '../utils/library'
+import { isDesktopApp, pickNativeAudioFiles, pickNativeFolder } from '../utils/platform'
+import {
+  nativeCoversFromPaths,
+  nativeTracksFromPaths,
+  scanNativeFolder,
+} from '../utils/nativeFileSystem'
 
 export function useLibraryImport() {
   const { addTracks, addCovers } = useMusicStore()
 
+  // Native desktop handlers using OS dialogs
+  async function handleNativeAddSongs() {
+    const filePaths = await pickNativeAudioFiles()
+    if (!filePaths || filePaths.length === 0) return
+
+    const storeLookup = useMusicStore.getState().coverLookup
+    const existingIds = new Set(useMusicStore.getState().tracks.map((t) => t.id))
+    const parsedTracks = await nativeTracksFromPaths(filePaths, storeLookup, existingIds)
+    if (parsedTracks.length > 0) {
+      addTracks(parsedTracks)
+    }
+  }
+
+  async function handleNativeMusicFolder() {
+    const folderPath = await pickNativeFolder()
+    if (!folderPath) return
+
+    const { audioPaths, coverPaths } = await scanNativeFolder(folderPath)
+
+    const storeLookup = useMusicStore.getState().coverLookup
+    const combinedLookup = new Map(storeLookup)
+
+    if (coverPaths.length > 0) {
+      const { lookup, urls } = nativeCoversFromPaths(coverPaths)
+      for (const [k, v] of lookup.entries()) {
+        combinedLookup.set(k, v)
+      }
+      addCovers(lookup, urls)
+    }
+
+    if (audioPaths.length > 0) {
+      const existingIds = new Set(useMusicStore.getState().tracks.map((t) => t.id))
+      const parsedTracks = await nativeTracksFromPaths(audioPaths, combinedLookup, existingIds)
+      if (parsedTracks.length > 0) {
+        addTracks(parsedTracks)
+      }
+    }
+  }
+
+  async function handleNativeCoverFolder() {
+    const folderPath = await pickNativeFolder()
+    if (!folderPath) return
+
+    const { coverPaths } = await scanNativeFolder(folderPath)
+    if (coverPaths.length > 0) {
+      const { lookup, urls } = nativeCoversFromPaths(coverPaths)
+      if (urls.length > 0) {
+        addCovers(lookup, urls)
+      }
+    }
+  }
+
+  // Web browser fallback handlers using HTML inputs
   async function handleMusicFiles(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? [])
     if (files.length === 0) return
@@ -103,6 +162,10 @@ export function useLibraryImport() {
   }
 
   return {
+    isDesktop: isDesktopApp(),
+    handleNativeAddSongs,
+    handleNativeMusicFolder,
+    handleNativeCoverFolder,
     handleMusicFiles,
     handleMusicFolder,
     handleCoverFolder,

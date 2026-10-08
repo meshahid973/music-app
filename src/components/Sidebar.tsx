@@ -27,6 +27,10 @@ export type SidebarProps = {
   onAddSongs: (e: ChangeEvent<HTMLInputElement>) => void
   onAddMusicFolder: (e: ChangeEvent<HTMLInputElement>) => void
   onAddCoverFolder: (e: ChangeEvent<HTMLInputElement>) => void
+  isDesktop?: boolean
+  onNativeAddSongs?: () => void
+  onNativeMusicFolder?: () => void
+  onNativeCoverFolder?: () => void
 }
 
 export function Sidebar({
@@ -42,6 +46,10 @@ export function Sidebar({
   onAddSongs,
   onAddMusicFolder,
   onAddCoverFolder,
+  isDesktop = false,
+  onNativeAddSongs,
+  onNativeMusicFolder,
+  onNativeCoverFolder,
 }: SidebarProps) {
   return (
     <aside className="sidebar">
@@ -134,33 +142,69 @@ export function Sidebar({
           </button>
         </form>
 
-        <label className="nav-item import-nav-item" title="Manually select audio files (current mode)">
-          <UploadFilled size={18} />
-          <span>Add songs</span>
-          <input type="file" accept="audio/*" multiple onChange={onAddSongs} />
-        </label>
+        {isDesktop && onNativeAddSongs ? (
+          <button
+            type="button"
+            className="nav-item import-nav-item"
+            title="Select audio files from your computer"
+            onClick={onNativeAddSongs}
+          >
+            <UploadFilled size={18} />
+            <span>Add songs</span>
+          </button>
+        ) : (
+          <label className="nav-item import-nav-item" title="Manually select audio files">
+            <UploadFilled size={18} />
+            <span>Add songs</span>
+            <input type="file" accept="audio/*" multiple onChange={onAddSongs} />
+          </label>
+        )}
 
-        <label className="nav-item import-nav-item" title="Import an entire music folder">
-          <FolderMusicFilled size={18} />
-          <span>Music folder</span>
-          <input
-            type="file"
-            multiple
-            onChange={onAddMusicFolder}
-            {...{ webkitdirectory: '', directory: '' }}
-          />
-        </label>
+        {isDesktop && onNativeMusicFolder ? (
+          <button
+            type="button"
+            className="nav-item import-nav-item"
+            title="Import an entire music folder from your computer"
+            onClick={onNativeMusicFolder}
+          >
+            <FolderMusicFilled size={18} />
+            <span>Music folder</span>
+          </button>
+        ) : (
+          <label className="nav-item import-nav-item" title="Import an entire music folder">
+            <FolderMusicFilled size={18} />
+            <span>Music folder</span>
+            <input
+              type="file"
+              multiple
+              onChange={onAddMusicFolder}
+              {...{ webkitdirectory: '', directory: '' }}
+            />
+          </label>
+        )}
 
-        <label className="nav-item import-nav-item" title="Import a folder of cover artwork">
-          <FolderImageFilled size={18} />
-          <span>Cover folder</span>
-          <input
-            type="file"
-            multiple
-            onChange={onAddCoverFolder}
-            {...{ webkitdirectory: '', directory: '' }}
-          />
-        </label>
+        {isDesktop && onNativeCoverFolder ? (
+          <button
+            type="button"
+            className="nav-item import-nav-item"
+            title="Import a folder of cover artwork from your computer"
+            onClick={onNativeCoverFolder}
+          >
+            <FolderImageFilled size={18} />
+            <span>Cover folder</span>
+          </button>
+        ) : (
+          <label className="nav-item import-nav-item" title="Import a folder of cover artwork">
+            <FolderImageFilled size={18} />
+            <span>Cover folder</span>
+            <input
+              type="file"
+              multiple
+              onChange={onAddCoverFolder}
+              {...{ webkitdirectory: '', directory: '' }}
+            />
+          </label>
+        )}
       </nav>
     </aside>
   )

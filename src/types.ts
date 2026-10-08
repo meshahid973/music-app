@@ -8,7 +8,9 @@ export type Track = {
   duration: number
   fileName: string
   audioUrl: string
+  filePath?: string
   coverUrl?: string
+  coverPath?: string
   coverSource?: 'direct' | 'embedded' | 'custom' | 'pool'
   accent: string
 }

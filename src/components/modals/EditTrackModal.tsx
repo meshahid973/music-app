@@ -8,6 +8,7 @@ import {
   UploadFilled,
 } from '../icons'
 import { cleanDisplayTitle } from '../../utils/library'
+import { isDesktopApp, pickNativeImageFile, toNativeAssetUrl } from '../../utils/platform'
 import type { Track } from '../../types'
 
 export type EditTrackModalProps = {
@@ -23,6 +24,14 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
   const [album, setAlbum] = useState(track.album)
   const [coverUrl, setCoverUrl] = useState<string | undefined>(track.coverUrl)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const isDesktop = isDesktopApp()
+
+  async function handleNativeChooseImage() {
+    const selected = await pickNativeImageFile()
+    if (selected) {
+      setCoverUrl(toNativeAssetUrl(selected))
+    }
+  }
 
   function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -120,16 +129,27 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
             <div className="cover-upload-controls">
               <p>Upload artwork to display on the spinning CD disc.</p>
               <div className="cover-upload-actions">
-                <label className="upload-file-btn">
-                  <UploadFilled size={14} />
-                  <span>{coverUrl ? 'Replace Art' : 'Upload Art'}</span>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                  />
-                </label>
+                {isDesktop ? (
+                  <button
+                    type="button"
+                    className="upload-file-btn"
+                    onClick={handleNativeChooseImage}
+                  >
+                    <UploadFilled size={14} />
+                    <span>{coverUrl ? 'Replace Art' : 'Upload Art'}</span>
+                  </button>
+                ) : (
+                  <label className="upload-file-btn">
+                    <UploadFilled size={14} />
+                    <span>{coverUrl ? 'Replace Art' : 'Upload Art'}</span>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                    />
+                  </label>
+                )}
                 {coverUrl && (
                   <button
                     type="button"

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import {
   PencilFilled,
@@ -38,6 +38,7 @@ function App() {
     shuffle,
     repeat,
     volume,
+    initDesktopStorage,
     setActivePlaylist,
     addTrackToPlaylist,
     removeTrackFromPlaylist,
@@ -46,6 +47,11 @@ function App() {
     setVolume,
     updateTrack,
   } = useMusicStore()
+
+  // Initialize desktop local database storage on launch
+  useEffect(() => {
+    initDesktopStorage()
+  }, [initDesktopStorage])
 
   // 1. Playlist and queue management
   const {
@@ -78,9 +84,17 @@ function App() {
     togglePlay,
   } = useAudioPlayback(queueRef)
 
-  // 4. File importing & drag/drop
-  const { handleMusicFiles, handleMusicFolder, handleCoverFolder, handleDrop } =
-    useLibraryImport()
+  // 4. File importing & drag/drop (supporting both native dialogs & web drag/drop)
+  const {
+    isDesktop,
+    handleNativeAddSongs,
+    handleNativeMusicFolder,
+    handleNativeCoverFolder,
+    handleMusicFiles,
+    handleMusicFolder,
+    handleCoverFolder,
+    handleDrop,
+  } = useLibraryImport()
 
   // 5. Global keyboard shortcuts (e.g. Space to play/pause, media keys)
   useKeyboardShortcuts({
@@ -111,6 +125,10 @@ function App() {
         onAddSongs={handleMusicFiles}
         onAddMusicFolder={handleMusicFolder}
         onAddCoverFolder={handleCoverFolder}
+        isDesktop={isDesktop}
+        onNativeAddSongs={handleNativeAddSongs}
+        onNativeMusicFolder={handleNativeMusicFolder}
+        onNativeCoverFolder={handleNativeCoverFolder}
       />
 
       <section className="content">
@@ -190,6 +208,10 @@ function App() {
           onAddSongs={handleMusicFiles}
           onAddMusicFolder={handleMusicFolder}
           onAddCoverFolder={handleCoverFolder}
+          isDesktop={isDesktop}
+          onNativeAddSongs={handleNativeAddSongs}
+          onNativeMusicFolder={handleNativeMusicFolder}
+          onNativeCoverFolder={handleNativeCoverFolder}
         />
       </section>
 

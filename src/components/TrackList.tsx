@@ -29,6 +29,10 @@ export type TrackListProps = {
   onAddSongs?: (e: ChangeEvent<HTMLInputElement>) => void
   onAddMusicFolder?: (e: ChangeEvent<HTMLInputElement>) => void
   onAddCoverFolder?: (e: ChangeEvent<HTMLInputElement>) => void
+  isDesktop?: boolean
+  onNativeAddSongs?: () => void
+  onNativeMusicFolder?: () => void
+  onNativeCoverFolder?: () => void
 }
 
 export function TrackList({
@@ -45,6 +49,10 @@ export function TrackList({
   onAddSongs,
   onAddMusicFolder,
   onAddCoverFolder,
+  isDesktop = false,
+  onNativeAddSongs,
+  onNativeMusicFolder,
+  onNativeCoverFolder,
 }: TrackListProps) {
   if (tracks.length === 0) {
     return (
@@ -53,36 +61,74 @@ export function TrackList({
         <h3>Your library is waiting</h3>
         <p>Add songs manually or import an entire music folder. Covers will automatically be applied to songs in your library.</p>
         <div className="empty-state-actions">
-          {onAddSongs && (
-            <label className="empty-state-btn" title="Manually select audio files">
+          {isDesktop && onNativeAddSongs ? (
+            <button
+              type="button"
+              className="empty-state-btn"
+              title="Select audio files from your computer"
+              onClick={onNativeAddSongs}
+            >
               <UploadFilled size={15} />
               <span>Add songs</span>
-              <input type="file" accept="audio/*" multiple onChange={onAddSongs} />
-            </label>
+            </button>
+          ) : (
+            onAddSongs && (
+              <label className="empty-state-btn" title="Manually select audio files">
+                <UploadFilled size={15} />
+                <span>Add songs</span>
+                <input type="file" accept="audio/*" multiple onChange={onAddSongs} />
+              </label>
+            )
           )}
-          {onAddMusicFolder && (
-            <label className="empty-state-btn" title="Import an entire music folder">
+
+          {isDesktop && onNativeMusicFolder ? (
+            <button
+              type="button"
+              className="empty-state-btn"
+              title="Import an entire music folder from your computer"
+              onClick={onNativeMusicFolder}
+            >
               <FolderMusicFilled size={15} />
               <span>Music folder</span>
-              <input
-                type="file"
-                multiple
-                onChange={onAddMusicFolder}
-                {...{ webkitdirectory: '', directory: '' }}
-              />
-            </label>
+            </button>
+          ) : (
+            onAddMusicFolder && (
+              <label className="empty-state-btn" title="Import an entire music folder">
+                <FolderMusicFilled size={15} />
+                <span>Music folder</span>
+                <input
+                  type="file"
+                  multiple
+                  onChange={onAddMusicFolder}
+                  {...{ webkitdirectory: '', directory: '' }}
+                />
+              </label>
+            )
           )}
-          {onAddCoverFolder && (
-            <label className="empty-state-btn subtle" title="Import a folder of cover artwork">
+
+          {isDesktop && onNativeCoverFolder ? (
+            <button
+              type="button"
+              className="empty-state-btn subtle"
+              title="Import a folder of cover artwork from your computer"
+              onClick={onNativeCoverFolder}
+            >
               <FolderImageFilled size={15} />
               <span>Cover folder</span>
-              <input
-                type="file"
-                multiple
-                onChange={onAddCoverFolder}
-                {...{ webkitdirectory: '', directory: '' }}
-              />
-            </label>
+            </button>
+          ) : (
+            onAddCoverFolder && (
+              <label className="empty-state-btn subtle" title="Import a folder of cover artwork">
+                <FolderImageFilled size={15} />
+                <span>Cover folder</span>
+                <input
+                  type="file"
+                  multiple
+                  onChange={onAddCoverFolder}
+                  {...{ webkitdirectory: '', directory: '' }}
+                />
+              </label>
+            )
           )}
         </div>
       </motion.div>
