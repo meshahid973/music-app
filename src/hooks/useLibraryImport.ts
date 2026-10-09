@@ -60,9 +60,9 @@ export function useLibraryImport() {
     getCurrentWebview()
       .onDragDropEvent((event) => {
         if (event.payload.type === 'drop' && event.payload.paths.length > 0) {
-          void scanNativeDroppedPaths(event.payload.paths).then(({ audioPaths, coverPaths }) =>
-            importNativeScanResult(audioPaths, coverPaths),
-          )
+          void scanNativeDroppedPaths(event.payload.paths)
+            .then(({ audioPaths, coverPaths }) => importNativeScanResult(audioPaths, coverPaths))
+            .catch((error) => console.warn('Could not import dropped music:', error))
         }
       })
       .then((fn) => {

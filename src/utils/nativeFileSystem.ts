@@ -1,6 +1,6 @@
-import { readDir } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
 import { toNativeAssetUrl } from './platform.ts'
-import { audioExtensions, coverExtensions, getExtension, readDuration } from './audioFiles.ts'
+import { readDuration } from './audioFiles.ts'
 import { colorFromString, normalizeName } from './covers.ts'
 import { autoDetectTrackMetadata } from './metadata.ts'
 import { cleanDisplayTitle } from './tracks.ts'
@@ -9,21 +9,13 @@ import { saveEmbeddedArtwork } from './artworkStorage.ts'
 import { objectUrlForBlob } from './objectUrls.ts'
 import type { CoverLookup, Track } from '../types.ts'
 
-function joinPath(dir: string, file: string): string {
-  if (dir.endsWith('/') || dir.endsWith('\\')) {
-    return `${dir}${file}`
-  }
-  const separator = dir.includes('\\') ? '\\' : '/'
-  return `${dir}${separator}${file}`
-}
-
 function getFileName(filePath: string): string {
-  const parts = filePath.split(/[/\\]/)
+  const parts = filePath.split(/[/\\\\]/)
   return parts[parts.length - 1] || filePath
 }
 
 function getParentDirName(filePath: string): string {
-  const parts = filePath.split(/[/\\]/).filter(Boolean)
+  const parts = filePath.split(/[/\\\\]/).filter(Boolean)
   return parts.length > 1 ? parts[parts.length - 2] : ''
 }
 
@@ -32,54 +24,18 @@ export interface NativeScanResult {
   coverPaths: string[]
 }
 
-export async function scanNativeFolder(folderPath: string): Promise<NativeScanResult> {
-  const audioPaths: string[] = []
-  const coverPaths: string[] = []
-
-  async function traverse(currentPath: string, depth = 0) {
-    if (depth > 8) return // Guard against excessive recursion
-    try {
-      const entries = await readDir(currentPath)
-      for (const entry of entries) {
-        const fullPath = joinPath(currentPath, entry.name)
-        if (entry.isDirectory) {
-          await traverse(fullPath, depth + 1)
-        } else if (entry.isFile) {
-          const ext = getExtension(entry.name)
-          if (audioExtensions.has(ext)) {
-            audioPaths.push(fullPath)
-          } else if (coverExtensions.has(ext)) {
-            coverPaths.push(fullPath)
-          }
-        }
-      }
-    } catch (err) {
-      console.warn(`Could not read directory ${currentPath}:`, err)
-    }
-  }
-
-  await traverse(folderPath)
-  return { audioPaths, coverPaths }
+async function scanNativePaths(paths: string[]): Promise<NativeScanResult> {
+  if (paths.length === 0) return { audioPaths: [], coverPaths: [] }
+  return invoke<NativeScanResult>('scan_music_paths', { paths })
 }
 
-export async function scanNativeDroppedPaths(droppedPaths: string[]): Promise<NativeScanResult> {
-  const audioPaths: string[] = []
-  const coverPaths: string[] = []
+// Both OS folder selection and Explorer drag/drop share the same Rust worker.
+export function scanNativeFolder(folderPath: string): Promise<NativeScanResult> {
+  return scanNativePaths([folderPath])
+}
 
-  for (const itemPath of droppedPaths) {
-    const ext = getExtension(itemPath)
-    if (audioExtensions.has(ext)) {
-      audioPaths.push(itemPath)
-    } else if (coverExtensions.has(ext)) {
-      coverPaths.push(itemPath)
-    } else {
-      const folderScan = await scanNativeFolder(itemPath)
-      audioPaths.push(...folderScan.audioPaths)
-      coverPaths.push(...folderScan.coverPaths)
-    }
-  }
-
-  return { audioPaths, coverPaths }
+export function scanNativeDroppedPaths(droppedPaths: string[]): Promise<NativeScanResult> {
+  return scanNativePaths(droppedPaths)
 }
 
 export function nativeCoversFromPaths(coverPaths: string[]): {
