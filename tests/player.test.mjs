@@ -786,11 +786,36 @@ test('Windows setup.exe Tauri configuration and capabilities include required NS
 })
 
 test('scanNativeDroppedPaths classifies dropped audio and cover files and nativeTracksFromPaths deduplicates batch paths', async () => {
-  const dropped = await scanNativeDroppedPaths([
-    'C:\\Music\\Album\\Track 01.mp3',
-    'C:\\Music\\Album\\cover.jpg',
-    'C:\\Music\\Album\\Track 02.flac',
-  ])
+  // Tauri's invoke transport is unavailable in Node; simulate its typed
+  // native scan response while Rust unit tests cover filesystem traversal.
+  const previousWindow = globalThis.window
+  globalThis.window = {
+    __TAURI_INTERNALS__: {
+      invoke: async (command, args) => {
+        assert.equal(command, 'scan_music_paths')
+        assert.deepEqual(args.paths, [
+          'C:\\Music\\Album\\Track 01.mp3',
+          'C:\\Music\\Album\\cover.jpg',
+          'C:\\Music\\Album\\Track 02.flac',
+        ])
+        return {
+          audioPaths: [args.paths[0], args.paths[2]],
+          coverPaths: [args.paths[1]],
+        }
+      },
+    },
+  }
+  let dropped
+  try {
+    dropped = await scanNativeDroppedPaths([
+      'C:\\Music\\Album\\Track 01.mp3',
+      'C:\\Music\\Album\\cover.jpg',
+      'C:\\Music\\Album\\Track 02.flac',
+    ])
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
+  }
   assert.deepEqual(dropped.audioPaths, [
     'C:\\Music\\Album\\Track 01.mp3',
     'C:\\Music\\Album\\Track 02.flac',
