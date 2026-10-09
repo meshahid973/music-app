@@ -5,6 +5,8 @@ export class PlaybackQueue {
   private cursor = -1
   private remaining: string[] = []
   get size() { return this.ids.length }
+  get currentHistory(): string[] { return [...this.history] }
+  get trackIds(): string[] { return [...this.ids] }
 
   start(ids: string[], current: string): void {
     this.ids = Array.from(new Set(ids))
@@ -12,6 +14,33 @@ export class PlaybackQueue {
     this.history = [current]
     this.cursor = 0
     this.remaining = this.ids.filter(id => id !== current)
+  }
+
+  sync(ids: string[], current?: string): void {
+    const unique = Array.from(new Set(ids))
+    if (unique.length === 0) {
+      this.clear()
+      return
+    }
+    this.ids = unique
+    if (current && !this.ids.includes(current)) {
+      this.ids.unshift(current)
+    }
+
+    const validIds = new Set(this.ids)
+    this.history = this.history.filter(id => validIds.has(id))
+
+    if (current) {
+      if (!this.history.includes(current)) {
+        this.history.push(current)
+      }
+      this.cursor = this.history.lastIndexOf(current)
+    } else if (this.cursor >= this.history.length) {
+      this.cursor = Math.max(0, this.history.length - 1)
+    }
+
+    const historySet = new Set(this.history)
+    this.remaining = this.ids.filter(id => !historySet.has(id))
   }
 
   clear(): void {

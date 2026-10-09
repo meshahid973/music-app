@@ -9,7 +9,7 @@ import {
 } from '../icons'
 import { cleanDisplayTitle } from '../../utils/library'
 import { isDesktopApp, pickNativeImageFile, toNativeAssetUrl } from '../../utils/platform'
-import { saveCustomArtwork } from '../../utils/artworkStorage'
+import { processTrackEdit } from '../../utils/trackEdit'
 import type { Track } from '../../types'
 
 export type EditTrackModalProps = {
@@ -69,36 +69,27 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
     setErrorMessage(null)
     setIsSaving(true)
 
-    let finalCoverUrl = coverUrl
-    let finalCoverPath = coverPath
-
-    if (isDesktop && pendingImageSource) {
-      try {
-        const saved = await saveCustomArtwork(track.id, pendingImageSource)
-        if (!saved) {
-          setErrorMessage('Failed to save custom artwork. Please check disk permissions and try again.')
-          setIsSaving(false)
-          return
-        }
-        finalCoverPath = saved
-        finalCoverUrl = toNativeAssetUrl(saved)
-      } catch (err) {
-        console.warn('Failed to save custom artwork:', err)
-        setErrorMessage('Failed to save custom artwork. Please try again.')
-        setIsSaving(false)
-        return
-      }
-    }
+    const result = await processTrackEdit({
+      track,
+      title,
+      artist,
+      album,
+      coverUrl,
+      coverPath,
+      pendingImageSource,
+      isDesktop,
+    })
 
     setIsSaving(false)
-    onSave({
-      title: title.trim() || track.title,
-      artist: artist.trim() || track.artist,
-      album: album.trim() || track.album,
-      coverUrl: finalCoverUrl,
-      coverPath: finalCoverUrl ? finalCoverPath : undefined,
-      coverSource: finalCoverUrl ? 'custom' : undefined,
-    })
+
+    if (!result.success) {
+      setErrorMessage(result.errorMessage || 'Failed to save custom artwork.')
+      return
+    }
+
+    if (result.updates) {
+      onSave(result.updates)
+    }
     onClose()
   }
 

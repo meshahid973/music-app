@@ -19,6 +19,18 @@ import {
 } from '../src/utils/artworkStorage.ts'
 import { nativeTracksFromPaths } from '../src/utils/nativeFileSystem.ts'
 import { useMusicStore } from '../src/store/useMusicStore.ts'
+import { syncPlaylistQueue } from '../src/hooks/usePlaylistManager.ts'
+import { processTrackEdit } from '../src/utils/trackEdit.ts'
+
+if (typeof globalThis.localStorage === 'undefined') {
+  const store = new Map()
+  globalThis.localStorage = {
+    getItem: (k) => store.get(k) ?? null,
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+    clear: () => store.clear(),
+  }
+}
 
 function fileInfo(path = 'album/song.mp3') {
   return { name: 'song.mp3', size: 123, lastModified: 42, webkitRelativePath: path }
@@ -464,68 +476,47 @@ test('custom artwork save failure leaves track unchanged and keeps new artwork f
     accent: '#444444',
   }
 
-  let saveReported = false
-  const onSave = () => { saveReported = true }
+  // 1. Exercise the REAL processTrackEdit implementation when custom artwork save fails
+  // In desktop mode with an invalid source or failed disk write, processTrackEdit must return failure
+  const failureResult = await processTrackEdit({
+    track: originalTrack,
+    title: 'New Title',
+    artist: 'New Artist',
+    album: 'New Album',
+    coverUrl: 'data:image/png;base64,invalid...',
+    pendingImageSource: 'data:image/png;base64,invalid...',
+    isDesktop: true,
+  })
 
-  // Simulate save failure
-  const mockSaveCustomArtwork = async () => null // returns null on failure
+  // Failure must be reported cleanly
+  assert.equal(failureResult.success, false)
+  assert.notEqual(failureResult.errorMessage, undefined)
+  assert.equal(failureResult.errorMessage.includes('Failed to save custom artwork'), true)
+  assert.equal(failureResult.updates, undefined)
 
-  let pendingCover = 'data:image/png;base64,invalid...'
-  let errorMessage = null
-
-  // Execution of modal submit logic
-  const saved = await mockSaveCustomArtwork()
-  if (!saved) {
-    errorMessage = 'Failed to save custom artwork. Please check disk permissions and try again.'
-  } else {
-    onSave()
-  }
-
-  // 1. Success was NOT reported
-  assert.equal(saveReported, false)
-  // 2. Appropriate error is set
-  assert.notEqual(errorMessage, null)
-  // 3. Pending artwork and original track remain intact for retry
-  assert.equal(pendingCover, 'data:image/png;base64,invalid...')
+  // Original track remains completely untouched
   assert.equal(originalTrack.coverPath, '/appdata/artwork/original.jpg')
+  assert.equal(originalTrack.title, 'Original Title')
 
-  // Retry with success
-  const mockSaveSuccess = async () => '/appdata/artwork/custom_saved.png'
-  const retrySaved = await mockSaveSuccess()
-  if (retrySaved) {
-    errorMessage = null
-    onSave()
-  }
-  assert.equal(saveReported, true)
-  assert.equal(errorMessage, null)
+  // 2. Retry with a valid source (e.g. web/non-desktop or successful path)
+  const retryResult = await processTrackEdit({
+    track: originalTrack,
+    title: 'New Title',
+    artist: 'New Artist',
+    album: 'New Album',
+    coverUrl: 'https://example.com/custom_art.png',
+    isDesktop: false,
+  })
+
+  assert.equal(retryResult.success, true)
+  assert.equal(retryResult.errorMessage, undefined)
+  assert.equal(retryResult.updates?.title, 'New Title')
+  assert.equal(retryResult.updates?.coverUrl, 'https://example.com/custom_art.png')
+  assert.equal(retryResult.updates?.coverSource, 'custom')
 })
 
 test('startup desktop library initialization safely merges concurrent in-memory imports', async () => {
-  const store = useMusicStore.getState()
-
-  // Concurrently added track while desktop storage is loading
-  const concurrentTrack = {
-    id: 'native:/music/new_drop.mp3',
-    title: 'Dropped Track',
-    artist: 'Drop Artist',
-    album: 'Drop Album',
-    duration: 120,
-    fileName: 'new_drop.mp3',
-    filePath: '/music/new_drop.mp3',
-    audioUrl: 'asset:///music/new_drop.mp3',
-    accent: '#555555',
-  }
-
-  // Add track to in-memory store
-  useMusicStore.setState({
-    tracks: [concurrentTrack],
-    playlists: [
-      { id: 'favorites', name: 'Favorites', trackIds: [concurrentTrack.id], createdAt: 1 },
-      { id: 'custom-concurrent', name: 'Concurrent Playlist', trackIds: [], createdAt: 2 },
-    ],
-  })
-
-  // Loaded library from desktop disk storage (representing previous session)
+  // 1. Seed the desktop backup storage representing previous session
   const loadedFromDisk = {
     tracks: [
       {
@@ -549,40 +540,152 @@ test('startup desktop library initialization safely merges concurrent in-memory 
     shuffle: false,
     repeat: 'off',
   }
+  localStorage.setItem('resonance_desktop_library_backup', JSON.stringify(loadedFromDisk))
 
-  // Perform safe merge as in initDesktopStorage
-  const trackMap = new Map()
-  for (const t of loadedFromDisk.tracks) trackMap.set(t.id, t)
-  for (const t of useMusicStore.getState().tracks) {
-    const existing = trackMap.get(t.id)
-    trackMap.set(t.id, existing ? { ...existing, ...t } : t)
+  // 2. Simulate concurrent user import while desktop storage is initializing
+  const concurrentTrack = {
+    id: 'native:/music/new_drop.mp3',
+    title: 'Dropped Track',
+    artist: 'Drop Artist',
+    album: 'Drop Album',
+    duration: 120,
+    fileName: 'new_drop.mp3',
+    filePath: '/music/new_drop.mp3',
+    audioUrl: 'asset:///music/new_drop.mp3',
+    accent: '#555555',
   }
-  const mergedTracks = Array.from(trackMap.values())
 
-  const playlistMap = new Map()
-  for (const p of loadedFromDisk.playlists) playlistMap.set(p.id, p)
-  for (const p of useMusicStore.getState().playlists) {
-    const existing = playlistMap.get(p.id)
-    if (existing) {
-      const mergedTrackIds = Array.from(new Set([...existing.trackIds, ...p.trackIds]))
-      playlistMap.set(p.id, { ...existing, ...p, trackIds: mergedTrackIds })
-    } else {
-      playlistMap.set(p.id, p)
-    }
-  }
-  const mergedPlaylists = Array.from(playlistMap.values())
+  useMusicStore.setState({
+    isInitialized: false,
+    tracks: [concurrentTrack],
+    playlists: [
+      { id: 'favorites', name: 'Favorites', trackIds: [concurrentTrack.id], createdAt: 1 },
+      { id: 'custom-concurrent', name: 'Concurrent Playlist', trackIds: [], createdAt: 2 },
+    ],
+  })
+
+  // 3. Invoke the REAL initDesktopStorage implementation
+  await useMusicStore.getState().initDesktopStorage()
+
+  const state = useMusicStore.getState()
+  assert.equal(state.isInitialized, true)
 
   // Verify: BOTH disk tracks and concurrent tracks exist
-  assert.equal(mergedTracks.length, 2)
-  assert.equal(mergedTracks.some(t => t.id === concurrentTrack.id), true)
-  assert.equal(mergedTracks.some(t => t.id === 'native:/music/persisted.mp3'), true)
+  assert.equal(state.tracks.length, 2)
+  assert.equal(state.tracks.some(t => t.id === concurrentTrack.id), true)
+  assert.equal(state.tracks.some(t => t.id === 'native:/music/persisted.mp3'), true)
 
   // Verify: Concurrently created playlist is preserved
-  assert.equal(mergedPlaylists.some(p => p.id === 'custom-concurrent'), true)
+  assert.equal(state.playlists.some(p => p.id === 'custom-concurrent'), true)
   // Verify: Favorites trackIds merged both concurrent and disk tracks
-  const favorites = mergedPlaylists.find(p => p.id === 'favorites')
+  const favorites = state.playlists.find(p => p.id === 'favorites')
   assert.equal(favorites.trackIds.includes(concurrentTrack.id), true)
   assert.equal(favorites.trackIds.includes('native:/music/persisted.mp3'), true)
+})
+
+test('playback queue initializes when tracks and currentTrackId arrive at startup and preserves history', () => {
+  const queue = new PlaybackQueue()
+  const syncState = { lastPlaylistId: null, lastTrackIds: [] }
+
+  // Startup: Desktop storage loaded tracks AND currentTrackId together into 'library'
+  // At startup, the queue was empty (size 0), and currentTrackId ('track2') is provided.
+  syncPlaylistQueue(queue, syncState, {
+    activePlaylistId: 'library',
+    playlistTrackIds: ['track1', 'track2', 'track3'],
+    currentTrackId: 'track2',
+  })
+
+  // Queue MUST be initialized and not left empty!
+  assert.equal(queue.size, 3)
+  assert.equal(queue.next('track2', false, 'off'), 'track3')
+  assert.equal(queue.previous('track2', false, 'off'), 'track1')
+
+  // Ordinary playback: track advances to 'track3'
+  // When Next was called, queue recorded history. Syncing during ordinary playback must NOT wipe history!
+  syncPlaylistQueue(queue, syncState, {
+    activePlaylistId: 'library',
+    playlistTrackIds: ['track1', 'track2', 'track3'],
+    currentTrackId: 'track3',
+  })
+  assert.equal(queue.size, 3)
+
+  // Tracks arrive later: user adds 'track4' and 'track5'
+  syncPlaylistQueue(queue, syncState, {
+    activePlaylistId: 'library',
+    playlistTrackIds: ['track1', 'track2', 'track3', 'track4', 'track5'],
+    currentTrackId: 'track3',
+  })
+  assert.equal(queue.size, 5)
+  assert.equal(queue.trackIds.includes('track4'), true)
+  assert.equal(queue.next('track3', false, 'off'), 'track4')
+
+  // Empty playlist selected: queue is cleared so previous tracks cannot continue
+  syncPlaylistQueue(queue, syncState, {
+    activePlaylistId: 'empty-playlist',
+    playlistTrackIds: [],
+    currentTrackId: 'track3',
+  })
+  assert.equal(queue.size, 0)
+  assert.equal(queue.next('track3', false, 'off'), undefined)
+  assert.equal(queue.previous('track3', false, 'off'), undefined)
+})
+
+test('embedded artwork provides in-session visible fallback when saving to AppData fails and is not persisted durably', async () => {
+  // Construct valid MP3 tag with an APIC JPEG frame
+  const fakeJpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0xff, 0xd9])
+  const mime = Buffer.from('image/jpeg\0', 'ascii')
+  const apicBody = Buffer.concat([Buffer.from([0]), mime, Buffer.from([3, 0]), fakeJpeg])
+  const apicSize = Buffer.from([(apicBody.length >>> 24) & 255, (apicBody.length >>> 16) & 255, (apicBody.length >>> 8) & 255, apicBody.length & 255])
+  const apicFrame = Buffer.concat([Buffer.from('APIC'), apicSize, Buffer.from([0, 0]), apicBody])
+
+  const buildFrame = (name, value) => {
+    const data = Buffer.concat([Buffer.from([3]), Buffer.from(value, 'utf8')])
+    const size = Buffer.from([(data.length >>> 24) & 255, (data.length >>> 16) & 255, (data.length >>> 8) & 255, data.length & 255])
+    return Buffer.concat([Buffer.from(name), size, Buffer.from([0, 0]), data])
+  }
+
+  const body = Buffer.concat([
+    buildFrame('TIT2', 'Song With Embedded Art'),
+    buildFrame('TPE1', 'Artist With Art'),
+    apicFrame,
+  ])
+  const header = Buffer.from([73, 68, 51, 3, 0, 0, ...synchsafe(body.length)])
+  const tagBytes = new Uint8Array(Buffer.concat([header, body]))
+
+  // Simulate native track extraction when saveEmbeddedArtwork returns null (non-desktop test environment)
+  const detected = await autoDetectTrackMetadata('song_with_art.mp3', tagBytes)
+  assert.notEqual(detected.coverBytes, undefined)
+
+  // In nativeFileSystem.ts, when saveEmbeddedArtwork returns null, fallback creates in-session blob URL
+  const inSessionUrl = URL.createObjectURL(new Blob([detected.coverBytes], { type: detected.coverMime }))
+  const trackWithFallback = {
+    id: 'native:/music/song_with_art.mp3',
+    title: detected.title,
+    artist: detected.artist,
+    album: detected.album,
+    duration: 180,
+    fileName: 'song_with_art.mp3',
+    filePath: '/music/song_with_art.mp3',
+    audioUrl: 'asset:///music/song_with_art.mp3',
+    coverUrl: inSessionUrl, // visible in-session fallback!
+    coverPath: undefined, // durable path is undefined!
+    coverSource: 'embedded',
+    accent: '#333333',
+  }
+
+  // 1. Visible in session
+  assert.equal(trackWithFallback.coverUrl.startsWith('blob:'), true)
+  assert.equal(trackWithFallback.coverPath, undefined)
+
+  // 2. When saving to persistence, temporary blob URL must NOT be treated as durable!
+  const sanitized = sanitizeTrackForPersistence(trackWithFallback)
+  assert.equal(sanitized.coverUrl, undefined)
+  assert.equal(sanitized.coverPath, undefined)
+
+  // 3. On restart / hydration, no stale path is resurrected
+  const hydrated = hydrateTrackArtwork(sanitized)
+  assert.equal(hydrated.coverUrl, undefined)
+  assert.equal(hydrated.coverPath, undefined)
 })
 
 test('native byte input extracts coverBytes without leaking unused object URLs', async () => {

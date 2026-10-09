@@ -6,6 +6,7 @@ import { autoDetectTrackMetadata } from './metadata.ts'
 import { cleanDisplayTitle } from './tracks.ts'
 import { readBoundedNativeFile } from './boundedMetadata.ts'
 import { saveEmbeddedArtwork } from './artworkStorage.ts'
+import { objectUrlForBlob } from './objectUrls.ts'
 import type { CoverLookup, Track } from '../types.ts'
 
 function joinPath(dir: string, file: string): string {
@@ -130,16 +131,25 @@ export async function nativeTracksFromPaths(
 
         // If track contains embedded artwork, save it durably to AppData
         if (detected.coverBytes && detected.coverBytes.length > 0) {
-          const savedPath = await saveEmbeddedArtwork(
-            id,
-            detected.coverBytes,
-            detected.coverMime,
-          )
-          if (savedPath) {
-            embeddedCoverPath = savedPath
-            embeddedCoverUrl = toNativeAssetUrl(savedPath)
-          } else if (detected.coverUrl && !detected.coverUrl.startsWith('blob:')) {
-            embeddedCoverUrl = detected.coverUrl
+          try {
+            const savedPath = await saveEmbeddedArtwork(
+              id,
+              detected.coverBytes,
+              detected.coverMime,
+            )
+            if (savedPath) {
+              embeddedCoverPath = savedPath
+              embeddedCoverUrl = toNativeAssetUrl(savedPath)
+            } else {
+              // Provide a visible in-session fallback when durable saving fails
+              const mime = detected.coverMime || 'image/jpeg'
+              embeddedCoverUrl = objectUrlForBlob(new Blob([detected.coverBytes as unknown as BlobPart], { type: mime }))
+              embeddedCoverPath = undefined
+            }
+          } catch {
+            const mime = detected.coverMime || 'image/jpeg'
+            embeddedCoverUrl = objectUrlForBlob(new Blob([detected.coverBytes as unknown as BlobPart], { type: mime }))
+            embeddedCoverPath = undefined
           }
         }
       } else {

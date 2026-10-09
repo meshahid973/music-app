@@ -35,7 +35,9 @@ export async function saveDesktopLibrary(data: DesktopLibraryPayload): Promise<v
     }
   } else {
     try {
-      localStorage.setItem(WEB_STORAGE_KEY, JSON.stringify(payload))
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(WEB_STORAGE_KEY, JSON.stringify(payload))
+      }
     } catch {
       // ignore
     }
@@ -64,12 +66,14 @@ export async function loadDesktopLibrary(): Promise<DesktopLibraryPayload | null
     }
   } else {
     try {
-      const raw = localStorage.getItem(WEB_STORAGE_KEY)
-      if (raw) {
-        const parsed: DesktopLibraryPayload = JSON.parse(raw)
-        return {
-          ...parsed,
-          tracks: hydrateTracksArtwork(parsed.tracks),
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(WEB_STORAGE_KEY)
+        if (raw) {
+          const parsed: DesktopLibraryPayload = JSON.parse(raw)
+          return {
+            ...parsed,
+            tracks: hydrateTracksArtwork(parsed.tracks),
+          }
         }
       }
     } catch {
