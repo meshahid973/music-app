@@ -1,6 +1,8 @@
+import { useRef } from 'react'
 import type { ChangeEvent } from 'react'
 import {
   AudioLinesFilled,
+  CheckFilled,
   DiscFilled,
   FolderImageFilled,
   FolderMusicFilled,
@@ -8,6 +10,7 @@ import {
   PencilFilled,
   PlaylistFilled,
   PlusFilled,
+  RefreshFilled,
   TrashFilled,
   UploadFilled,
 } from './icons'
@@ -31,6 +34,13 @@ export type SidebarProps = {
   onNativeAddSongs?: () => void
   onNativeMusicFolder?: () => void
   onNativeCoverFolder?: () => void
+  onRescanMusicFolder?: () => void
+  onRescanCoverFolder?: () => void
+  isScanningMusic?: boolean
+  isScanningCovers?: boolean
+  musicFolderName?: string
+  coverFolderName?: string
+  scanNotice?: string | null
 }
 
 export function Sidebar({
@@ -50,7 +60,49 @@ export function Sidebar({
   onNativeAddSongs,
   onNativeMusicFolder,
   onNativeCoverFolder,
+  onRescanMusicFolder,
+  onRescanCoverFolder,
+  isScanningMusic = false,
+  isScanningCovers = false,
+  musicFolderName,
+  coverFolderName,
+  scanNotice,
 }: SidebarProps) {
+  const musicInputRef = useRef<HTMLInputElement>(null)
+  const coverInputRef = useRef<HTMLInputElement>(null)
+
+  const handleMusicTriggerClick = () => {
+    if (isDesktop && onNativeMusicFolder) {
+      onNativeMusicFolder()
+    } else {
+      musicInputRef.current?.click()
+    }
+  }
+
+  const handleCoverTriggerClick = () => {
+    if (isDesktop && onNativeCoverFolder) {
+      onNativeCoverFolder()
+    } else {
+      coverInputRef.current?.click()
+    }
+  }
+
+  const handleRescanMusicClick = () => {
+    if (onRescanMusicFolder) {
+      onRescanMusicFolder()
+    } else {
+      handleMusicTriggerClick()
+    }
+  }
+
+  const handleRescanCoverClick = () => {
+    if (onRescanCoverFolder) {
+      onRescanCoverFolder()
+    } else {
+      handleCoverTriggerClick()
+    }
+  }
+
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -160,50 +212,103 @@ export function Sidebar({
           </label>
         )}
 
-        {isDesktop && onNativeMusicFolder ? (
+        {/* Music Folder row with dedicated Rescan button */}
+        <div className="nav-item nav-folder-row">
           <button
             type="button"
-            className="nav-item import-nav-item"
-            title="Import an entire music folder from your computer"
-            onClick={onNativeMusicFolder}
+            className="nav-folder-trigger"
+            title={
+              musicFolderName
+                ? `Music folder: ${musicFolderName} (click to change)`
+                : 'Select or import a music folder'
+            }
+            onClick={handleMusicTriggerClick}
           >
             <FolderMusicFilled size={18} />
-            <span>Music folder</span>
+            <span className="nav-folder-label">
+              {isScanningMusic ? 'Scanning...' : 'Music folder'}
+            </span>
           </button>
-        ) : (
-          <label className="nav-item import-nav-item" title="Import an entire music folder">
-            <FolderMusicFilled size={18} />
-            <span>Music folder</span>
+
+          {!isDesktop && (
             <input
+              ref={musicInputRef}
               type="file"
               multiple
               onChange={onAddMusicFolder}
               {...{ webkitdirectory: '', directory: '' }}
+              style={{ display: 'none' }}
+              aria-hidden="true"
             />
-          </label>
-        )}
+          )}
 
-        {isDesktop && onNativeCoverFolder ? (
           <button
             type="button"
-            className="nav-item import-nav-item"
-            title="Import a folder of cover artwork from your computer"
-            onClick={onNativeCoverFolder}
+            className={`nav-rescan-btn ${isScanningMusic ? 'scanning' : ''}`}
+            title={
+              musicFolderName
+                ? `Rescan "${musicFolderName}" for new songs`
+                : 'Rescan music folder for new songs'
+            }
+            aria-label="Rescan music folder"
+            onClick={handleRescanMusicClick}
+            disabled={isScanningMusic}
+          >
+            <RefreshFilled size={14} className={isScanningMusic ? 'spinning' : ''} />
+          </button>
+        </div>
+
+        {/* Cover Folder row with dedicated Rescan button */}
+        <div className="nav-item nav-folder-row">
+          <button
+            type="button"
+            className="nav-folder-trigger"
+            title={
+              coverFolderName
+                ? `Cover folder: ${coverFolderName} (click to change)`
+                : 'Select or import a cover artwork folder'
+            }
+            onClick={handleCoverTriggerClick}
           >
             <FolderImageFilled size={18} />
-            <span>Cover folder</span>
+            <span className="nav-folder-label">
+              {isScanningCovers ? 'Scanning...' : 'Cover folder'}
+            </span>
           </button>
-        ) : (
-          <label className="nav-item import-nav-item" title="Import a folder of cover artwork">
-            <FolderImageFilled size={18} />
-            <span>Cover folder</span>
+
+          {!isDesktop && (
             <input
+              ref={coverInputRef}
               type="file"
               multiple
               onChange={onAddCoverFolder}
               {...{ webkitdirectory: '', directory: '' }}
+              style={{ display: 'none' }}
+              aria-hidden="true"
             />
-          </label>
+          )}
+
+          <button
+            type="button"
+            className={`nav-rescan-btn ${isScanningCovers ? 'scanning' : ''}`}
+            title={
+              coverFolderName
+                ? `Rescan "${coverFolderName}" for new artwork`
+                : 'Rescan cover folder for new artwork'
+            }
+            aria-label="Rescan cover folder"
+            onClick={handleRescanCoverClick}
+            disabled={isScanningCovers}
+          >
+            <RefreshFilled size={14} className={isScanningCovers ? 'spinning' : ''} />
+          </button>
+        </div>
+
+        {scanNotice && (
+          <div className="sidebar-scan-notice" role="status">
+            <CheckFilled size={14} />
+            <span>{scanNotice}</span>
+          </div>
         )}
       </nav>
     </aside>

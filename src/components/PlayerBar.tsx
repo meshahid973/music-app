@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import type { CSSProperties, RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { CSSProperties, PointerEvent, RefObject } from 'react'
 import type { Howl } from 'howler'
 import ElasticSlider from './ElasticSlider'
 import {
@@ -48,12 +48,20 @@ export function PlayerBar({
   onRepeat,
   onVolume,
 }: PlayerBarProps) {
-  const isDraggingRef = useRef(false)
-  const rangeInputRef = useRef<HTMLInputElement>(null)
+  const duration = currentTrack?.duration ?? 0
+
+  // Scrubber refs & state
+  const trackRef = useRef<HTMLDivElement>(null)
+  const fillRef = useRef<HTMLDivElement>(null)
+  const thumbRef = useRef<HTMLDivElement>(null)
   const timeLabelRef = useRef<HTMLSpanElement>(null)
+  const isDraggingRef = useRef(false)
   const rafRef = useRef<number | null>(null)
 
-  const duration = currentTrack?.duration ?? 0
+  const [isDragging, setIsDragging] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const [hoverPct, setHoverPct] = useState(0)
+  const [hoverTime, setHoverTime] = useState(0)
 
   // 60fps continuous animation frame for seamless, smooth progression
   useEffect(() => {
@@ -75,9 +83,11 @@ export function PlayerBar({
           const clampedPos = duration > 0 ? Math.min(pos, duration) : pos
           const pct = duration > 0 ? (clampedPos / duration) * 100 : 0
 
-          if (rangeInputRef.current) {
-            rangeInputRef.current.value = String(clampedPos)
-            rangeInputRef.current.style.setProperty('--progress-pct', `${pct}%`)
+          if (fillRef.current) {
+            fillRef.current.style.width = `${pct}%`
+          }
+          if (thumbRef.current) {
+            thumbRef.current.style.left = `${pct}%`
           }
 
           const currentSec = Math.floor(clampedPos)
@@ -104,90 +114,223 @@ export function PlayerBar({
 
   // Sync on track switch, pause, or external seek
   useEffect(() => {
-    if (rangeInputRef.current && !isDraggingRef.current) {
+    if (!isDraggingRef.current) {
       const pct = duration > 0 ? (Math.min(seek, duration) / duration) * 100 : 0
-      rangeInputRef.current.value = String(seek)
-      rangeInputRef.current.style.setProperty('--progress-pct', `${pct}%`)
-    }
-    if (timeLabelRef.current && !isDraggingRef.current) {
-      timeLabelRef.current.textContent = formatTime(seek)
+      if (fillRef.current) {
+        fillRef.current.style.width = `${pct}%`
+      }
+      if (thumbRef.current) {
+        thumbRef.current.style.left = `${pct}%`
+      }
+      if (timeLabelRef.current) {
+        timeLabelRef.current.textContent = formatTime(seek)
+      }
     }
   }, [seek, duration, currentTrack?.id])
 
+  const getTimeFromPointer = useCallback(
+    (clientX: number) => {
+      if (!trackRef.current || duration <= 0) return 0
+      const rect = trackRef.current.getBoundingClientRect()
+      if (rect.width <= 0) return 0
+      const relative = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+      return relative * duration
+    },
+    [duration],
+  )
+
+  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (duration <= 0) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    isDraggingRef.current = true
+    setIsDragging(true)
+
+    const targetTime = getTimeFromPointer(e.clientX)
+    const pct = (targetTime / duration) * 100
+
+    if (fillRef.current) fillRef.current.style.width = `${pct}%`
+    if (thumbRef.current) thumbRef.current.style.left = `${pct}%`
+    if (timeLabelRef.current) timeLabelRef.current.textContent = formatTime(targetTime)
+  }
+
+  const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (duration <= 0 || !trackRef.current) return
+    const rect = trackRef.current.getBoundingClientRect()
+    const relative = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    const calculatedTime = relative * duration
+
+    setHoverPct(relative * 100)
+    setHoverTime(calculatedTime)
+
+    if (isDraggingRef.current) {
+      const pct = relative * 100
+      if (fillRef.current) fillRef.current.style.width = `${pct}%`
+      if (thumbRef.current) thumbRef.current.style.left = `${pct}%`
+      if (timeLabelRef.current) timeLabelRef.current.textContent = formatTime(calculatedTime)
+    }
+  }
+
+  const handlePointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    if (isDraggingRef.current) {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      }
+      isDraggingRef.current = false
+      setIsDragging(false)
+      const finalTime = getTimeFromPointer(e.clientX)
+      onSeek(finalTime)
+    }
+  }
+
+  const initialPct = duration > 0 ? (Math.min(seek, duration) / duration) * 100 : 0
+
   return (
     <footer className="player-bar">
+      {/* 1. Track Info on Left */}
       <div className="player-track">
-        <div className="mini-cover large" style={{ '--cover-accent': currentTrack?.accent } as CSSProperties}>
-          {currentTrack?.coverUrl ? <img src={currentTrack.coverUrl} alt="" /> : <DiscFilled size={22} />}
+        <div
+          className="mini-cover large"
+          style={{ '--cover-accent': currentTrack?.accent } as CSSProperties}
+        >
+          {currentTrack?.coverUrl ? (
+            <img src={currentTrack.coverUrl} alt="" />
+          ) : (
+            <DiscFilled size={22} />
+          )}
         </div>
         <div>
-          <strong>{currentTrack ? cleanDisplayTitle(currentTrack.title) : 'No track selected'}</strong>
+          <strong>
+            {currentTrack ? cleanDisplayTitle(currentTrack.title) : 'No track selected'}
+          </strong>
           <span>{currentTrack?.artist ?? 'Choose a song to start'}</span>
         </div>
       </div>
 
+      {/* 2. Center Transport Controls & Modern Scrubber */}
       <div className="transport">
         <div className="transport-buttons">
-          <button className={shuffle ? 'control active' : 'control'} type="button" onClick={onShuffle} aria-label="Toggle shuffle">
+          <button
+            className={shuffle ? 'control active' : 'control'}
+            type="button"
+            onClick={onShuffle}
+            aria-label="Toggle shuffle"
+          >
             <ShuffleFilled size={18} />
           </button>
-          <button className="control" type="button" onClick={onPrevious} aria-label="Previous track">
+          <button
+            className="control"
+            type="button"
+            onClick={onPrevious}
+            aria-label="Previous track"
+          >
             <SkipBackFilled size={20} />
           </button>
-          <button className="play-button" type="button" onClick={onTogglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}>
+          <button
+            className="play-button"
+            type="button"
+            onClick={onTogglePlay}
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+          >
             {isPlaying ? <PauseFilled size={24} /> : <PlayFilled size={24} />}
           </button>
-          <button className="control" type="button" onClick={onNext} aria-label="Next track">
+          <button
+            className="control"
+            type="button"
+            onClick={onNext}
+            aria-label="Next track"
+          >
             <SkipForwardFilled size={20} />
           </button>
-          <button className={repeat !== 'off' ? 'control active' : 'control'} type="button" onClick={onRepeat} aria-label="Cycle repeat mode">
+          <button
+            className={repeat !== 'off' ? 'control active' : 'control'}
+            type="button"
+            onClick={onRepeat}
+            aria-label="Cycle repeat mode"
+          >
             {repeat === 'one' ? <RepeatOneFilled size={18} /> : <RepeatFilled size={18} />}
           </button>
         </div>
+
+        {/* Brand-new Modern Audio Progress Scrubber */}
         <div className="progress-line">
-          <span ref={timeLabelRef}>{formatTime(seek)}</span>
-          <input
-            ref={rangeInputRef}
-            type="range"
-            className="frosted-range"
-            min="0"
-            max={Math.max(duration, 1)}
-            step="any"
-            defaultValue={seek}
-            onPointerDown={() => {
-              isDraggingRef.current = true
-            }}
-            onInput={(event) => {
-              const val = Number(event.currentTarget.value)
-              const pct = duration > 0 ? (val / duration) * 100 : 0
-              if (rangeInputRef.current) {
-                rangeInputRef.current.style.setProperty('--progress-pct', `${pct}%`)
-              }
-              if (timeLabelRef.current) {
-                timeLabelRef.current.textContent = formatTime(val)
-              }
-            }}
-            onChange={(event) => {
-              const val = Number(event.target.value)
-              isDraggingRef.current = false
-              onSeek(val)
-            }}
-            onPointerUp={(event) => {
-              isDraggingRef.current = false
-              const val = Number(event.currentTarget.value)
-              onSeek(val)
-            }}
-            style={
-              {
-                '--progress-pct': `${duration > 0 ? (Math.min(seek, duration) / duration) * 100 : 0}%`,
-              } as CSSProperties
-            }
-            aria-label="Playback progress"
-          />
-          <span>{formatTime(duration)}</span>
+          <div className="modern-scrubber-row">
+            <span ref={timeLabelRef} className="scrubber-timestamp current">
+              {formatTime(seek)}
+            </span>
+
+            <div
+              ref={trackRef}
+              className={`scrubber-hitbox ${isHovered || isDragging ? 'active' : ''}`}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+              onPointerEnter={() => setIsHovered(true)}
+              onPointerLeave={() => {
+                if (!isDragging) setIsHovered(false)
+              }}
+              role="slider"
+              tabIndex={0}
+              aria-label="Playback progress"
+              aria-valuemin={0}
+              aria-valuemax={duration}
+              aria-valuenow={seek}
+              aria-valuetext={`${formatTime(seek)} of ${formatTime(duration)}`}
+              onKeyDown={(e) => {
+                if (duration <= 0) return
+                if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  onSeek(Math.min(duration, seek + 5))
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  onSeek(Math.max(0, seek - 5))
+                } else if (e.key === 'Home') {
+                  e.preventDefault()
+                  onSeek(0)
+                } else if (e.key === 'End') {
+                  e.preventDefault()
+                  onSeek(duration)
+                }
+              }}
+            >
+              <div className="scrubber-rail">
+                {/* Hover preview ghost bar */}
+                {isHovered && duration > 0 && (
+                  <div
+                    className="scrubber-hover-ghost"
+                    style={{ width: `${hoverPct}%` }}
+                  />
+                )}
+
+                {/* Active playback fill */}
+                <div
+                  ref={fillRef}
+                  className="scrubber-fill"
+                  style={{ width: `${initialPct}%` }}
+                />
+
+                {/* Draggable thumb handle */}
+                <div
+                  ref={thumbRef}
+                  className="scrubber-thumb"
+                  style={{ left: `${initialPct}%` }}
+                />
+              </div>
+
+              {/* Hover timestamp tooltip */}
+              {isHovered && duration > 0 && (
+                <div className="scrubber-tooltip" style={{ left: `${hoverPct}%` }}>
+                  {formatTime(hoverTime)}
+                </div>
+              )}
+            </div>
+
+            <span className="scrubber-timestamp total">{formatTime(duration)}</span>
+          </div>
         </div>
       </div>
 
+      {/* 3. Brand-new Modern Volume Controller on Right */}
       <div className="volume">
         <ElasticSlider value={volume} onChange={onVolume} />
       </div>

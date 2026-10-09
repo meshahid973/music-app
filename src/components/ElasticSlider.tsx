@@ -1,85 +1,163 @@
-import { motion } from 'framer-motion'
-import { VolumeX } from 'lucide-react'
-import { useRef, useState } from 'react'
-import type { PointerEvent } from 'react'
-import { VolumeFilled } from './icons'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { PointerEvent, WheelEvent } from 'react'
+import { Volume1, Volume2, VolumeX } from 'lucide-react'
 import './ElasticSlider.css'
 
-type ElasticSliderProps = { value: number; onChange: (volume: number) => void }
-const MAX_OVERFLOW = 45
+export type ElasticSliderProps = {
+  value: number
+  onChange: (volume: number) => void
+}
 
-/** Controlled, keyboard-accessible adaptation of React Bits Elastic Slider:
- * https://reactbits.dev/components/elastic-slider
+/**
+ * Modern, responsive volume controller with:
+ * - Dynamic mute/unmute toggle button with stateful icons (Muted, Low, High)
+ * - Smooth pointer-captured draggable slider with hover expansion
+ * - Mouse wheel scrolling support
+ * - Tabular percentage readout
  */
 export default function ElasticSlider({ value, onChange }: ElasticSliderProps) {
-  const sliderRef = useRef<HTMLDivElement>(null)
-  const dragging = useRef(false)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const prevVolumeRef = useRef<number>(value > 0 ? value : 0.8)
   const [isDragging, setIsDragging] = useState(false)
-  const [overflow, setOverflow] = useState(0)
-  const [region, setRegion] = useState<'left' | 'middle' | 'right'>('middle')
-  const [hovered, setHovered] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
 
-  const pointerValue = (clientX: number) => {
-    if (!sliderRef.current) return value
-    const { left, right } = sliderRef.current.getBoundingClientRect()
-    const width = right - left
-    const relative = width <= 0 ? 0 : (clientX - left) / width
-    return Math.max(0, Math.min(1, relative))
+  // Track previous non-zero volume for unmuting
+  useEffect(() => {
+    if (value > 0) {
+      prevVolumeRef.current = value
+    }
+  }, [value])
+
+  const calculateVolumeFromClientX = useCallback(
+    (clientX: number) => {
+      if (!trackRef.current) return value
+      const rect = trackRef.current.getBoundingClientRect()
+      if (rect.width <= 0) return 0
+      const relative = (clientX - rect.left) / rect.width
+      return Math.max(0, Math.min(1, Math.round(relative * 100) / 100))
+    },
+    [value],
+  )
+
+  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setIsDragging(true)
+    const newVol = calculateVolumeFromClientX(e.clientX)
+    onChange(newVol)
   }
 
-  const move = (event: PointerEvent<HTMLDivElement>) => {
-    if (!sliderRef.current) return
-    const { left, right } = sliderRef.current.getBoundingClientRect()
-    const outside = event.clientX < left ? left - event.clientX :
-      event.clientX > right ? event.clientX - right : 0
-    setRegion(event.clientX < left ? 'left' : event.clientX > right ? 'right' : 'middle')
-    setOverflow(MAX_OVERFLOW * (2 / (1 + Math.exp(-outside / MAX_OVERFLOW)) - 1))
-    if (!dragging.current) return
-    onChange(pointerValue(event.clientX))
+  const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return
+    const newVol = calculateVolumeFromClientX(e.clientX)
+    onChange(newVol)
   }
-  const release = () => {
-    dragging.current = false
+
+  const handlePointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    }
     setIsDragging(false)
-    setOverflow(0)
-    setRegion('middle')
   }
-  const percent = Math.round(Math.max(0, Math.min(value, 1)) * 100)
+
+  const handleToggleMute = () => {
+    if (value > 0) {
+      prevVolumeRef.current = value
+      onChange(0)
+    } else {
+      onChange(prevVolumeRef.current || 0.8)
+    }
+  }
+
+  const handleWheel = (e: WheelEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const delta = e.deltaY < 0 ? 0.05 : -0.05
+    const next = Math.max(0, Math.min(1, Math.round((value + delta) * 100) / 100))
+    onChange(next)
+  }
+
+  const percent = Math.round(Math.max(0, Math.min(1, value)) * 100)
+
+  // Select dynamic volume icon
+  const renderVolumeIcon = () => {
+    if (percent === 0) {
+      return <VolumeX size={18} className="volume-icon muted" />
+    }
+    if (percent < 50) {
+      return <Volume1 size={18} className="volume-icon low" />
+    }
+    return <Volume2 size={18} className="volume-icon high" />
+  }
+
   return (
-    <div className="elastic-volume" onPointerMove={move}
-      onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}
-      onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)}>
-      <motion.div className="elastic-volume-icon" aria-hidden="true"
-        animate={{ x: region === 'left' ? -overflow : 0, scale: region === 'left' ? 1.25 : 1 }}
-        transition={{ type: 'spring', stiffness: 360, damping: 20 }}>
-        <VolumeX size={17} />
-      </motion.div>
-      <div ref={sliderRef} className="elastic-volume-control">
-        <motion.div className="elastic-volume-rail"
-          animate={{ scaleX: 1 + overflow / 160, scaleY: overflow ? 0.82 : hovered || isDragging ? 1.6 : 1 }}
-          transition={{ type: 'spring', stiffness: 320, damping: 21 }}>
-          <span className="elastic-volume-fill" style={{ width: `${percent}%` }} />
-        </motion.div>
-        <input type="range" min="0" max="1" step="0.005" value={value}
-          aria-label="Volume" aria-valuetext={`${percent} percent`}
-          onChange={event => onChange(Math.max(0, Math.min(1, Number(event.target.value))))}
-          onPointerDown={(event) => {
-            dragging.current = true
-            setIsDragging(true)
-            event.currentTarget.setPointerCapture(event.pointerId)
-            onChange(pointerValue(event.clientX))
-          }}
-          onPointerUp={(event) => {
-            event.currentTarget.releasePointerCapture(event.pointerId)
-            release()
-          }}
-          onPointerCancel={release} />
+    <div
+      className="modern-volume-control"
+      onWheel={handleWheel}
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={() => {
+        if (!isDragging) setIsHovered(false)
+      }}
+    >
+      <button
+        type="button"
+        className="volume-mute-btn"
+        onClick={handleToggleMute}
+        title={percent === 0 ? 'Unmute' : 'Mute'}
+        aria-label={percent === 0 ? 'Unmute volume' : 'Mute volume'}
+      >
+        {renderVolumeIcon()}
+      </button>
+
+      <div
+        ref={trackRef}
+        className={`volume-track-container ${isHovered || isDragging ? 'active' : ''}`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        role="slider"
+        tabIndex={0}
+        aria-label="Volume slider"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        aria-valuetext={`${percent} percent`}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+            e.preventDefault()
+            onChange(Math.min(1, Math.round((value + 0.05) * 100) / 100))
+          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+            e.preventDefault()
+            onChange(Math.max(0, Math.round((value - 0.05) * 100) / 100))
+          } else if (e.key === 'Home') {
+            e.preventDefault()
+            onChange(0)
+          } else if (e.key === 'End') {
+            e.preventDefault()
+            onChange(1)
+          }
+        }}
+      >
+        <div className="volume-track-rail">
+          <div className="volume-track-fill" style={{ width: `${percent}%` }} />
+          <div
+            className={`volume-track-thumb ${isHovered || isDragging ? 'visible' : ''}`}
+            style={{ left: `${percent}%` }}
+          />
+        </div>
       </div>
-      <motion.div className="elastic-volume-icon" aria-hidden="true"
-        animate={{ x: region === 'right' ? overflow : 0, scale: region === 'right' ? 1.25 : 1 }}
-        transition={{ type: 'spring', stiffness: 360, damping: 20 }}>
-        <VolumeFilled size={17} />
-      </motion.div>
-      <output className="elastic-volume-value" aria-live="off">{percent}%</output>
+
+      <span
+        className="volume-percentage"
+        onClick={() => {
+          // Quick presets: 0% -> 50% -> 100%
+          if (percent === 0) onChange(0.5)
+          else if (percent < 90) onChange(1)
+          else onChange(0.5)
+        }}
+        title="Click to toggle preset levels"
+      >
+        {percent}%
+      </span>
     </div>
   )
 }

@@ -11,6 +11,10 @@ export interface DesktopLibraryPayload {
   volume: number
   shuffle: boolean
   repeat: RepeatMode
+  musicFolderPath?: string
+  coverFolderPath?: string
+  musicFolderName?: string
+  coverFolderName?: string
 }
 
 const STORAGE_FILE = 'resonance_library.json'

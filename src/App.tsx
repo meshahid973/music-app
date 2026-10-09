@@ -87,9 +87,16 @@ function App() {
   // 4. File importing & drag/drop (supporting both native dialogs & web drag/drop)
   const {
     isDesktop,
+    musicFolderName,
+    coverFolderName,
+    isScanningMusic,
+    isScanningCovers,
+    scanNotice,
     handleNativeAddSongs,
     handleNativeMusicFolder,
     handleNativeCoverFolder,
+    handleRescanMusicFolder,
+    handleRescanCoverFolder,
     handleMusicFiles,
     handleMusicFolder,
     handleCoverFolder,
@@ -129,6 +136,13 @@ function App() {
         onNativeAddSongs={handleNativeAddSongs}
         onNativeMusicFolder={handleNativeMusicFolder}
         onNativeCoverFolder={handleNativeCoverFolder}
+        onRescanMusicFolder={handleRescanMusicFolder}
+        onRescanCoverFolder={handleRescanCoverFolder}
+        isScanningMusic={isScanningMusic}
+        isScanningCovers={isScanningCovers}
+        musicFolderName={musicFolderName}
+        coverFolderName={coverFolderName}
+        scanNotice={scanNotice}
       />
 
       <section className="content">
