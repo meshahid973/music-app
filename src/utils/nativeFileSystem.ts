@@ -94,136 +94,136 @@ export async function nativeTracksFromPaths(
       const id = `native:${filePath}`
       const audioUrl = toNativeAssetUrl(filePath)
 
-    let duration = 0
-    try {
-      duration = await readDuration(audioUrl)
-    } catch {
-      duration = 0
-    }
+      let duration = 0
+      try {
+        duration = await readDuration(audioUrl)
+      } catch {
+        duration = 0
+      }
 
-    // Read ONLY bounded metadata region (up to 4MB max) instead of full audio file
-    let detectedTitle = ''
-    let detectedArtist = ''
-    let detectedAlbum = ''
-    let embeddedCoverUrl: string | undefined
-    let embeddedCoverPath: string | undefined
+      // Read ONLY bounded metadata region (up to 4MB max) instead of full audio file
+      let detectedTitle = ''
+      let detectedArtist = ''
+      let detectedAlbum = ''
+      let embeddedCoverUrl: string | undefined
+      let embeddedCoverPath: string | undefined
 
-    try {
-      const tagBytes = await readBoundedNativeFile(filePath)
-      if (tagBytes && tagBytes.length >= 10) {
-        const detected = await autoDetectTrackMetadata(fileName, tagBytes)
-        detectedTitle = detected.title
-        detectedArtist = detected.artist
-        detectedAlbum = detected.album
+      try {
+        const tagBytes = await readBoundedNativeFile(filePath)
+        if (tagBytes && tagBytes.length >= 10) {
+          const detected = await autoDetectTrackMetadata(fileName, tagBytes)
+          detectedTitle = detected.title
+          detectedArtist = detected.artist
+          detectedAlbum = detected.album
 
-        // If track contains embedded artwork, save it durably to AppData
-        if (detected.coverBytes && detected.coverBytes.length > 0) {
-          try {
-            const savedPath = await saveEmbeddedArtwork(
-              id,
-              detected.coverBytes,
-              detected.coverMime,
-            )
-            if (savedPath) {
-              embeddedCoverPath = savedPath
-              embeddedCoverUrl = toNativeAssetUrl(savedPath)
-            } else {
-              // Provide a visible in-session fallback when durable saving fails
+          // If track contains embedded artwork, save it durably to AppData
+          if (detected.coverBytes && detected.coverBytes.length > 0) {
+            try {
+              const savedPath = await saveEmbeddedArtwork(
+                id,
+                detected.coverBytes,
+                detected.coverMime,
+              )
+              if (savedPath) {
+                embeddedCoverPath = savedPath
+                embeddedCoverUrl = toNativeAssetUrl(savedPath)
+              } else {
+                // Provide a visible in-session fallback when durable saving fails
+                const mime = detected.coverMime || 'image/jpeg'
+                embeddedCoverUrl = objectUrlForBlob(new Blob([detected.coverBytes as unknown as BlobPart], { type: mime }))
+                embeddedCoverPath = undefined
+              }
+            } catch {
               const mime = detected.coverMime || 'image/jpeg'
               embeddedCoverUrl = objectUrlForBlob(new Blob([detected.coverBytes as unknown as BlobPart], { type: mime }))
               embeddedCoverPath = undefined
             }
-          } catch {
-            const mime = detected.coverMime || 'image/jpeg'
-            embeddedCoverUrl = objectUrlForBlob(new Blob([detected.coverBytes as unknown as BlobPart], { type: mime }))
-            embeddedCoverPath = undefined
           }
+        } else {
+          // Fallback for files with missing or invalid tags
+          const detected = await autoDetectTrackMetadata(fileName)
+          detectedTitle = detected.title
+          detectedArtist = detected.artist
+          detectedAlbum = detected.album
         }
-      } else {
-        // Fallback for files with missing or invalid tags
+      } catch (err) {
+        console.warn(`Error reading metadata for ${fileName}:`, err)
         const detected = await autoDetectTrackMetadata(fileName)
         detectedTitle = detected.title
         detectedArtist = detected.artist
         detectedAlbum = detected.album
       }
-    } catch (err) {
-      console.warn(`Error reading metadata for ${fileName}:`, err)
-      const detected = await autoDetectTrackMetadata(fileName)
-      detectedTitle = detected.title
-      detectedArtist = detected.artist
-      detectedAlbum = detected.album
-    }
 
-    // Direct cover matches from directory or pool
-    let directCoverUrl: string | undefined
-    let directCoverPath: string | undefined
+      // Direct cover matches from directory or pool
+      let directCoverUrl: string | undefined
+      let directCoverPath: string | undefined
 
-    const normFileName = normalizeName(fileName)
-    const normTitle = normalizeName(detectedTitle)
-    const normCleanTitle = normalizeName(cleanDisplayTitle(detectedTitle))
+      const normFileName = normalizeName(fileName)
+      const normTitle = normalizeName(detectedTitle)
+      const normCleanTitle = normalizeName(cleanDisplayTitle(detectedTitle))
 
-    if (covers.has(normFileName)) {
-      directCoverUrl = covers.get(normFileName)
-      directCoverPath = coverPathsMap?.get(normFileName)
-    } else if (covers.has(normTitle)) {
-      directCoverUrl = covers.get(normTitle)
-      directCoverPath = coverPathsMap?.get(normTitle)
-    } else if (covers.has(normCleanTitle)) {
-      directCoverUrl = covers.get(normCleanTitle)
-      directCoverPath = coverPathsMap?.get(normCleanTitle)
-    }
-
-    // Check parent folder name
-    const parentFolder = normalizeName(getParentDirName(filePath))
-    if (!directCoverUrl && parentFolder && covers.has(parentFolder)) {
-      directCoverUrl = covers.get(parentFolder)
-      directCoverPath = coverPathsMap?.get(parentFolder)
-    }
-
-    // Check album name match
-    if (!directCoverUrl && detectedAlbum) {
-      const normAlbum = normalizeName(detectedAlbum)
-      if (normAlbum && covers.has(normAlbum)) {
-        directCoverUrl = covers.get(normAlbum)
-        directCoverPath = coverPathsMap?.get(normAlbum)
+      if (covers.has(normFileName)) {
+        directCoverUrl = covers.get(normFileName)
+        directCoverPath = coverPathsMap?.get(normFileName)
+      } else if (covers.has(normTitle)) {
+        directCoverUrl = covers.get(normTitle)
+        directCoverPath = coverPathsMap?.get(normTitle)
+      } else if (covers.has(normCleanTitle)) {
+        directCoverUrl = covers.get(normCleanTitle)
+        directCoverPath = coverPathsMap?.get(normCleanTitle)
       }
-    }
 
-    let coverUrl: string | undefined
-    let coverPath: string | undefined
-    let coverSource: Track['coverSource']
+      // Check parent folder name
+      const parentFolder = normalizeName(getParentDirName(filePath))
+      if (!directCoverUrl && parentFolder && covers.has(parentFolder)) {
+        directCoverUrl = covers.get(parentFolder)
+        directCoverPath = coverPathsMap?.get(parentFolder)
+      }
 
-    if (directCoverUrl) {
-      coverUrl = directCoverUrl
-      // When a direct cover wins over embedded artwork, coverPath MUST refer to that direct cover,
-      // or be cleared (undefined) if no durable path is available.
-      coverPath = directCoverPath
-      coverSource = 'direct'
-    } else if (embeddedCoverUrl) {
-      coverUrl = embeddedCoverUrl
-      coverPath = embeddedCoverPath
-      coverSource = 'embedded'
-    }
+      // Check album name match
+      if (!directCoverUrl && detectedAlbum) {
+        const normAlbum = normalizeName(detectedAlbum)
+        if (normAlbum && covers.has(normAlbum)) {
+          directCoverUrl = covers.get(normAlbum)
+          directCoverPath = coverPathsMap?.get(normAlbum)
+        }
+      }
 
-    const parentName = getParentDirName(filePath)
-    const album =
-      detectedAlbum && detectedAlbum !== 'Local files'
-        ? detectedAlbum
-        : parentName || 'Local files'
+      let coverUrl: string | undefined
+      let coverPath: string | undefined
+      let coverSource: Track['coverSource']
+
+      if (directCoverUrl) {
+        coverUrl = directCoverUrl
+        // When a direct cover wins over embedded artwork, coverPath MUST refer to that direct cover,
+        // or be cleared (undefined) if no durable path is available.
+        coverPath = directCoverPath
+        coverSource = 'direct'
+      } else if (embeddedCoverUrl) {
+        coverUrl = embeddedCoverUrl
+        coverPath = embeddedCoverPath
+        coverSource = 'embedded'
+      }
+
+      const parentName = getParentDirName(filePath)
+      const album =
+        detectedAlbum && detectedAlbum !== 'Local files'
+          ? detectedAlbum
+          : parentName || 'Local files'
 
       tracks[index] = {
-      id,
-      title: detectedTitle || cleanDisplayTitle(fileName),
-      artist: detectedArtist || 'Unknown artist',
-      album,
-      duration,
-      fileName,
-      filePath,
-      audioUrl,
-      coverUrl,
-      coverPath,
-      coverSource,
-      accent: colorFromString(fileName),
+        id,
+        title: detectedTitle || cleanDisplayTitle(fileName),
+        artist: detectedArtist || 'Unknown artist',
+        album,
+        duration,
+        fileName,
+        filePath,
+        audioUrl,
+        coverUrl,
+        coverPath,
+        coverSource,
+        accent: colorFromString(fileName),
       }
     }
   }
