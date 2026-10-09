@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Playlist, RepeatMode, Track } from '../types'
-import { assignCoversToTracks, syncTracksWithCovers, uniqueTracks } from '../utils/library'
-import { loadDesktopLibrary, saveDesktopLibrary } from '../utils/desktopDatabase'
-import { hydrateTracksArtwork, sanitizeTracksForPersistence } from '../utils/artworkStorage'
+import type { Playlist, RepeatMode, Track } from '../types.ts'
+import { assignCoversToTracks, syncTracksWithCovers, uniqueTracks } from '../utils/library.ts'
+import { loadDesktopLibrary, saveDesktopLibrary } from '../utils/desktopDatabase.ts'
+import { hydrateTracksArtwork, sanitizeTracksForPersistence } from '../utils/artworkStorage.ts'
 
 type MusicState = {
   tracks: Track[]
@@ -38,6 +38,8 @@ export const libraryId = 'library'
 export const favoritesId = 'favorites'
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+let initPromise: Promise<void> | null = null
+
 function queueSave(state: MusicState) {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
@@ -82,28 +84,86 @@ export const useMusicStore = create<MusicState>()(
 
       initDesktopStorage: async () => {
         if (get().isInitialized) return
-        try {
-          const loaded = await loadDesktopLibrary()
-          if (loaded) {
-            set((state) => ({
-              tracks: loaded.tracks.length > 0 ? loaded.tracks : state.tracks,
-              playlists: loaded.playlists.length > 0 ? loaded.playlists : state.playlists,
-              activePlaylistId: loaded.activePlaylistId || state.activePlaylistId,
-              currentTrackId: loaded.currentTrackId || state.currentTrackId,
-              volume: typeof loaded.volume === 'number' ? loaded.volume : state.volume,
-              shuffle: typeof loaded.shuffle === 'boolean' ? loaded.shuffle : state.shuffle,
-              repeat: loaded.repeat || state.repeat,
-              isInitialized: true,
-            }))
-            return
+        if (initPromise) return initPromise
+
+        initPromise = (async () => {
+          try {
+            const loaded = await loadDesktopLibrary()
+            if (loaded) {
+              set((state) => {
+                // 1. Safely merge tracks: loaded tracks + any tracks concurrently added to state
+                const trackMap = new Map<string, Track>()
+                for (const t of loaded.tracks) {
+                  trackMap.set(t.id, t)
+                }
+                for (const t of state.tracks) {
+                  const existing = trackMap.get(t.id)
+                  if (existing) {
+                    trackMap.set(t.id, { ...existing, ...t })
+                  } else {
+                    trackMap.set(t.id, t)
+                  }
+                }
+                const mergedTracks = Array.from(trackMap.values())
+
+                // 2. Safely merge playlists: loaded playlists + any playlists concurrently created/updated
+                const playlistMap = new Map<string, Playlist>()
+                for (const p of loaded.playlists) {
+                  playlistMap.set(p.id, p)
+                }
+                for (const p of state.playlists) {
+                  const existing = playlistMap.get(p.id)
+                  if (existing) {
+                    const mergedTrackIds = Array.from(new Set([...existing.trackIds, ...p.trackIds]))
+                    playlistMap.set(p.id, { ...existing, ...p, trackIds: mergedTrackIds })
+                  } else {
+                    playlistMap.set(p.id, p)
+                  }
+                }
+                const mergedPlaylists = Array.from(playlistMap.values())
+
+                const activePlaylistId =
+                  state.activePlaylistId !== libraryId && state.activePlaylistId
+                    ? state.activePlaylistId
+                    : loaded.activePlaylistId || state.activePlaylistId
+
+                const currentTrackId =
+                  state.currentTrackId || loaded.currentTrackId || mergedTracks[0]?.id
+
+                const nextState = {
+                  tracks: mergedTracks,
+                  playlists: mergedPlaylists,
+                  activePlaylistId,
+                  currentTrackId,
+                  volume: typeof loaded.volume === 'number' ? loaded.volume : state.volume,
+                  shuffle: typeof loaded.shuffle === 'boolean' ? loaded.shuffle : state.shuffle,
+                  repeat: loaded.repeat || state.repeat,
+                  isInitialized: true,
+                }
+
+                // If tracks or playlists were added concurrently while loading from disk,
+                // queue a save so disk storage reflects the merged state.
+                if (state.tracks.length > 0 || state.playlists.length > loaded.playlists.length) {
+                  queueSave({ ...state, ...nextState })
+                }
+
+                return nextState
+              })
+              return
+            }
+          } catch (err) {
+            console.warn('Could not initialize desktop storage:', err)
+          } finally {
+            initPromise = null
           }
-        } catch (err) {
-          console.warn('Could not initialize desktop storage:', err)
-        }
-        set((state) => ({
-          tracks: hydrateTracksArtwork(state.tracks),
-          isInitialized: true,
-        }))
+
+          set((state) => ({
+            tracks: hydrateTracksArtwork(state.tracks),
+            isInitialized: true,
+          }))
+        })()
+
+        return initPromise
       },
 
       addTracks: (incoming) =>

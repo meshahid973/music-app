@@ -30,7 +30,11 @@ export function usePlaylistManager() {
         ? tracks.map((track) => track.id)
         : activePlaylist?.trackIds ?? []
 
-    if (!playlistTrackIds.length) return
+    if (!playlistTrackIds.length) {
+      lastPlaylistIdRef.current = activePlaylistId
+      queueRef.current.clear()
+      return
+    }
 
     const currentIdInPlaylist = currentTrackId
       ? playlistTrackIds.includes(currentTrackId)

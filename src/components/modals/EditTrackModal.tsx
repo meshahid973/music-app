@@ -26,10 +26,13 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
   const [coverUrl, setCoverUrl] = useState<string | undefined>(track.coverUrl)
   const [coverPath, setCoverPath] = useState<string | undefined>(track.coverPath)
   const [pendingImageSource, setPendingImageSource] = useState<string | undefined>(undefined)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const isDesktop = isDesktopApp()
 
   async function handleNativeChooseImage() {
+    setErrorMessage(null)
     const selected = await pickNativeImageFile()
     if (selected) {
       setCoverPath(selected)
@@ -39,6 +42,7 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
   }
 
   function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    setErrorMessage(null)
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -54,6 +58,7 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
   }
 
   function handleRemoveCover() {
+    setErrorMessage(null)
     setCoverUrl(undefined)
     setCoverPath(undefined)
     setPendingImageSource(undefined)
@@ -61,17 +66,31 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    setErrorMessage(null)
+    setIsSaving(true)
+
     let finalCoverUrl = coverUrl
     let finalCoverPath = coverPath
 
     if (isDesktop && pendingImageSource) {
-      const saved = await saveCustomArtwork(track.id, pendingImageSource)
-      if (saved) {
+      try {
+        const saved = await saveCustomArtwork(track.id, pendingImageSource)
+        if (!saved) {
+          setErrorMessage('Failed to save custom artwork. Please check disk permissions and try again.')
+          setIsSaving(false)
+          return
+        }
         finalCoverPath = saved
         finalCoverUrl = toNativeAssetUrl(saved)
+      } catch (err) {
+        console.warn('Failed to save custom artwork:', err)
+        setErrorMessage('Failed to save custom artwork. Please try again.')
+        setIsSaving(false)
+        return
       }
     }
 
+    setIsSaving(false)
     onSave({
       title: title.trim() || track.title,
       artist: artist.trim() || track.artist,
@@ -105,6 +124,24 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
         </header>
 
         <form onSubmit={handleSubmit} className="modal-body">
+          {errorMessage && (
+            <div
+              className="modal-error-banner"
+              role="alert"
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                color: '#fca5a5',
+                fontSize: '13px',
+                marginBottom: '16px',
+              }}
+            >
+              {errorMessage}
+            </div>
+          )}
+
           {/* Cover Art Upload & CD Preview */}
           <div className="cover-upload-section">
             <div className="cover-preview-box">
@@ -223,11 +260,11 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
           </div>
 
           <footer className="modal-footer">
-            <button type="button" className="btn-secondary" onClick={onClose}>
+            <button type="button" className="btn-secondary" onClick={onClose} disabled={isSaving}>
               Cancel
             </button>
-            <button type="submit" className="btn-primary">
-              Save Changes
+            <button type="submit" className="btn-primary" disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save Changes'}
             </button>
           </footer>
         </form>

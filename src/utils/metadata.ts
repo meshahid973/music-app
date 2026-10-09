@@ -155,6 +155,43 @@ export function detectSongAndArtist(rawFileNameOrTitle: string): {
   }
 }
 
+function findNextFrameHeader(
+  bytes: Uint8Array,
+  start: number,
+  limit: number,
+  version: number,
+): number {
+  const headerSize = version === 2 ? 6 : 10
+  const idSize = version === 2 ? 3 : 4
+  const knownPrefixes =
+    version === 2
+      ? ['TT2', 'TP1', 'TAL', 'TRK', 'TYE', 'COM']
+      : ['TIT2', 'TPE1', 'TALB', 'TRCK', 'TYER', 'TDRC', 'COMM', 'TCON', 'TPE2', 'TPOS']
+
+  for (let i = start; i + headerSize <= limit; i++) {
+    const candidateId = String.fromCharCode(...bytes.subarray(i, i + idSize))
+    if (knownPrefixes.includes(candidateId)) {
+      const frameSize =
+        version === 2
+          ? (bytes[i + 3] << 16) | (bytes[i + 4] << 8) | bytes[i + 5]
+          : version === 4
+            ? ((bytes[i + 4] & 0x7f) << 21) |
+              ((bytes[i + 5] & 0x7f) << 14) |
+              ((bytes[i + 6] & 0x7f) << 7) |
+              (bytes[i + 7] & 0x7f)
+            : new DataView(bytes.buffer, bytes.byteOffset).getUint32(i + 4)
+
+      if (frameSize > 0 && frameSize < limit - i && i + headerSize + frameSize <= limit) {
+        const encoding = bytes[i + headerSize]
+        if (encoding <= 3) {
+          return i
+        }
+      }
+    }
+  }
+  return -1
+}
+
 /**
  * Bounded ID3v2.2–2.4 reader with support for title, artist, album, and cover-art frames.
  * Reads only the tag (up to 4MB) and does not load the audio stream.
@@ -229,7 +266,20 @@ export async function readID3Metadata(
         : version === 4 ? synchsafe(bytes, offset + 4) : view.getUint32(offset + 4)
       const start = offset + headerSize
       const end = start + frameSize
-      if (frameSize <= 0 || end > limit) break
+
+      if (frameSize <= 0) break
+      if (end > limit) {
+        // If an oversized/truncated artwork frame exceeds the read limit, don't let it abort
+        // parsing if subsequent title/artist text frames are present in the buffer.
+        if (id === 'APIC' || id === 'PIC') {
+          const nextOffset = findNextFrameHeader(bytes, start, limit, version)
+          if (nextOffset > 0) {
+            offset = nextOffset
+            continue
+          }
+        }
+        break
+      }
 
       const encoding = bytes[start]
       const content = bytes.subarray(start + 1, end)
@@ -237,7 +287,7 @@ export async function readID3Metadata(
       if ((id === 'TPE1' || id === 'TP1') && !artist) artist = decodeText(encoding, content)
       if ((id === 'TALB' || id === 'TAL') && !album) album = decodeText(encoding, content)
 
-      if ((id === 'APIC' || id === 'PIC') && !coverUrl && frameSize > 8) {
+      if ((id === 'APIC' || id === 'PIC') && !coverUrl && !coverBytes && frameSize > 8) {
         const pictureFormat = id === 'PIC'
           ? String.fromCharCode(...bytes.subarray(start + 1, start + 4)).toLowerCase()
           : ''
@@ -263,12 +313,16 @@ export async function readID3Metadata(
         if (cursor < end && /^image\/(jpe?g|png|webp|gif)$/i.test(mime)) {
           coverBytes = Uint8Array.from(bytes.subarray(cursor, end))
           coverMime = mime
-          coverUrl = objectUrlForBlob(new Blob([coverBytes as unknown as BlobPart], { type: mime }))
+          // Avoid creating temporary browser blob URLs when parsing native byte input.
+          // Native imports will persist the coverBytes durably to disk.
+          if (!(source instanceof Uint8Array)) {
+            coverUrl = objectUrlForBlob(new Blob([coverBytes as unknown as BlobPart], { type: mime }))
+          }
         }
       }
       offset = end
     }
-    return title || artist || album || coverUrl
+    return title || artist || album || coverUrl || coverBytes
       ? { title, artist, album, coverUrl, coverBytes, coverMime }
       : null
   } catch {
@@ -287,7 +341,7 @@ export async function autoDetectTrackMetadata(
   // 1. Try reading real ID3 tags from source if provided
   if (source) {
     const id3 = await readID3Metadata(source)
-    if (id3 && (id3.title || id3.artist || id3.coverUrl)) {
+    if (id3 && (id3.title || id3.artist || id3.coverUrl || id3.coverBytes)) {
       const cleanTitle = cleanMusicString(id3.title || '')
       const cleanArtist = cleanMusicString(id3.artist || '')
 

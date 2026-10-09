@@ -14,6 +14,13 @@ export class PlaybackQueue {
     this.remaining = this.ids.filter(id => id !== current)
   }
 
+  clear(): void {
+    this.ids = []
+    this.history = []
+    this.cursor = -1
+    this.remaining = []
+  }
+
   next(current: string, shuffle: boolean, repeat: 'off' | 'one' | 'all', automatic = false, random = Math.random): string | undefined {
     if (!this.ids.length) return undefined
     if (automatic && repeat === 'one') return current
