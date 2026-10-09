@@ -22,6 +22,25 @@ npm run build
 npm run preview
 ```
 
+## Building Windows `setup.exe` (Tauri Desktop)
+
+### Option 1: Build locally on Windows
+
+Prerequisites: Node.js 22+, Rust stable toolchain (`rustup`), and Microsoft Visual Studio C++ Build Tools.
+
+```bash
+npm install
+npm run tauri:build:win
+```
+
+The NSIS installer will be output to:
+`src-tauri/target/release/bundle/nsis/Resonance_1.0.0_x64-setup.exe`
+
+### Option 2: Build via GitHub Actions
+
+1. Push to `main` or manually trigger the **Verify music player** or **Release Resonance** workflow via `workflow_dispatch` in the **Actions** tab to download the `Resonance-Windows-Setup` artifact containing `Resonance_1.0.0_x64-setup.exe`.
+2. Push a version tag (`git tag v1.0.0 && git push origin v1.0.0`) to automatically publish a GitHub Release with `Resonance_1.0.0_x64-setup.exe` and `.msi` installers attached.
+
 ## Using Resonance
 
 Import local audio files from **Add songs** or choose a **Music folder**. The app extracts supported ID3 tags and can match album art by filename or folder. Add tracks to playlists and Favorites, search your library, and use the player controls to shuffle or repeat songs.

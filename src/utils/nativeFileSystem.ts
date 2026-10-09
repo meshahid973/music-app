@@ -62,6 +62,26 @@ export async function scanNativeFolder(folderPath: string): Promise<NativeScanRe
   return { audioPaths, coverPaths }
 }
 
+export async function scanNativeDroppedPaths(droppedPaths: string[]): Promise<NativeScanResult> {
+  const audioPaths: string[] = []
+  const coverPaths: string[] = []
+
+  for (const itemPath of droppedPaths) {
+    const ext = getExtension(itemPath)
+    if (audioExtensions.has(ext)) {
+      audioPaths.push(itemPath)
+    } else if (coverExtensions.has(ext)) {
+      coverPaths.push(itemPath)
+    } else {
+      const folderScan = await scanNativeFolder(itemPath)
+      audioPaths.push(...folderScan.audioPaths)
+      coverPaths.push(...folderScan.coverPaths)
+    }
+  }
+
+  return { audioPaths, coverPaths }
+}
+
 export function nativeCoversFromPaths(coverPaths: string[]): {
   lookup: CoverLookup
   paths: Map<string, string>
@@ -99,11 +119,13 @@ export async function nativeTracksFromPaths(
   coverPathsMap?: Map<string, string>,
 ): Promise<Track[]> {
   const tracks: Track[] = []
+  const seen = new Set(existingIds)
 
   for (const filePath of filePaths) {
     const fileName = getFileName(filePath)
     const id = `native:${filePath}`
-    if (existingIds.has(id)) continue
+    if (seen.has(id)) continue
+    seen.add(id)
 
     const audioUrl = toNativeAssetUrl(filePath)
 
