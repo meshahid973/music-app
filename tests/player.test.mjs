@@ -806,3 +806,31 @@ test('scanNativeDroppedPaths classifies dropped audio and cover files and native
   assert.equal(tracks[0].artist, 'Artist')
 })
 
+test('setMusicFolder and setCoverFolder preserve folder paths and names in music store state', () => {
+  useMusicStore.getState().setMusicFolder('C:\\Users\\Music', 'Music')
+  useMusicStore.getState().setCoverFolder('C:\\Users\\Covers', 'Covers')
+
+  const state = useMusicStore.getState()
+  assert.equal(state.musicFolderPath, 'C:\\Users\\Music')
+  assert.equal(state.musicFolderName, 'Music')
+  assert.equal(state.coverFolderPath, 'C:\\Users\\Covers')
+  assert.equal(state.coverFolderName, 'Covers')
+})
+
+test('rescan filtering only returns newly added audio files when rescanning a folder', async () => {
+  const existingTracks = [
+    { id: 'native:C:\\Music\\Song 1.mp3', title: 'Song 1', artist: 'Artist', duration: 100, fileName: 'Song 1.mp3', audioUrl: 'asset://song1.mp3' }
+  ]
+  const existingIds = new Set(existingTracks.map(t => t.id))
+
+  // Rescan finds Song 1 (existing) and Song 2 (newly added)
+  const allScannedFiles = ['C:\\Music\\Song 1.mp3', 'C:\\Music\\Song 2.mp3']
+  const newTracks = await nativeTracksFromPaths(allScannedFiles, new Map(), existingIds)
+
+  // Only Song 2 should be returned as a new track to add
+  assert.equal(newTracks.length, 1)
+  assert.equal(newTracks[0].id, 'native:C:\\Music\\Song 2.mp3')
+  assert.equal(newTracks[0].title, 'Song 2')
+})
+
+

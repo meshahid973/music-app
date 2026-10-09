@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { useMusicStore } from '../store/useMusicStore'
@@ -17,8 +17,33 @@ import {
 } from '../utils/nativeFileSystem'
 
 export function useLibraryImport() {
-  const { addTracks, addCovers } = useMusicStore()
+  const {
+    addTracks,
+    addCovers,
+    musicFolderPath,
+    coverFolderPath,
+    musicFolderName,
+    coverFolderName,
+    setMusicFolder,
+    setCoverFolder,
+  } = useMusicStore()
   const isDesktop = isDesktopApp()
+
+  const [isScanningMusic, setIsScanningMusic] = useState(false)
+  const [isScanningCovers, setIsScanningCovers] = useState(false)
+  const [scanNotice, setScanNotice] = useState<string | null>(null)
+  const noticeTimerRef = useRef<number | null>(null)
+
+  const showNotice = useCallback((message: string) => {
+    if (noticeTimerRef.current) {
+      window.clearTimeout(noticeTimerRef.current)
+    }
+    setScanNotice(message)
+    noticeTimerRef.current = window.setTimeout(() => {
+      setScanNotice(null)
+      noticeTimerRef.current = null
+    }, 3800)
+  }, [])
 
   const importNativeScanResult = useCallback(
     async (audioPaths: string[], coverPaths: string[]) => {
@@ -26,16 +51,21 @@ export function useLibraryImport() {
       const combinedLookup = new Map(storeLookup)
 
       let coverPathsMap: Map<string, string> | undefined
+      let addedCoversCount = 0
 
       if (coverPaths.length > 0) {
         const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
         coverPathsMap = paths
         for (const [k, v] of lookup.entries()) {
+          if (!combinedLookup.has(k)) {
+            addedCoversCount++
+          }
           combinedLookup.set(k, v)
         }
         addCovers(lookup, urls)
       }
 
+      let addedTracksCount = 0
       if (audioPaths.length > 0) {
         const existingIds = new Set(useMusicStore.getState().tracks.map((t) => t.id))
         const parsedTracks = await nativeTracksFromPaths(
@@ -45,9 +75,12 @@ export function useLibraryImport() {
           coverPathsMap,
         )
         if (parsedTracks.length > 0) {
+          addedTracksCount = parsedTracks.length
           addTracks(parsedTracks)
         }
       }
+
+      return { addedTracksCount, addedCoversCount }
     },
     [addCovers, addTracks],
   )
@@ -92,6 +125,9 @@ export function useLibraryImport() {
     const parsedTracks = await nativeTracksFromPaths(filePaths, storeLookup, existingIds)
     if (parsedTracks.length > 0) {
       addTracks(parsedTracks)
+      showNotice(`Added ${parsedTracks.length} song${parsedTracks.length === 1 ? '' : 's'}`)
+    } else {
+      showNotice('All selected songs are already in your library')
     }
   }
 
@@ -99,20 +135,207 @@ export function useLibraryImport() {
     const folderPath = await pickNativeFolder()
     if (!folderPath) return
 
-    const { audioPaths, coverPaths } = await scanNativeFolder(folderPath)
-    await importNativeScanResult(audioPaths, coverPaths)
+    const folderName = folderPath.split(/[/\\]/).filter(Boolean).pop() || folderPath
+    setMusicFolder(folderPath, folderName)
+
+    setIsScanningMusic(true)
+    try {
+      const { audioPaths, coverPaths } = await scanNativeFolder(folderPath)
+      const result = await importNativeScanResult(audioPaths, coverPaths)
+      if (result.addedTracksCount > 0) {
+        showNotice(`Added ${result.addedTracksCount} new song${result.addedTracksCount === 1 ? '' : 's'}`)
+      } else {
+        showNotice(`Library is up to date (${audioPaths.length} songs found)`)
+      }
+    } finally {
+      setIsScanningMusic(false)
+    }
+  }
+
+  async function handleRescanMusicFolder() {
+    if (isDesktop) {
+      const currentPath = useMusicStore.getState().musicFolderPath
+      if (!currentPath) {
+        await handleNativeMusicFolder()
+        return
+      }
+
+      setIsScanningMusic(true)
+      try {
+        const { audioPaths, coverPaths } = await scanNativeFolder(currentPath)
+        const result = await importNativeScanResult(audioPaths, coverPaths)
+        if (result.addedTracksCount > 0) {
+          showNotice(`Found and added ${result.addedTracksCount} new song${result.addedTracksCount === 1 ? '' : 's'}`)
+        } else {
+          showNotice('Music folder is up to date (no new files)')
+        }
+      } catch (err) {
+        console.warn('Rescan music folder failed:', err)
+        showNotice('Failed to scan music folder')
+      } finally {
+        setIsScanningMusic(false)
+      }
+    } else {
+      if ('showDirectoryPicker' in window) {
+        try {
+          setIsScanningMusic(true)
+          // @ts-expect-error window.showDirectoryPicker
+          const dirHandle = await window.showDirectoryPicker()
+          if (dirHandle) {
+            setMusicFolder(undefined, dirHandle.name)
+            const files: File[] = []
+            async function readEntries(dir: any, pathPrefix = '') {
+              for await (const entry of dir.values()) {
+                if (entry.kind === 'file') {
+                  const f = await entry.getFile()
+                  Object.defineProperty(f, 'webkitRelativePath', {
+                    value: pathPrefix ? `${pathPrefix}/${f.name}` : f.name,
+                    writable: true,
+                  })
+                  files.push(f)
+                } else if (entry.kind === 'directory') {
+                  await readEntries(entry, pathPrefix ? `${pathPrefix}/${entry.name}` : entry.name)
+                }
+              }
+            }
+            await readEntries(dirHandle)
+            await processWebMusicFiles(files)
+          }
+        } catch (err: any) {
+          if (err?.name !== 'AbortError') {
+            console.warn('Web directory picker error:', err)
+          }
+        } finally {
+          setIsScanningMusic(false)
+        }
+      }
+    }
   }
 
   async function handleNativeCoverFolder() {
     const folderPath = await pickNativeFolder()
     if (!folderPath) return
 
-    const { coverPaths } = await scanNativeFolder(folderPath)
-    if (coverPaths.length > 0) {
-      const { lookup, urls } = nativeCoversFromPaths(coverPaths)
-      if (urls.length > 0) {
-        addCovers(lookup, urls)
+    const folderName = folderPath.split(/[/\\]/).filter(Boolean).pop() || folderPath
+    setCoverFolder(folderPath, folderName)
+
+    setIsScanningCovers(true)
+    try {
+      const { coverPaths } = await scanNativeFolder(folderPath)
+      if (coverPaths.length > 0) {
+        const { lookup, urls } = nativeCoversFromPaths(coverPaths)
+        if (urls.length > 0) {
+          addCovers(lookup, urls)
+          showNotice(`Imported ${urls.length} cover artwork${urls.length === 1 ? '' : 's'}`)
+        }
+      } else {
+        showNotice('No cover artwork files found')
       }
+    } finally {
+      setIsScanningCovers(false)
+    }
+  }
+
+  async function handleRescanCoverFolder() {
+    if (isDesktop) {
+      const currentPath = useMusicStore.getState().coverFolderPath
+      if (!currentPath) {
+        await handleNativeCoverFolder()
+        return
+      }
+
+      setIsScanningCovers(true)
+      try {
+        const { coverPaths } = await scanNativeFolder(currentPath)
+        if (coverPaths.length > 0) {
+          const { lookup, urls } = nativeCoversFromPaths(coverPaths)
+          if (urls.length > 0) {
+            addCovers(lookup, urls)
+            showNotice(`Found and updated ${urls.length} cover image${urls.length === 1 ? '' : 's'}`)
+          }
+        } else {
+          showNotice('Cover folder is up to date (no new files)')
+        }
+      } catch (err) {
+        console.warn('Rescan cover folder failed:', err)
+        showNotice('Failed to scan cover folder')
+      } finally {
+        setIsScanningCovers(false)
+      }
+    } else {
+      if ('showDirectoryPicker' in window) {
+        try {
+          setIsScanningCovers(true)
+          // @ts-expect-error window.showDirectoryPicker
+          const dirHandle = await window.showDirectoryPicker()
+          if (dirHandle) {
+            setCoverFolder(undefined, dirHandle.name)
+            const files: File[] = []
+            async function readEntries(dir: any, pathPrefix = '') {
+              for await (const entry of dir.values()) {
+                if (entry.kind === 'file') {
+                  const f = await entry.getFile()
+                  Object.defineProperty(f, 'webkitRelativePath', {
+                    value: pathPrefix ? `${pathPrefix}/${f.name}` : f.name,
+                    writable: true,
+                  })
+                  files.push(f)
+                } else if (entry.kind === 'directory') {
+                  await readEntries(entry, pathPrefix ? `${pathPrefix}/${entry.name}` : entry.name)
+                }
+              }
+            }
+            await readEntries(dirHandle)
+            processWebCoverFiles(files)
+          }
+        } catch (err: any) {
+          if (err?.name !== 'AbortError') {
+            console.warn('Web directory picker error:', err)
+          }
+        } finally {
+          setIsScanningCovers(false)
+        }
+      }
+    }
+  }
+
+  // Web helper functions
+  async function processWebMusicFiles(files: File[]) {
+    if (files.length === 0) return
+
+    const coverFiles = files.filter(isCoverFile)
+    const storeLookup = useMusicStore.getState().coverLookup
+    const combinedLookup = new Map(storeLookup)
+
+    if (coverFiles.length > 0) {
+      const { lookup, urls } = extractCovers(coverFiles)
+      for (const [k, v] of lookup.entries()) {
+        combinedLookup.set(k, v)
+      }
+      addCovers(lookup, urls)
+    }
+
+    const parsedTracks = await tracksFromFiles(
+      files,
+      combinedLookup,
+      new Set(useMusicStore.getState().tracks.map((track) => track.id)),
+    )
+    if (parsedTracks.length > 0) {
+      addTracks(parsedTracks)
+      showNotice(`Added ${parsedTracks.length} new song${parsedTracks.length === 1 ? '' : 's'}`)
+    } else {
+      showNotice('Music folder is up to date (no new files)')
+    }
+  }
+
+  function processWebCoverFiles(files: File[]) {
+    if (files.length === 0) return
+    const { lookup, urls } = extractCovers(files)
+    if (urls.length > 0) {
+      addCovers(lookup, urls)
+      showNotice(`Updated ${urls.length} cover artwork${urls.length === 1 ? '' : 's'}`)
+    } else {
+      showNotice('No cover artwork files found')
     }
   }
 
@@ -140,6 +363,9 @@ export function useLibraryImport() {
     )
     if (parsedTracks.length > 0) {
       addTracks(parsedTracks)
+      showNotice(`Added ${parsedTracks.length} song${parsedTracks.length === 1 ? '' : 's'}`)
+    } else {
+      showNotice('All selected songs are already in your library')
     }
     event.target.value = ''
   }
@@ -148,25 +374,16 @@ export function useLibraryImport() {
     const files = Array.from(event.target.files ?? [])
     if (files.length === 0) return
 
-    const coverFiles = files.filter(isCoverFile)
-    const storeLookup = useMusicStore.getState().coverLookup
-    const combinedLookup = new Map(storeLookup)
-
-    if (coverFiles.length > 0) {
-      const { lookup, urls } = extractCovers(coverFiles)
-      for (const [k, v] of lookup.entries()) {
-        combinedLookup.set(k, v)
-      }
-      addCovers(lookup, urls)
+    if (files[0]?.webkitRelativePath) {
+      const rootFolder = files[0].webkitRelativePath.split('/')[0]
+      if (rootFolder) setMusicFolder(undefined, rootFolder)
     }
 
-    const parsedTracks = await tracksFromFiles(
-      files,
-      combinedLookup,
-      new Set(useMusicStore.getState().tracks.map((track) => track.id)),
-    )
-    if (parsedTracks.length > 0) {
-      addTracks(parsedTracks)
+    setIsScanningMusic(true)
+    try {
+      await processWebMusicFiles(files)
+    } finally {
+      setIsScanningMusic(false)
     }
     event.target.value = ''
   }
@@ -174,9 +391,17 @@ export function useLibraryImport() {
   function handleCoverFolder(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? [])
     if (files.length === 0) return
-    const { lookup, urls } = extractCovers(files)
-    if (urls.length > 0) {
-      addCovers(lookup, urls)
+
+    if (files[0]?.webkitRelativePath) {
+      const rootFolder = files[0].webkitRelativePath.split('/')[0]
+      if (rootFolder) setCoverFolder(undefined, rootFolder)
+    }
+
+    setIsScanningCovers(true)
+    try {
+      processWebCoverFiles(files)
+    } finally {
+      setIsScanningCovers(false)
     }
     event.target.value = ''
   }
@@ -205,15 +430,27 @@ export function useLibraryImport() {
         combinedLookup,
         new Set(useMusicStore.getState().tracks.map((track) => track.id)),
       )
-      addTracks(parsedTracks)
+      if (parsedTracks.length > 0) {
+        addTracks(parsedTracks)
+        showNotice(`Added ${parsedTracks.length} song${parsedTracks.length === 1 ? '' : 's'}`)
+      }
     }
   }
 
   return {
-    isDesktop: isDesktopApp(),
+    isDesktop,
+    musicFolderPath,
+    coverFolderPath,
+    musicFolderName,
+    coverFolderName,
+    isScanningMusic,
+    isScanningCovers,
+    scanNotice,
     handleNativeAddSongs,
     handleNativeMusicFolder,
     handleNativeCoverFolder,
+    handleRescanMusicFolder,
+    handleRescanCoverFolder,
     handleMusicFiles,
     handleMusicFolder,
     handleCoverFolder,

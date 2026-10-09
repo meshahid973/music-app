@@ -16,7 +16,13 @@ type MusicState = {
   shuffle: boolean
   repeat: RepeatMode
   volume: number
+  musicFolderPath?: string
+  coverFolderPath?: string
+  musicFolderName?: string
+  coverFolderName?: string
   isInitialized: boolean
+  setMusicFolder: (path?: string, name?: string) => void
+  setCoverFolder: (path?: string, name?: string) => void
   initDesktopStorage: () => Promise<void>
   addTracks: (tracks: Track[]) => void
   addCovers: (covers: Map<string, string>, extraUrls?: string[]) => void
@@ -51,6 +57,10 @@ function queueSave(state: MusicState) {
       volume: state.volume,
       shuffle: state.shuffle,
       repeat: state.repeat,
+      musicFolderPath: state.musicFolderPath,
+      coverFolderPath: state.coverFolderPath,
+      musicFolderName: state.musicFolderName,
+      coverFolderName: state.coverFolderName,
     })
   }, 400)
 }
@@ -80,7 +90,31 @@ export const useMusicStore = create<MusicState>()(
       shuffle: false,
       repeat: 'off',
       volume: 0.82,
+      musicFolderPath: undefined,
+      coverFolderPath: undefined,
+      musicFolderName: undefined,
+      coverFolderName: undefined,
       isInitialized: false,
+
+      setMusicFolder: (path, name) =>
+        set((state) => {
+          const next = {
+            musicFolderPath: path !== undefined ? path : state.musicFolderPath,
+            musicFolderName: name !== undefined ? name : state.musicFolderName,
+          }
+          queueSave({ ...state, ...next })
+          return next
+        }),
+
+      setCoverFolder: (path, name) =>
+        set((state) => {
+          const next = {
+            coverFolderPath: path !== undefined ? path : state.coverFolderPath,
+            coverFolderName: name !== undefined ? name : state.coverFolderName,
+          }
+          queueSave({ ...state, ...next })
+          return next
+        }),
 
       initDesktopStorage: async () => {
         if (get().isInitialized) return
@@ -138,6 +172,10 @@ export const useMusicStore = create<MusicState>()(
                   volume: typeof loaded.volume === 'number' ? loaded.volume : state.volume,
                   shuffle: typeof loaded.shuffle === 'boolean' ? loaded.shuffle : state.shuffle,
                   repeat: loaded.repeat || state.repeat,
+                  musicFolderPath: state.musicFolderPath || loaded.musicFolderPath,
+                  coverFolderPath: state.coverFolderPath || loaded.coverFolderPath,
+                  musicFolderName: state.musicFolderName || loaded.musicFolderName,
+                  coverFolderName: state.coverFolderName || loaded.coverFolderName,
                   isInitialized: true,
                 }
 
@@ -327,6 +365,10 @@ export const useMusicStore = create<MusicState>()(
         volume: state.volume,
         shuffle: state.shuffle,
         repeat: state.repeat,
+        musicFolderPath: state.musicFolderPath,
+        coverFolderPath: state.coverFolderPath,
+        musicFolderName: state.musicFolderName,
+        coverFolderName: state.coverFolderName,
       }),
     },
   ),

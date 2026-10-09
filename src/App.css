@@ -318,12 +318,111 @@ h3 {
 }
 
 .import-button input,
-.import-nav-item input {
+.import-nav-item input,
+.nav-folder-row input {
   width: 0;
   height: 0;
   opacity: 0;
   position: absolute;
   pointer-events: none;
+}
+
+.nav-folder-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px 0 13px;
+  cursor: default;
+}
+
+.nav-folder-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 15px;
+}
+
+.nav-folder-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-rescan-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--panel-strong);
+  border: 1px solid var(--line-strong);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.nav-rescan-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: scale(1.08);
+}
+
+.nav-rescan-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.nav-rescan-btn.scanning {
+  color: var(--lime);
+  border-color: var(--lime);
+  background: rgba(198, 255, 0, 0.08);
+  cursor: wait;
+}
+
+.nav-rescan-btn .spinning {
+  animation: spin-rescan 0.8s linear infinite;
+}
+
+@keyframes spin-rescan {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sidebar-scan-notice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(198, 255, 0, 0.08);
+  border: 1px solid rgba(198, 255, 0, 0.25);
+  color: var(--lime);
+  margin-top: 4px;
 }
 
 .hero-player {
