@@ -823,11 +823,15 @@ test('scanNativeDroppedPaths classifies dropped audio and cover files and native
   assert.deepEqual(dropped.coverPaths, ['C:\\Music\\Album\\cover.jpg'])
 
   const tracks = await nativeTracksFromPaths(
-    ['C:\\Music\\Artist - Song.mp3', 'C:\\Music\\Artist - Song.mp3'],
+    [
+      'C:\\Music\\Artist - Song.mp3',
+      'C:\\Music\\Artist - Song.mp3',
+      'C:\\Music\\Other - Second.mp3',
+    ],
     new Map(),
   )
-  assert.equal(tracks.length, 1)
-  assert.equal(tracks[0].title, 'Song')
-  assert.equal(tracks[0].artist, 'Artist')
+  assert.equal(tracks.length, 2)
+  assert.deepEqual(tracks.map((track) => track.title), ['Song', 'Second'])
+  assert.deepEqual(tracks.map((track) => track.artist), ['Artist', 'Other'])
 })
 

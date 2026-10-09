@@ -74,16 +74,25 @@ export async function nativeTracksFromPaths(
   existingIds: ReadonlySet<string> = new Set(),
   coverPathsMap?: Map<string, string>,
 ): Promise<Track[]> {
-  const tracks: Track[] = []
   const seen = new Set(existingIds)
-
-  for (const filePath of filePaths) {
-    const fileName = getFileName(filePath)
-    const id = `native:${filePath}`
-    if (seen.has(id)) continue
+  const uniquePaths = filePaths.filter((path) => {
+    const id = `native:${path}`
+    if (seen.has(id)) return false
     seen.add(id)
+    return true
+  })
 
-    const audioUrl = toNativeAssetUrl(filePath)
+  // Bounded concurrency speeds up large imports without opening hundreds of
+  // media elements or metadata files simultaneously. Preserve file order.
+  const tracks = new Array<Track>(uniquePaths.length)
+  let cursor = 0
+  async function parseNext(): Promise<void> {
+    while (cursor < uniquePaths.length) {
+      const index = cursor++
+      const filePath = uniquePaths[index]
+      const fileName = getFileName(filePath)
+      const id = `native:${filePath}`
+      const audioUrl = toNativeAssetUrl(filePath)
 
     let duration = 0
     try {
@@ -202,7 +211,7 @@ export async function nativeTracksFromPaths(
         ? detectedAlbum
         : parentName || 'Local files'
 
-    tracks.push({
+      tracks[index] = {
       id,
       title: detectedTitle || cleanDisplayTitle(fileName),
       artist: detectedArtist || 'Unknown artist',
@@ -215,8 +224,12 @@ export async function nativeTracksFromPaths(
       coverPath,
       coverSource,
       accent: colorFromString(fileName),
-    })
+      }
+    }
   }
 
+  await Promise.all(
+    Array.from({ length: Math.min(4, uniquePaths.length) }, () => parseNext()),
+  )
   return tracks
 }
