@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Playlist, RepeatMode, Track } from '../types'
 import { assignCoversToTracks, syncTracksWithCovers, uniqueTracks } from '../utils/library'
 import { loadDesktopLibrary, saveDesktopLibrary } from '../utils/desktopDatabase'
+import { hydrateTracksArtwork, sanitizeTracksForPersistence } from '../utils/artworkStorage'
 
 type MusicState = {
   tracks: Track[]
@@ -99,7 +100,10 @@ export const useMusicStore = create<MusicState>()(
         } catch (err) {
           console.warn('Could not initialize desktop storage:', err)
         }
-        set({ isInitialized: true })
+        set((state) => ({
+          tracks: hydrateTracksArtwork(state.tracks),
+          isInitialized: true,
+        }))
       },
 
       addTracks: (incoming) =>
@@ -233,7 +237,16 @@ export const useMusicStore = create<MusicState>()(
               ? {
                   ...track,
                   ...updates,
-                  coverSource: updates.coverUrl !== undefined ? 'custom' : track.coverSource,
+                  coverPath:
+                    updates.coverUrl === undefined && 'coverUrl' in updates
+                      ? undefined
+                      : updates.coverPath !== undefined
+                        ? updates.coverPath
+                        : track.coverPath,
+                  coverSource:
+                    updates.coverUrl !== undefined
+                      ? updates.coverSource || (updates.coverUrl ? 'custom' : undefined)
+                      : track.coverSource,
                 }
               : track,
           )
@@ -246,7 +259,9 @@ export const useMusicStore = create<MusicState>()(
       version: 1,
       // Persist playlists, settings, and native persistent tracks
       partialize: (state) => ({
-        tracks: state.tracks.filter((track) => Boolean(track.filePath)),
+        tracks: sanitizeTracksForPersistence(
+          state.tracks.filter((track) => Boolean(track.filePath)),
+        ),
         playlists: state.playlists,
         activePlaylistId: state.activePlaylistId,
         volume: state.volume,

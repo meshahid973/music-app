@@ -10,6 +10,17 @@ export type DetectedTrackInfo = {
   artist: string
   album: string
   coverUrl?: string
+  coverBytes?: Uint8Array
+  coverMime?: string
+}
+
+export type ID3Metadata = {
+  title?: string
+  artist?: string
+  album?: string
+  coverUrl?: string
+  coverBytes?: Uint8Array
+  coverMime?: string
 }
 
 /**
@@ -148,33 +159,50 @@ export function detectSongAndArtist(rawFileNameOrTitle: string): {
  * Bounded ID3v2.2–2.4 reader with support for title, artist, album, and cover-art frames.
  * Reads only the tag (up to 4MB) and does not load the audio stream.
  */
-export async function readID3Metadata(file: File): Promise<{
-  title?: string
-  artist?: string
-  album?: string
-  coverUrl?: string
-} | null> {
+export async function readID3Metadata(
+  source: File | Blob | Uint8Array,
+): Promise<ID3Metadata | null> {
   try {
-    const initial = new Uint8Array(await file.slice(0, 10).arrayBuffer())
-    if (initial.length < 10 || initial[0] !== 0x49 || initial[1] !== 0x44 || initial[2] !== 0x33) return null
-    const version = initial[3]
-    if (version < 2 || version > 4) return null
+    let bytes: Uint8Array
+    let limit: number
 
-    const synchsafe = (b: Uint8Array, i: number) =>
-      ((b[i] & 0x7f) << 21) | ((b[i + 1] & 0x7f) << 14) |
-      ((b[i + 2] & 0x7f) << 7) | (b[i + 3] & 0x7f)
+    if (source instanceof Uint8Array) {
+      if (source.length < 10 || source[0] !== 0x49 || source[1] !== 0x44 || source[2] !== 0x33) return null
+      const version = source[3]
+      if (version < 2 || version > 4) return null
+      const synchsafe = (b: Uint8Array, i: number) =>
+        ((b[i] & 0x7f) << 21) | ((b[i + 1] & 0x7f) << 14) |
+        ((b[i + 2] & 0x7f) << 7) | (b[i + 3] & 0x7f)
+      const tagSize = synchsafe(source, 6)
+      const size = Math.min(source.length, 10 + tagSize, 4 * 1024 * 1024)
+      bytes = source.subarray(0, size)
+      limit = bytes.length
+    } else {
+      const initial = new Uint8Array(await source.slice(0, 10).arrayBuffer())
+      if (initial.length < 10 || initial[0] !== 0x49 || initial[1] !== 0x44 || initial[2] !== 0x33) return null
+      const version = initial[3]
+      if (version < 2 || version > 4) return null
 
-    const tagSize = synchsafe(initial, 6)
-    // Read the declared tag, including reasonably sized cover art, without loading whole audio files.
-    const size = Math.min(file.size, 10 + tagSize, 4 * 1024 * 1024)
-    const bytes = new Uint8Array(await file.slice(0, size).arrayBuffer())
+      const synchsafe = (b: Uint8Array, i: number) =>
+        ((b[i] & 0x7f) << 21) | ((b[i + 1] & 0x7f) << 14) |
+        ((b[i + 2] & 0x7f) << 7) | (b[i + 3] & 0x7f)
+
+      const tagSize = synchsafe(initial, 6)
+      // Read the declared tag, including reasonably sized cover art, without loading whole audio files.
+      const size = Math.min(source.size, 10 + tagSize, 4 * 1024 * 1024)
+      bytes = new Uint8Array(await source.slice(0, size).arrayBuffer())
+      limit = bytes.length
+    }
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-    const limit = bytes.length
     let offset = 10
     let title: string | undefined
     let artist: string | undefined
     let album: string | undefined
     let coverUrl: string | undefined
+    let coverBytes: Uint8Array | undefined
+    let coverMime: string | undefined
+
+    const version = bytes[3]
 
     const decodeText = (encoding: number, data: Uint8Array): string => {
       try {
@@ -185,6 +213,10 @@ export async function readID3Metadata(file: File): Promise<{
         return ''
       }
     }
+
+    const synchsafe = (b: Uint8Array, i: number) =>
+      ((b[i] & 0x7f) << 21) | ((b[i + 1] & 0x7f) << 14) |
+      ((b[i + 2] & 0x7f) << 7) | (b[i + 3] & 0x7f)
 
     while (offset + (version === 2 ? 6 : 10) <= limit) {
       const headerSize = version === 2 ? 6 : 10
@@ -228,13 +260,17 @@ export async function readID3Metadata(file: File): Promise<{
           while (cursor < end && bytes[cursor] !== 0) cursor++
           cursor++
         }
-        if (cursor + 64 < end && /^image\/(jpeg|png|webp|gif)$/i.test(mime)) {
-          coverUrl = objectUrlForBlob(new Blob([Uint8Array.from(bytes.subarray(cursor, end))], { type: mime }))
+        if (cursor < end && /^image\/(jpe?g|png|webp|gif)$/i.test(mime)) {
+          coverBytes = Uint8Array.from(bytes.subarray(cursor, end))
+          coverMime = mime
+          coverUrl = objectUrlForBlob(new Blob([coverBytes as unknown as BlobPart], { type: mime }))
         }
       }
       offset = end
     }
-    return title || artist || album || coverUrl ? { title, artist, album, coverUrl } : null
+    return title || artist || album || coverUrl
+      ? { title, artist, album, coverUrl, coverBytes, coverMime }
+      : null
   } catch {
     return null
   }
@@ -246,12 +282,12 @@ export async function readID3Metadata(file: File): Promise<{
  */
 export async function autoDetectTrackMetadata(
   fileName: string,
-  file?: File
+  source?: File | Blob | Uint8Array,
 ): Promise<DetectedTrackInfo> {
-  // 1. Try reading real ID3 tags from file if provided
-  if (file) {
-    const id3 = await readID3Metadata(file)
-    if (id3 && (id3.title || id3.artist)) {
+  // 1. Try reading real ID3 tags from source if provided
+  if (source) {
+    const id3 = await readID3Metadata(source)
+    if (id3 && (id3.title || id3.artist || id3.coverUrl)) {
       const cleanTitle = cleanMusicString(id3.title || '')
       const cleanArtist = cleanMusicString(id3.artist || '')
 
@@ -261,6 +297,8 @@ export async function autoDetectTrackMetadata(
           artist: cleanArtist,
           album: cleanMusicString(id3.album || '') || 'Local files',
           coverUrl: id3.coverUrl,
+          coverBytes: id3.coverBytes,
+          coverMime: id3.coverMime,
         }
       }
 
@@ -271,6 +309,8 @@ export async function autoDetectTrackMetadata(
         artist: cleanArtist || fromName.artist,
         album: cleanMusicString(id3.album || '') || 'Local files',
         coverUrl: id3.coverUrl,
+        coverBytes: id3.coverBytes,
+        coverMime: id3.coverMime,
       }
     }
   }

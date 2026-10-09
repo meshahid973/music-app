@@ -1,6 +1,7 @@
 import { BaseDirectory, exists, mkdir, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
-import { isDesktopApp, toNativeAssetUrl } from './platform'
-import type { Playlist, RepeatMode, Track } from '../types'
+import { isDesktopApp } from './platform.ts'
+import { hydrateTracksArtwork, sanitizeTracksForPersistence } from './artworkStorage.ts'
+import type { Playlist, RepeatMode, Track } from '../types.ts'
 
 export interface DesktopLibraryPayload {
   tracks: Track[]
@@ -16,20 +17,25 @@ const STORAGE_FILE = 'resonance_library.json'
 const WEB_STORAGE_KEY = 'resonance_desktop_library_backup'
 
 export async function saveDesktopLibrary(data: DesktopLibraryPayload): Promise<void> {
+  const payload: DesktopLibraryPayload = {
+    ...data,
+    tracks: sanitizeTracksForPersistence(data.tracks),
+  }
+
   if (isDesktopApp()) {
     try {
       const appDataExists = await exists('', { baseDir: BaseDirectory.AppData })
       if (!appDataExists) {
         await mkdir('', { baseDir: BaseDirectory.AppData, recursive: true })
       }
-      const json = JSON.stringify(data, null, 2)
+      const json = JSON.stringify(payload, null, 2)
       await writeTextFile(STORAGE_FILE, json, { baseDir: BaseDirectory.AppData })
     } catch (err) {
       console.warn('Failed to save native library to AppData:', err)
     }
   } else {
     try {
-      localStorage.setItem(WEB_STORAGE_KEY, JSON.stringify(data))
+      localStorage.setItem(WEB_STORAGE_KEY, JSON.stringify(payload))
     } catch {
       // ignore
     }
@@ -46,17 +52,7 @@ export async function loadDesktopLibrary(): Promise<DesktopLibraryPayload | null
       if (!content) return null
 
       const parsed: DesktopLibraryPayload = JSON.parse(content)
-      // Re-hydrate native asset URLs for any saved tracks that have file paths
-      const hydratedTracks = parsed.tracks.map((track) => {
-        if (track.filePath) {
-          return {
-            ...track,
-            audioUrl: toNativeAssetUrl(track.filePath),
-            coverUrl: track.coverPath ? toNativeAssetUrl(track.coverPath) : track.coverUrl,
-          }
-        }
-        return track
-      })
+      const hydratedTracks = hydrateTracksArtwork(parsed.tracks)
 
       return {
         ...parsed,
@@ -69,7 +65,13 @@ export async function loadDesktopLibrary(): Promise<DesktopLibraryPayload | null
   } else {
     try {
       const raw = localStorage.getItem(WEB_STORAGE_KEY)
-      if (raw) return JSON.parse(raw)
+      if (raw) {
+        const parsed: DesktopLibraryPayload = JSON.parse(raw)
+        return {
+          ...parsed,
+          tracks: hydrateTracksArtwork(parsed.tracks),
+        }
+      }
     } catch {
       // ignore
     }

@@ -38,8 +38,11 @@ export function useLibraryImport() {
     const storeLookup = useMusicStore.getState().coverLookup
     const combinedLookup = new Map(storeLookup)
 
+    let coverPathsMap: Map<string, string> | undefined
+
     if (coverPaths.length > 0) {
-      const { lookup, urls } = nativeCoversFromPaths(coverPaths)
+      const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+      coverPathsMap = paths
       for (const [k, v] of lookup.entries()) {
         combinedLookup.set(k, v)
       }
@@ -48,7 +51,12 @@ export function useLibraryImport() {
 
     if (audioPaths.length > 0) {
       const existingIds = new Set(useMusicStore.getState().tracks.map((t) => t.id))
-      const parsedTracks = await nativeTracksFromPaths(audioPaths, combinedLookup, existingIds)
+      const parsedTracks = await nativeTracksFromPaths(
+        audioPaths,
+        combinedLookup,
+        existingIds,
+        coverPathsMap,
+      )
       if (parsedTracks.length > 0) {
         addTracks(parsedTracks)
       }

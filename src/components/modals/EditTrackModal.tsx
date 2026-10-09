@@ -9,6 +9,7 @@ import {
 } from '../icons'
 import { cleanDisplayTitle } from '../../utils/library'
 import { isDesktopApp, pickNativeImageFile, toNativeAssetUrl } from '../../utils/platform'
+import { saveCustomArtwork } from '../../utils/artworkStorage'
 import type { Track } from '../../types'
 
 export type EditTrackModalProps = {
@@ -23,13 +24,17 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
   const [artist, setArtist] = useState(track.artist)
   const [album, setAlbum] = useState(track.album)
   const [coverUrl, setCoverUrl] = useState<string | undefined>(track.coverUrl)
+  const [coverPath, setCoverPath] = useState<string | undefined>(track.coverPath)
+  const [pendingImageSource, setPendingImageSource] = useState<string | undefined>(undefined)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const isDesktop = isDesktopApp()
 
   async function handleNativeChooseImage() {
     const selected = await pickNativeImageFile()
     if (selected) {
+      setCoverPath(selected)
       setCoverUrl(toNativeAssetUrl(selected))
+      setPendingImageSource(selected)
     }
   }
 
@@ -41,6 +46,8 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string
       setCoverUrl(dataUrl)
+      setCoverPath(undefined)
+      setPendingImageSource(dataUrl)
     }
     reader.readAsDataURL(file)
     event.target.value = ''
@@ -48,15 +55,30 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
 
   function handleRemoveCover() {
     setCoverUrl(undefined)
+    setCoverPath(undefined)
+    setPendingImageSource(undefined)
   }
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    let finalCoverUrl = coverUrl
+    let finalCoverPath = coverPath
+
+    if (isDesktop && pendingImageSource) {
+      const saved = await saveCustomArtwork(track.id, pendingImageSource)
+      if (saved) {
+        finalCoverPath = saved
+        finalCoverUrl = toNativeAssetUrl(saved)
+      }
+    }
+
     onSave({
       title: title.trim() || track.title,
       artist: artist.trim() || track.artist,
       album: album.trim() || track.album,
-      coverUrl,
+      coverUrl: finalCoverUrl,
+      coverPath: finalCoverUrl ? finalCoverPath : undefined,
+      coverSource: finalCoverUrl ? 'custom' : undefined,
     })
     onClose()
   }
