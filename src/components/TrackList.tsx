@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties } from 'react'
 import {
   CloseFilled,
@@ -15,10 +16,13 @@ import { libraryId } from '../store/useMusicStore'
 import { cleanDisplayTitle, formatTime } from '../utils/library'
 import type { Playlist, Track } from '../types'
 
+const TRACK_BATCH_SIZE = 120
+
 export type TrackListProps = {
   tracks: Track[]
   playlists: Playlist[]
   activePlaylistId: string
+  query?: string
   activePlaylist?: Playlist
   currentTrackId?: string
   isPlaying: boolean
@@ -39,6 +43,7 @@ export function TrackList({
   tracks,
   playlists,
   activePlaylistId,
+  query = '',
   activePlaylist,
   currentTrackId,
   isPlaying,
@@ -54,6 +59,32 @@ export function TrackList({
   onNativeMusicFolder,
   onNativeCoverFolder,
 }: TrackListProps) {
+  // Keep initial renders bounded for large libraries, while retaining natural
+  // document scrolling and an accessible manual fallback.
+  const [visibleCount, setVisibleCount] = useState(TRACK_BATCH_SIZE)
+  const moreRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setVisibleCount(TRACK_BATCH_SIZE)
+  }, [activePlaylistId, query])
+
+  useEffect(() => {
+    if (visibleCount >= tracks.length || typeof IntersectionObserver === 'undefined') return
+    const element = moreRef.current
+    if (!element) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisibleCount((count) => Math.min(tracks.length, count + TRACK_BATCH_SIZE))
+        }
+      },
+      { rootMargin: '500px 0px' },
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [tracks.length, visibleCount])
+
   if (tracks.length === 0) {
     return (
       <motion.div className="empty-state" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
@@ -145,7 +176,7 @@ export function TrackList({
         exit={{ opacity: 0, y: -6 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       >
-        {tracks.map((track, index) => (
+        {tracks.slice(0, visibleCount).map((track, index) => (
           <motion.article
             className={currentTrackId === track.id ? 'track-row active' : 'track-row'}
             key={track.id}
@@ -226,6 +257,16 @@ export function TrackList({
             </div>
           </motion.article>
         ))}
+        {visibleCount < tracks.length && (
+          <div className="track-list-more" ref={moreRef}>
+            <button
+              type="button"
+              onClick={() => setVisibleCount((count) => Math.min(tracks.length, count + TRACK_BATCH_SIZE))}
+            >
+              Show more songs ({tracks.length - visibleCount} remaining)
+            </button>
+          </div>
+        )}
       </motion.div>
     </AnimatePresence>
   )

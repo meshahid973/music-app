@@ -210,6 +210,7 @@ function App() {
 
         <TrackList
           tracks={visibleTracks}
+          query={query}
           playlists={playlists}
           activePlaylistId={activePlaylistId}
           activePlaylist={activePlaylist}

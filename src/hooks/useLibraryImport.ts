@@ -93,9 +93,12 @@ export function useLibraryImport() {
     getCurrentWebview()
       .onDragDropEvent((event) => {
         if (event.payload.type === 'drop' && event.payload.paths.length > 0) {
-          void scanNativeDroppedPaths(event.payload.paths).then(({ audioPaths, coverPaths }) =>
-            importNativeScanResult(audioPaths, coverPaths),
-          )
+          void scanNativeDroppedPaths(event.payload.paths)
+            .then(({ audioPaths, coverPaths }) => importNativeScanResult(audioPaths, coverPaths))
+            .catch((error) => {
+              console.warn('Could not import dropped music:', error)
+              showNotice('Could not import dropped music')
+            })
         }
       })
       .then((fn) => {
@@ -113,7 +116,7 @@ export function useLibraryImport() {
       cancelled = true
       unlisten?.()
     }
-  }, [isDesktop, importNativeScanResult])
+  }, [isDesktop, importNativeScanResult, showNotice])
 
   // Native desktop handlers using OS dialogs
   async function handleNativeAddSongs() {

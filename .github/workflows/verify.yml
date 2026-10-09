@@ -32,6 +32,8 @@ jobs:
           workspaces: src-tauri -> target
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Test native Rust library scanner
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
       - name: Build Tauri Windows desktop installer
         run: npx tauri build
       - name: Upload Windows desktop installer
