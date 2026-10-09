@@ -17,10 +17,11 @@ import {
   hydrateTracksArtwork,
   sanitizeArtworkFilename,
 } from '../src/utils/artworkStorage.ts'
-import { nativeTracksFromPaths } from '../src/utils/nativeFileSystem.ts'
+import { nativeTracksFromPaths, scanNativeDroppedPaths } from '../src/utils/nativeFileSystem.ts'
 import { useMusicStore } from '../src/store/useMusicStore.ts'
 import { syncPlaylistQueue } from '../src/hooks/usePlaylistManager.ts'
 import { processTrackEdit } from '../src/utils/trackEdit.ts'
+import fs from 'node:fs'
 
 if (typeof globalThis.localStorage === 'undefined') {
   const store = new Map()
@@ -760,3 +761,48 @@ test('oversized artwork frame does not prevent later title and artist frames fro
   assert.equal(parsed?.title, 'Recovered Title')
   assert.equal(parsed?.artist, 'Recovered Artist')
 })
+
+test('Windows setup.exe Tauri configuration and capabilities include required NSIS and filesystem permissions', () => {
+  const tauriConf = JSON.parse(fs.readFileSync(new URL('../src-tauri/tauri.conf.json', import.meta.url), 'utf8'))
+  assert.equal(tauriConf.bundle?.active, true)
+  assert.equal(tauriConf.app?.security?.assetProtocol?.enable, true)
+  assert.equal(tauriConf.bundle?.windows?.nsis?.installMode, 'currentUser')
+  assert.equal(tauriConf.bundle?.windows?.nsis?.installerIcon, 'icons/icon.ico')
+  assert.equal(tauriConf.bundle?.windows?.webviewInstallMode?.type, 'downloadBootstrapper')
+
+  const capability = JSON.parse(
+    fs.readFileSync(new URL('../src-tauri/capabilities/default.json', import.meta.url), 'utf8'),
+  )
+  assert.equal(capability.permissions.includes('core:default'), true)
+  assert.equal(capability.permissions.includes('dialog:default'), true)
+  assert.equal(capability.permissions.includes('fs:read-all'), true)
+  assert.equal(capability.permissions.includes('fs:allow-appdata-read-recursive'), true)
+  assert.equal(capability.permissions.includes('fs:allow-appdata-write-recursive'), true)
+  assert.equal(capability.permissions.includes('fs:allow-appdata-meta-recursive'), true)
+  const scopeEntry = capability.permissions.find(
+    (entry) => typeof entry === 'object' && entry !== null && entry.identifier === 'fs:scope',
+  )
+  assert.notEqual(scopeEntry, undefined)
+})
+
+test('scanNativeDroppedPaths classifies dropped audio and cover files and nativeTracksFromPaths deduplicates batch paths', async () => {
+  const dropped = await scanNativeDroppedPaths([
+    'C:\\Music\\Album\\Track 01.mp3',
+    'C:\\Music\\Album\\cover.jpg',
+    'C:\\Music\\Album\\Track 02.flac',
+  ])
+  assert.deepEqual(dropped.audioPaths, [
+    'C:\\Music\\Album\\Track 01.mp3',
+    'C:\\Music\\Album\\Track 02.flac',
+  ])
+  assert.deepEqual(dropped.coverPaths, ['C:\\Music\\Album\\cover.jpg'])
+
+  const tracks = await nativeTracksFromPaths(
+    ['C:\\Music\\Artist - Song.mp3', 'C:\\Music\\Artist - Song.mp3'],
+    new Map(),
+  )
+  assert.equal(tracks.length, 1)
+  assert.equal(tracks[0].title, 'Song')
+  assert.equal(tracks[0].artist, 'Artist')
+})
+

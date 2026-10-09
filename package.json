@@ -9,7 +9,9 @@
     "lint": "oxlint src",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "tauri:build": "tauri build",
+    "tauri:build:win": "tauri build --bundles nsis"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.1",

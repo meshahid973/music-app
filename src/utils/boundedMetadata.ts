@@ -1,4 +1,5 @@
 import { open } from '@tauri-apps/plugin-fs'
+import { isDesktopApp } from './platform.ts'
 
 export interface BoundedReader {
   stat(): Promise<{ size: number }>
@@ -285,6 +286,7 @@ export async function readBoundedNativeFile(
   filePath: string,
   maxBytes = MAX_METADATA_BYTES,
 ): Promise<Uint8Array | null> {
+  if (!isDesktopApp()) return null
   try {
     const handle = await open(filePath, { read: true })
     return await readBoundedMetadataFromReader(handle, maxBytes)

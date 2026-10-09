@@ -2,6 +2,7 @@ import { Howl } from 'howler'
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { useMusicStore } from '../store/useMusicStore'
+import { getExtension } from '../utils/audioFiles'
 import { revokeOwnedObjectUrls } from '../utils/objectUrls'
 import type { PlaybackQueue } from '../utils/queue'
 
@@ -57,9 +58,13 @@ export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
     if (!currentAudioUrl) return
 
     const shouldAutoplay = useMusicStore.getState().isPlaying
+    const currentFileName = useMusicStore
+      .getState()
+      .tracks.find((t) => t.id === currentId)?.fileName
+    const ext = getExtension(currentFileName ?? '') || 'mp3'
     const howl = new Howl({
       src: [currentAudioUrl],
-      format: ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'webm'],
+      format: [ext],
       html5: true,
       autoplay: shouldAutoplay,
       volume: volumeRef.current,
