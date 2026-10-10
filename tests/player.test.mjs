@@ -968,3 +968,24 @@ test('switching between normal mode and ambient mode updates store state', () =>
 })
 
 
+
+
+test('theme presets and accent colors are normalized for persistence', async () => {
+  const { migrateDesktopLibraryPayload } = await import('../src/utils/desktopDatabase.ts')
+  const base = {
+    tracks: [],
+    playlists: [],
+    activePlaylistId: 'library',
+    volume: 0.82,
+    shuffle: false,
+    repeat: 'off',
+    themeMode: 'ambient',
+  }
+  const valid = migrateDesktopLibraryPayload({ ...base, themePreset: 'ocean', accentColor: '#12abef' })
+  assert.equal(valid?.themePreset, 'ocean')
+  assert.equal(valid?.accentColor, '#12abef')
+
+  const invalid = migrateDesktopLibraryPayload({ ...base, themePreset: 'untrusted-class-name', accentColor: 'red; background:url(x)' })
+  assert.equal(invalid?.themePreset, undefined)
+  assert.equal(invalid?.accentColor, undefined)
+})
