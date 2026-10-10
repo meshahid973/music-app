@@ -358,18 +358,21 @@ export function useLibraryImport() {
     }
   }
 
-  // Web helper functions
-  async function processWebMusicFiles(files: File[]) {
+  // Shared web import path for file pickers and directory scans.
+  async function importWebMusicFiles(
+    files: File[],
+    emptyMessage: string,
+    emptyTitle: string,
+  ) {
     if (files.length === 0) return
 
     const coverFiles = files.filter(isCoverFile)
-    const storeLookup = useMusicStore.getState().coverLookup
-    const combinedLookup = new Map(storeLookup)
+    const combinedLookup = new Map(useMusicStore.getState().coverLookup)
 
     if (coverFiles.length > 0) {
       const { lookup, urls } = extractCovers(coverFiles)
-      for (const [k, v] of lookup.entries()) {
-        combinedLookup.set(k, v)
+      for (const [key, value] of lookup.entries()) {
+        combinedLookup.set(key, value)
       }
       addCovers(lookup, urls)
     }
@@ -389,8 +392,12 @@ export function useLibraryImport() {
         'Import Successful',
       )
     } else {
-      showNotice('Music folder is up to date (no new files)', 'info', 'Folder Scanned')
+      showNotice(emptyMessage, 'info', emptyTitle)
     }
+  }
+
+  async function processWebMusicFiles(files: File[]) {
+    await importWebMusicFiles(files, 'Music folder is up to date (no new files)', 'Folder Scanned')
   }
 
   function processWebCoverFiles(files: File[]) {
@@ -415,36 +422,15 @@ export function useLibraryImport() {
     const files = Array.from(event.target.files ?? [])
     if (files.length === 0) return
 
-    const coverFiles = files.filter(isCoverFile)
-    const storeLookup = useMusicStore.getState().coverLookup
-    const combinedLookup = new Map(storeLookup)
-
-    if (coverFiles.length > 0) {
-      const { lookup, urls } = extractCovers(coverFiles)
-      for (const [k, v] of lookup.entries()) {
-        combinedLookup.set(k, v)
-      }
-      addCovers(lookup, urls)
-    }
-
-    const parsedTracks = await tracksFromFiles(
-      files,
-      combinedLookup,
-      new Set(useMusicStore.getState().tracks.map((track) => track.id)),
-    )
-    if (parsedTracks.length > 0) {
-      addTracks(parsedTracks)
-      showNotice(
-        parsedTracks.length === 1
-          ? '1 song imported successfully'
-          : `${parsedTracks.length} songs imported successfully`,
-        'success',
-        'Import Successful',
+    try {
+      await importWebMusicFiles(
+        files,
+        'All selected songs are already in your library',
+        'Library Up to Date',
       )
-    } else {
-      showNotice('All selected songs are already in your library', 'info', 'Library Up to Date')
+    } finally {
+      event.target.value = ''
     }
-    event.target.value = ''
   }
 
   async function handleMusicFolder(event: ChangeEvent<HTMLInputElement>) {
