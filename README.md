@@ -13,7 +13,13 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. The Vite server is localhost-only by default; to test from another device on a trusted network, explicitly opt in with `npm run dev -- --host 0.0.0.0` and configure allowed hosts deliberately.
+Open http://localhost:3000. The development server binds to localhost by default. To intentionally expose it to another device on a trusted network, pass the host option explicitly:
+
+```bash
+npm run dev -- --host 0.0.0.0
+```
+
+Only expose the development server on networks you trust; it can serve development resources. Do not enable permissive host checks for convenience.
 
 ```bash
 npm test
