@@ -15,6 +15,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate release tag matches app versions
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $expected = $env:GITHUB_REF_NAME -replace '^v', ''
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          $tauri = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $cargo = Get-Content src-tauri/Cargo.toml -Raw
+          $cargoMatch = [regex]::Match($cargo, '(?m)^version\s*=\s*"([^"]+)"')
+          if (-not $cargoMatch.Success) {
+            throw "Could not read the Cargo package version."
+          }
+          $cargoVersion = $cargoMatch.Groups[1].Value
+          $versions = @(
+            @{ name = "tag"; value = $expected },
+            @{ name = "package.json"; value = $package.version },
+            @{ name = "tauri.conf.json"; value = $tauri.version },
+            @{ name = "Cargo.toml"; value = $cargoVersion }
+          )
+          $versions | ForEach-Object { Write-Host "$($_.name): $($_.value)" }
+          if ($package.version -ne $expected -or $tauri.version -ne $expected -or $cargoVersion -ne $expected) {
+            throw "Release tag version does not match all app version declarations."
+          }
+
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
