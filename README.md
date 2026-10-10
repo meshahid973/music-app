@@ -51,9 +51,11 @@ The NSIS installer will be output to:
 
 Import local audio files from **Add songs** or choose a **Music folder**. The app extracts supported ID3 tags and can match album art by filename or folder. Add tracks to playlists and Favorites, search your library, and use the player controls to shuffle or repeat songs.
 
-Playlists and player preferences are stored in your browser's localStorage. **For privacy and browser-security reasons, audio files themselves are not persisted or uploaded.** After refreshing, re-import the same local files to restore playable tracks and associate them with saved playlists. Music stays on your device.
+In the **Windows desktop app**, the library, playlists, playback preferences, and durable artwork references are saved to the app's local AppData storage, with a localStorage backup for recovery. The app stores file paths and metadata rather than copying your music into its database; the original audio files must remain available at those paths. If a source file is moved or deleted, its saved entry may no longer be playable until you locate or re-import it.
 
-Some audio extensions may be recognized but cannot play if the browser lacks a suitable decoder. There is no backend, cloud sync, or account system.
+In the **browser build**, playback depends on the browser session's access to imported files. Temporary browser object URLs are not durable across restarts, so re-import files when needed. Music is not uploaded to a server. There is no backend, cloud sync, or account system.
+
+Some audio extensions may be recognized but cannot play if the WebView/browser lacks a suitable decoder. Before publishing a Windows release, complete the [Windows release QA checklist](docs/RELEASE_CHECKLIST.md); CI builds are not a substitute for installing and smoke-testing the generated installer on a clean Windows machine.
 
 ## Contributing
 
