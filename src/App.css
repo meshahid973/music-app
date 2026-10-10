@@ -1,4 +1,5 @@
 .app-shell {
+  --lime: var(--user-accent, #e6eaee);
   --bg: #090a0a;
   --panel: #141516;
   --panel-strong: #1e2022;
@@ -3145,3 +3146,45 @@ h3 {
   border-top: 1px solid var(--line);
 }
 
+
+
+/* Surface palettes share the same component tokens so controls remain visually consistent. */
+.app-shell.theme-preset-ocean {
+  --bg: #071219;
+  --panel: #0e202b;
+  --panel-strong: #173342;
+  --panel-soft: #1c3b4b;
+  --line: #234554;
+  --line-strong: #326476;
+  --text: #e8f6fc;
+  --muted: #a4c1ce;
+  --faint: #6f929f;
+}
+.app-shell.theme-preset-violet {
+  --bg: #100d19;
+  --panel: #1b1628;
+  --panel-strong: #29213c;
+  --panel-soft: #342a4a;
+  --line: #3a2e51;
+  --line-strong: #5b477a;
+  --text: #f5efff;
+  --muted: #c0b2d8;
+  --faint: #8c7ba6;
+}
+.app-shell.theme-preset-forest {
+  --bg: #09130f;
+  --panel: #14231b;
+  --panel-strong: #1d3327;
+  --panel-soft: #294535;
+  --line: #2a4737;
+  --line-strong: #426a52;
+  --text: #eff8f0;
+  --muted: #b2cbb8;
+  --faint: #789783;
+}
+.theme-customization-section { margin-top: 28px; }
+.theme-customization-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.theme-control-field { display: grid; gap: 8px; color: var(--muted); font-size: 13px; }
+.theme-control-field select { width: 100%; min-height: 42px; padding: 0 12px; color: var(--text); background: var(--panel-strong); border: 1px solid var(--line); border-radius: 10px; }
+.theme-control-field input[type="color"] { width: 100%; height: 42px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-strong); cursor: pointer; }
+@media (max-width: 560px) { .theme-customization-controls { grid-template-columns: 1fr; } }
