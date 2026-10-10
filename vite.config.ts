@@ -5,8 +5,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0',
+    // Vite's default host is localhost. Do not expose the dev server to the
+    // local network unless a developer explicitly opts in via the CLI.
     port: 3000,
-    allowedHosts: true,
   },
 })
