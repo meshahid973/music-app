@@ -46,6 +46,8 @@ function App() {
     shuffle,
     repeat,
     themeMode,
+    themePreset,
+    accentColor,
     volume,
     initDesktopStorage,
     setActivePlaylist,
@@ -174,7 +176,7 @@ function App() {
 
   return (
     <main
-      className={`app-shell theme-${themeMode}`}
+      className={`app-shell theme-${themeMode} theme-preset-${themePreset}`}
       style={
         {
           '--ambient-bg': isAmbient ? heroTheme.heroBg : 'transparent',
@@ -182,6 +184,7 @@ function App() {
           '--ambient-border': isAmbient ? heroTheme.borderColor : 'var(--line)',
           '--ambient-shadow': isAmbient ? heroTheme.shadowColor : 'rgba(0, 0, 0, 0.45)',
           '--hero-background': isAmbient ? heroTheme.background : 'var(--panel)',
+          '--user-accent': accentColor,
         } as CSSProperties
       }
       onContextMenu={(event) => event.preventDefault()}
