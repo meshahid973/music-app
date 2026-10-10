@@ -126,23 +126,28 @@ export function useLibraryImport() {
 
   // Native desktop handlers using OS dialogs
   async function handleNativeAddSongs() {
-    const filePaths = await pickNativeAudioFiles()
-    if (!filePaths || filePaths.length === 0) return
+    try {
+      const filePaths = await pickNativeAudioFiles()
+      if (!filePaths || filePaths.length === 0) return
 
-    const storeLookup = useMusicStore.getState().coverLookup
-    const existingIds = new Set(useMusicStore.getState().tracks.map((t) => t.id))
-    const parsedTracks = await nativeTracksFromPaths(filePaths, storeLookup, existingIds)
-    if (parsedTracks.length > 0) {
-      addTracks(parsedTracks)
-      showNotice(
-        parsedTracks.length === 1
-          ? '1 song imported successfully'
-          : `${parsedTracks.length} songs imported successfully`,
-        'success',
-        'Import Successful',
-      )
-    } else {
-      showNotice('All selected songs are already in your library', 'info', 'Library Up to Date')
+      const storeLookup = useMusicStore.getState().coverLookup
+      const existingIds = new Set(useMusicStore.getState().tracks.map((t) => t.id))
+      const parsedTracks = await nativeTracksFromPaths(filePaths, storeLookup, existingIds)
+      if (parsedTracks.length > 0) {
+        addTracks(parsedTracks)
+        showNotice(
+          parsedTracks.length === 1
+            ? '1 song imported successfully'
+            : `${parsedTracks.length} songs imported successfully`,
+          'success',
+          'Import Successful',
+        )
+      } else {
+        showNotice('All selected songs are already in your library', 'info', 'Library Up to Date')
+      }
+    } catch (err) {
+      console.warn('Importing selected audio files failed:', err)
+      showNotice('Could not import the selected audio files', 'error', 'Import Failed')
     }
   }
 
@@ -168,6 +173,9 @@ export function useLibraryImport() {
       } else {
         showNotice(`Library is up to date (${audioPaths.length} songs found)`, 'info', 'Folder Scanned')
       }
+    } catch (err) {
+      console.warn('Importing the selected music folder failed:', err)
+      showNotice('Could not import the selected music folder', 'error', 'Import Failed')
     } finally {
       setIsScanningMusic(false)
     }
@@ -264,6 +272,9 @@ export function useLibraryImport() {
       } else {
         showNotice('No cover artwork files found', 'info', 'Covers Notice')
       }
+    } catch (err) {
+      console.warn('Importing the selected cover folder failed:', err)
+      showNotice('Could not import the selected cover folder', 'error', 'Import Failed')
     } finally {
       setIsScanningCovers(false)
     }
