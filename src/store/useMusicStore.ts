@@ -64,6 +64,8 @@ function queueSave(state: MusicState) {
       shuffle: state.shuffle,
       repeat: state.repeat,
       themeMode: state.themeMode,
+      themePreset: state.themePreset,
+      accentColor: state.accentColor,
       musicFolderPath: state.musicFolderPath,
       coverFolderPath: state.coverFolderPath,
       musicFolderName: state.musicFolderName,
