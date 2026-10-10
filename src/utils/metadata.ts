@@ -48,8 +48,11 @@ export function cleanMusicString(raw: string): string {
     cleaned = cleaned.replace(pattern, '')
   }
   return cleaned
-    .replace(/[_-]+/g, ' ')
+    // Underscores are common filename word separators; hyphens are meaningful in names
+    // such as Jay-Z and AC-DC, so only normalize underscores.
+    .replace(/_+/g, ' ')
     .replace(/\s{2,}/g, ' ')
+    .replace(/^[\s-]+|[\s-]+$/g, '')
     .trim()
 }
 
@@ -254,6 +257,22 @@ export async function readID3Metadata(
     const synchsafe = (b: Uint8Array, i: number) =>
       ((b[i] & 0x7f) << 21) | ((b[i + 1] & 0x7f) << 14) |
       ((b[i + 2] & 0x7f) << 7) | (b[i + 3] & 0x7f)
+
+    // ID3v2.3 and v2.4 may include an extended header before the first frame.
+    // Treat its declared size as untrusted and reject truncated/out-of-bounds headers.
+    if (version >= 3 && (bytes[5] & 0x40) !== 0) {
+      if (offset + 4 > limit) return null
+      const declaredSize = version === 4 ? synchsafe(bytes, offset) : view.getUint32(offset)
+      const extendedHeaderSize = version === 4 ? declaredSize : declaredSize + 4
+      if (
+        declaredSize < 6 ||
+        !Number.isSafeInteger(extendedHeaderSize) ||
+        offset + extendedHeaderSize > limit
+      ) {
+        return null
+      }
+      offset += extendedHeaderSize
+    }
 
     while (offset + (version === 2 ? 6 : 10) <= limit) {
       const headerSize = version === 2 ? 6 : 10

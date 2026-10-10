@@ -52,6 +52,11 @@ export async function processTrackEdit({
     }
   }
 
+  const coverChanged =
+    pendingImageSource !== undefined ||
+    coverUrl !== track.coverUrl ||
+    coverPath !== track.coverPath
+
   return {
     success: true,
     updates: {
@@ -60,7 +65,12 @@ export async function processTrackEdit({
       album: album.trim() || track.album,
       coverUrl: finalCoverUrl,
       coverPath: finalCoverUrl ? finalCoverPath : undefined,
-      coverSource: finalCoverUrl ? 'custom' : undefined,
+      // Editing text fields must not reclassify embedded/direct artwork as custom.
+      coverSource: !finalCoverUrl
+        ? undefined
+        : coverChanged
+          ? 'custom'
+          : track.coverSource,
     },
   }
 }

@@ -968,3 +968,56 @@ test('switching between normal mode and ambient mode updates store state', () =>
 })
 
 
+
+
+test('filename metadata parsing preserves meaningful hyphens in artist and title', async () => {
+  const detected = await autoDetectTrackMetadata('Jay-Z - 99-Problems.mp3')
+  assert.equal(detected.artist, 'Jay-Z')
+  assert.equal(detected.title, '99-Problems')
+})
+
+test('ID3v2.3 parser skips a valid extended header before reading frames', async () => {
+  const tagged = new Uint8Array(await makeTag(3, 'Extended Header Song', 'Extended Header Artist').arrayBuffer())
+  const frameBytes = tagged.subarray(10)
+  // ID3v2.3 extended header: 4-byte size (excluding the size field), flags, padding size.
+  const extendedHeader = Buffer.from([0, 0, 0, 6, 0, 0, 0, 0, 0, 0])
+  const tagSize = extendedHeader.length + frameBytes.length
+  const header = Buffer.from([73, 68, 51, 3, 0, 0x40, ...synchsafe(tagSize)])
+  const file = new File([Buffer.concat([header, extendedHeader, Buffer.from(frameBytes)])], 'extended.mp3', { type: 'audio/mpeg' })
+  const result = await readID3Metadata(file)
+  assert.equal(result?.title, 'Extended Header Song')
+  assert.equal(result?.artist, 'Extended Header Artist')
+})
+
+test('editing text metadata preserves existing embedded artwork provenance', async () => {
+  const originalTrack = {
+    id: 'native:/music/embedded.mp3',
+    title: 'Original',
+    artist: 'Original Artist',
+    album: 'Original Album',
+    duration: 180,
+    fileName: 'embedded.mp3',
+    filePath: '/music/embedded.mp3',
+    audioUrl: 'asset:///music/embedded.mp3',
+    coverUrl: 'asset:///appdata/artwork/embedded.jpg',
+    coverPath: '/appdata/artwork/embedded.jpg',
+    coverSource: 'embedded',
+    accent: '#555555',
+  }
+  const result = await processTrackEdit({
+    track: originalTrack,
+    title: '  Corrected Title  ',
+    artist: '  Corrected Artist ',
+    album: '  Corrected Album ',
+    coverUrl: originalTrack.coverUrl,
+    coverPath: originalTrack.coverPath,
+    isDesktop: true,
+  })
+  assert.equal(result.success, true)
+  assert.equal(result.updates?.title, 'Corrected Title')
+  assert.equal(result.updates?.artist, 'Corrected Artist')
+  assert.equal(result.updates?.album, 'Corrected Album')
+  assert.equal(result.updates?.coverUrl, originalTrack.coverUrl)
+  assert.equal(result.updates?.coverPath, originalTrack.coverPath)
+  assert.equal(result.updates?.coverSource, 'embedded')
+})
