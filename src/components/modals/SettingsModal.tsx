@@ -7,7 +7,7 @@ import {
   SparklesFilled,
 } from '../icons'
 import { useMusicStore } from '../../store/useMusicStore'
-import type { ThemeMode } from '../../types'
+import type { ThemeMode, ThemePreset } from '../../types'
 
 export type SettingsModalProps = {
   onClose: () => void
@@ -17,7 +17,7 @@ type SettingsTab = 'looks' | 'shortcuts'
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('looks')
-  const { themeMode, setThemeMode, tracks, playlists } = useMusicStore()
+  const { themeMode, setThemeMode, themePreset, setThemePreset, accentColor, setAccentColor, tracks, playlists } = useMusicStore()
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -204,6 +204,39 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                     </p>
                   </div>
                 </button>
+              </div>
+
+              <div className="theme-customization-section">
+                <div className="settings-section-header">
+                  <span className="settings-eyebrow">Color palette</span>
+                  <p className="settings-section-desc">
+                    Choose a surface palette and customize the interface accent. Your choices are saved with your library.
+                  </p>
+                </div>
+                <div className="theme-customization-controls">
+                  <label className="theme-control-field">
+                    <span>Preset</span>
+                    <select
+                      value={themePreset}
+                      onChange={(event) => setThemePreset(event.target.value as ThemePreset)}
+                      aria-label="Theme preset"
+                    >
+                      <option value="midnight">Midnight</option>
+                      <option value="ocean">Ocean</option>
+                      <option value="violet">Violet</option>
+                      <option value="forest">Forest</option>
+                    </select>
+                  </label>
+                  <label className="theme-control-field theme-accent-field">
+                    <span>Accent color</span>
+                    <input
+                      type="color"
+                      value={accentColor}
+                      onChange={(event) => setAccentColor(event.target.value)}
+                      aria-label="Accent color"
+                    />
+                  </label>
+                </div>
               </div>
             </div>
           )}
