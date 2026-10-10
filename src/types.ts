@@ -1,5 +1,6 @@
 export type RepeatMode = 'off' | 'one' | 'all'
 export type ThemeMode = 'ambient' | 'normal'
+export type ThemePreset = 'midnight' | 'ocean' | 'violet' | 'forest'
 
 export type Track = {
   id: string
