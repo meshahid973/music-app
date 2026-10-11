@@ -222,6 +222,7 @@ export const useMusicStore = create<MusicState>()(
 
           set((state) => ({
             tracks: hydrateTracksArtwork(state.tracks),
+            firstRunSetupCompleted: state.firstRunSetupCompleted || state.tracks.length > 0,
             isInitialized: true,
           }))
         })()
