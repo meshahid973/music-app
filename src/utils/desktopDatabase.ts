@@ -19,6 +19,7 @@ export interface DesktopLibraryPayload {
   coverFolderPath?: string
   musicFolderName?: string
   coverFolderName?: string
+  firstRunSetupCompleted?: boolean
 }
 
 const STORAGE_FILE = 'resonance_library.json'
@@ -84,6 +85,7 @@ export function migrateDesktopLibraryPayload(raw: unknown): DesktopLibraryPayloa
   const themeMode = normalizeTheme(raw.themeMode)
   const themePreset = normalizeThemePreset(raw.themePreset)
   const accentColor = normalizeAccentColor(raw.accentColor)
+  const firstRunSetupCompleted = normalizeBoolean(raw.firstRunSetupCompleted, false)
 
   const payload: DesktopLibraryPayload = {
     version: STORAGE_VERSION,
@@ -101,6 +103,7 @@ export function migrateDesktopLibraryPayload(raw: unknown): DesktopLibraryPayloa
     coverFolderPath: normalizeString(raw.coverFolderPath),
     musicFolderName: normalizeString(raw.musicFolderName),
     coverFolderName: normalizeString(raw.coverFolderName),
+    firstRunSetupCompleted,
   }
 
   return payload
