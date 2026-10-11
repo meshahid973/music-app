@@ -55,7 +55,6 @@ function App() {
     volume,
     isInitialized,
     musicFolderPath: configuredMusicFolderPath,
-    coverFolderPath: configuredCoverFolderPath,
     firstRunSetupCompleted,
     setFirstRunSetupCompleted,
     initDesktopStorage,
