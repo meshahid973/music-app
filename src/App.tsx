@@ -149,7 +149,6 @@ function App() {
       }
     } finally {
       setFirstRunBusyAction(null)
-      setIsFirstRunSetupInProgress(false)
     }
   }
 
@@ -163,7 +162,6 @@ function App() {
       }
     } finally {
       setFirstRunBusyAction(null)
-      setIsFirstRunSetupInProgress(false)
     }
   }
 
