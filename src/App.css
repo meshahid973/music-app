@@ -490,62 +490,41 @@ h3 {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
   overflow: hidden;
   border-radius: 28px;
 }
 
-.hero-banner-ambient {
+.hero-acrylic-backdrop {
   position: absolute;
-  top: -15%;
-  right: -5%;
-  bottom: -15%;
-  height: 130%;
-  width: clamp(520px, 72%, 920px);
+  inset: -8%;
   overflow: hidden;
   pointer-events: none;
-  /* Ultra-smooth multi-stop ease-out mask fade */
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    rgba(0, 0, 0, 0.01) 12%,
-    rgba(0, 0, 0, 0.04) 22%,
-    rgba(0, 0, 0, 0.10) 32%,
-    rgba(0, 0, 0, 0.22) 44%,
-    rgba(0, 0, 0, 0.40) 56%,
-    rgba(0, 0, 0, 0.62) 68%,
-    rgba(0, 0, 0, 0.84) 80%,
-    rgba(0, 0, 0, 0.96) 90%,
-    #000 100%
-  );
-  mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    rgba(0, 0, 0, 0.01) 12%,
-    rgba(0, 0, 0, 0.04) 22%,
-    rgba(0, 0, 0, 0.10) 32%,
-    rgba(0, 0, 0, 0.22) 44%,
-    rgba(0, 0, 0, 0.40) 56%,
-    rgba(0, 0, 0, 0.62) 68%,
-    rgba(0, 0, 0, 0.84) 80%,
-    rgba(0, 0, 0, 0.96) 90%,
-    #000 100%
-  );
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
 }
 
-.hero-banner-ambient-img {
+.hero-acrylic-backdrop-img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: right center;
-  filter: blur(48px) saturate(1.12);
-  opacity: 0.62;
-  transform: scale(1.15);
-  display: block;
+  object-position: center;
+  filter: blur(38px) saturate(1.35) brightness(0.72);
+  opacity: 0.72;
+  transform: scale(1.18);
+}
+
+.hero-acrylic-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    rgba(10, 11, 12, 0.2) 0%,
+    rgba(10, 11, 12, 0.06) 48%,
+    rgba(10, 11, 12, 0.22) 100%
+  );
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .hero-banner-cover {
@@ -582,6 +561,11 @@ h3 {
   object-fit: cover;
   display: block;
   border-radius: 20px;
+}
+
+.now-copy {
+  position: relative;
+  z-index: 2;
 }
 
 .cover-stage {
@@ -2679,10 +2663,6 @@ h3 {
   background:
     linear-gradient(180deg, #111315 0%, #090a0a 100%),
     var(--bg) !important;
-}
-
-.app-shell.theme-normal .hero-banner-ambient {
-  display: none !important;
 }
 
 .app-shell.theme-normal .hero-player {

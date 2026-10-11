@@ -163,30 +163,35 @@ export function Sidebar({
                   <PlusFilled size={13} />
                 </button>
               )}
-              <button
-                type="button"
-                className="nav-action-btn edit"
-                title={`Rename playlist "${playlist.name}"`}
-                aria-label={`Rename playlist "${playlist.name}"`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onRenamePlaylist(playlist)
-                }}
-              >
-                <PencilFilled size={13} />
-              </button>
-              <button
-                type="button"
-                className="nav-action-btn delete"
-                title={`Delete playlist "${playlist.name}"`}
-                aria-label={`Delete playlist "${playlist.name}"`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDeletePlaylist(playlist)
-                }}
-              >
-                <TrashFilled size={13} />
-              </button>
+              {playlist.id !== favoritesId && (
+                <>
+                  <button
+                    type="button"
+                    className="nav-action-btn edit"
+                    title={`Rename playlist "${playlist.name}"`}
+                    aria-label={`Rename playlist "${playlist.name}"`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onRenamePlaylist(playlist)
+                    }}
+                  >
+                    <PencilFilled size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    className="nav-action-btn delete"
+                    title={`Delete playlist "${playlist.name}"`}
+                    aria-label={`Delete playlist "${playlist.name}"`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDeletePlaylist(playlist)
+                    }}
+                  >
+                    <TrashFilled size={13} />
+                  </button>
+
+                </>
+              )}
             </div>
           </div>
         ))}

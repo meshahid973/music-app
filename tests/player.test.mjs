@@ -970,24 +970,30 @@ test('rescan filtering only returns newly added audio files when rescanning a fo
   assert.equal(newTracks[0].title, 'Song 2')
 })
 
-test('favorites toggle adds and removes tracks from the favorites playlist', () => {
-  const store = useMusicStore.getState()
-  const trackId = 'test-track-fav-1'
+test('Favorites is permanent and liking a song restores it if missing', () => {
+  const originalPlaylists = useMusicStore.getState().playlists
+  const trackId = 'test-track-fav-restore'
 
-  // Initially not in favorites
-  let favoritesPlaylist = useMusicStore.getState().playlists.find((p) => p.id === 'favorites')
+  // Simulate a persisted library where Favorites was missing.
+  useMusicStore.setState({
+    playlists: originalPlaylists.filter((playlist) => playlist.id !== 'favorites'),
+  })
+  useMusicStore.getState().addTrackToPlaylist('favorites', trackId)
+
+  let favoritesPlaylist = useMusicStore.getState().playlists.find((playlist) => playlist.id === 'favorites')
   assert.ok(favoritesPlaylist)
-  assert.equal(favoritesPlaylist.trackIds.includes(trackId), false)
-
-  // Add to favorites
-  store.addTrackToPlaylist('favorites', trackId)
-  favoritesPlaylist = useMusicStore.getState().playlists.find((p) => p.id === 'favorites')
+  assert.equal(favoritesPlaylist.name, 'Favorites')
   assert.equal(favoritesPlaylist.trackIds.includes(trackId), true)
 
-  // Remove from favorites
-  store.removeTrackFromPlaylist('favorites', trackId)
-  favoritesPlaylist = useMusicStore.getState().playlists.find((p) => p.id === 'favorites')
-  assert.equal(favoritesPlaylist.trackIds.includes(trackId), false)
+  // The protected playlist cannot be deleted or renamed.
+  useMusicStore.getState().deletePlaylist('favorites')
+  useMusicStore.getState().renamePlaylist('favorites', 'Renamed')
+  favoritesPlaylist = useMusicStore.getState().playlists.find((playlist) => playlist.id === 'favorites')
+  assert.ok(favoritesPlaylist)
+  assert.equal(favoritesPlaylist.name, 'Favorites')
+
+  useMusicStore.getState().removeTrackFromPlaylist('favorites', trackId)
+  useMusicStore.setState({ playlists: originalPlaylists })
 })
 
 test('addTrackToPlaylist prevents duplicate track ids in playlist', () => {
@@ -1032,18 +1038,32 @@ test('clicking or switching playlist while actively listening does not auto-swit
   assert.equal(queue.next('track2', false, 'off'), 'track3')
 })
 
-test('switching between normal mode and ambient mode updates store state', () => {
-  const store = useMusicStore.getState()
-  // Default is ambient mode
-  assert.equal(store.themeMode, 'ambient')
-
-  // Switch to normal mode
-  store.setThemeMode('normal')
+test('ambient mode is removed and legacy preferences normalize to normal', () => {
+  const settingsSource = fs.readFileSync(
+    new URL('../src/components/modals/SettingsModal.tsx', import.meta.url),
+    'utf8',
+  )
+  assert.equal(settingsSource.includes('Ambient Mode'), false)
   assert.equal(useMusicStore.getState().themeMode, 'normal')
 
-  // Switch back to ambient mode
-  store.setThemeMode('ambient')
-  assert.equal(useMusicStore.getState().themeMode, 'ambient')
+  const migrated = migrateDesktopLibraryPayload({
+    tracks: [],
+    playlists: [],
+    volume: 0.82,
+    shuffle: false,
+    repeat: 'off',
+    themeMode: 'ambient',
+  })
+  assert.equal(migrated?.themeMode, 'normal')
+
+  const heroSource = fs.readFileSync(
+    new URL('../src/components/HeroPlayer.tsx', import.meta.url),
+    'utf8',
+  )
+  const heroStyles = fs.readFileSync(new URL('../src/App.css', import.meta.url), 'utf8')
+  assert.equal(heroSource.includes('hero-acrylic-backdrop'), true)
+  assert.equal(heroStyles.includes('.hero-acrylic-backdrop-img'), true)
+  assert.equal(heroStyles.includes('.app-shell.theme-normal .hero-acrylic-backdrop'), false)
 })
 
 

@@ -7,7 +7,7 @@ import {
   SparklesFilled,
 } from '../icons'
 import { useMusicStore } from '../../store/useMusicStore'
-import type { ThemeMode, ThemePreset } from '../../types'
+import type { ThemePreset } from '../../types'
 
 export type SettingsModalProps = {
   onClose: () => void
@@ -17,7 +17,7 @@ type SettingsTab = 'looks' | 'shortcuts'
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('looks')
-  const { themeMode, setThemeMode, themePreset, setThemePreset, accentColor, setAccentColor, tracks, playlists } = useMusicStore()
+  const { themePreset, setThemePreset, accentColor, setAccentColor, tracks, playlists } = useMusicStore()
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -28,10 +28,6 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
-
-  const handleSelectMode = (mode: ThemeMode) => {
-    setThemeMode(mode)
-  }
 
   return (
     <motion.div
@@ -115,95 +111,10 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               className="settings-panel looks-panel"
             >
               <div className="settings-section-header">
-                <span className="settings-eyebrow">Visual Theme & Ambiance</span>
+                <span className="settings-eyebrow">Appearance</span>
                 <p className="settings-section-desc">
-                  Choose how Resonance renders backgrounds, dynamic lighting, and cover artwork reflections.
+                  Customize the interface palette. The player artwork uses its own soft acrylic blur.
                 </p>
-              </div>
-
-              {/* Segmented Quick Toggle */}
-              <div className="settings-segmented-control" role="group" aria-label="Display mode switch">
-                <button
-                  type="button"
-                  className={`settings-segment-btn ${themeMode === 'normal' ? 'active' : ''}`}
-                  onClick={() => handleSelectMode('normal')}
-                  aria-pressed={themeMode === 'normal'}
-                >
-                  <span>Normal Mode</span>
-                </button>
-                <button
-                  type="button"
-                  className={`settings-segment-btn ${themeMode === 'ambient' ? 'active' : ''}`}
-                  onClick={() => handleSelectMode('ambient')}
-                  aria-pressed={themeMode === 'ambient'}
-                >
-                  <span className="ambient-badge-sparkle">✦</span>
-                  <span>Ambient Mode</span>
-                </button>
-              </div>
-
-              {/* Visual Mode Option Cards */}
-              <div className="theme-options-grid">
-                {/* Normal Mode Option */}
-                <button
-                  type="button"
-                  className={`theme-mode-card normal-card ${themeMode === 'normal' ? 'selected' : ''}`}
-                  onClick={() => handleSelectMode('normal')}
-                  aria-pressed={themeMode === 'normal'}
-                  aria-label="Normal mode: clean dark interface"
-                >
-                  <div className="theme-card-preview normal-preview">
-                    <div className="mini-player-wireframe normal-wireframe">
-                      <div className="wireframe-art neutral" />
-                      <div className="wireframe-lines">
-                        <div className="line-sm" />
-                        <div className="line-xs" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="theme-card-info">
-                    <div className="theme-card-title-row">
-                      <h4>Normal Studio Mode</h4>
-                      <span className={`theme-status-tag ${themeMode === 'normal' ? 'active' : ''}`}>
-                        {themeMode === 'normal' ? 'Active' : 'Select'}
-                      </span>
-                    </div>
-                    <p>
-                      Clean, understated dark studio interface. Solid neutral dark panels without background light flares or colored artwork bleeds.
-                    </p>
-                  </div>
-                </button>
-
-                {/* Dynamic Ambient Mode Option */}
-                <button
-                  type="button"
-                  className={`theme-mode-card ambient-card ${themeMode === 'ambient' ? 'selected' : ''}`}
-                  onClick={() => handleSelectMode('ambient')}
-                  aria-pressed={themeMode === 'ambient'}
-                  aria-label="Dynamic Ambient mode: glowing artwork-synced interface"
-                >
-                  <div className="theme-card-preview ambient-preview">
-                    <div className="mini-player-wireframe ambient-wireframe">
-                      <div className="wireframe-art vibrant" />
-                      <div className="wireframe-ambient-glow" />
-                      <div className="wireframe-lines">
-                        <div className="line-sm" />
-                        <div className="line-xs" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="theme-card-info">
-                    <div className="theme-card-title-row">
-                      <h4>Dynamic Ambiance</h4>
-                      <span className={`theme-status-tag ${themeMode === 'ambient' ? 'active' : ''}`}>
-                        {themeMode === 'ambient' ? 'Active' : 'Select'}
-                      </span>
-                    </div>
-                    <p>
-                      Dynamic background glow and responsive reflections that blend the current track&apos;s artwork colors seamlessly across the entire app interface.
-                    </p>
-                  </div>
-                </button>
               </div>
 
               <div className="theme-customization-section">
