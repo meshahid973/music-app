@@ -163,6 +163,8 @@ export function Sidebar({
                   <PlusFilled size={13} />
                 </button>
               )}
+              {playlist.id !== favoritesId && (
+                <>
               <button
                 type="button"
                 className="nav-action-btn edit"
@@ -187,6 +189,9 @@ export function Sidebar({
               >
                 <TrashFilled size={13} />
               </button>
+
+                </>
+              )}
             </div>
           </div>
         ))}
