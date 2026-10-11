@@ -34,6 +34,7 @@ export function useLibraryImport() {
   const [isScanningCovers, setIsScanningCovers] = useState(false)
   const [scanNotice, setScanNotice] = useState<string | null>(null)
   const noticeTimerRef = useRef<number | null>(null)
+  const nativeCoverPathsRef = useRef<Map<string, string>>(new Map())
 
   const showNotice = useCallback(
     (
@@ -59,19 +60,21 @@ export function useLibraryImport() {
       const storeLookup = useMusicStore.getState().coverLookup
       const combinedLookup = new Map(storeLookup)
 
-      let coverPathsMap: Map<string, string> | undefined
       let addedCoversCount = 0
 
       if (coverPaths.length > 0) {
         const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
-        coverPathsMap = paths
         for (const [k, v] of lookup.entries()) {
           if (!combinedLookup.has(k)) {
             addedCoversCount++
           }
           combinedLookup.set(k, v)
         }
-        addCovers(lookup, urls)
+        // Preserve keys from an independently selected cover folder too.
+        for (const [key, path] of paths.entries()) {
+          nativeCoverPathsRef.current.set(key, path)
+        }
+        addCovers(lookup, urls, paths)
       }
 
       let addedTracksCount = 0
@@ -81,7 +84,7 @@ export function useLibraryImport() {
           audioPaths,
           combinedLookup,
           existingIds,
-          coverPathsMap,
+          nativeCoverPathsRef.current,
         )
         if (parsedTracks.length > 0) {
           addedTracksCount = parsedTracks.length
@@ -130,9 +133,27 @@ export function useLibraryImport() {
       const filePaths = await pickNativeAudioFiles()
       if (!filePaths || filePaths.length === 0) return
 
-      const storeLookup = useMusicStore.getState().coverLookup
+      const storeState = useMusicStore.getState()
+      const combinedLookup = new Map(storeState.coverLookup)
+
+      // Restore the filename-to-path index after a restart before parsing individual songs.
+      if (nativeCoverPathsRef.current.size === 0 && storeState.coverFolderPath) {
+        const { coverPaths } = await scanNativeFolder(storeState.coverFolderPath)
+        if (coverPaths.length > 0) {
+          const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+          for (const [key, value] of lookup.entries()) combinedLookup.set(key, value)
+          for (const [key, path] of paths.entries()) nativeCoverPathsRef.current.set(key, path)
+          addCovers(lookup, urls, paths)
+        }
+      }
+
       const existingIds = new Set(useMusicStore.getState().tracks.map((t) => t.id))
-      const parsedTracks = await nativeTracksFromPaths(filePaths, storeLookup, existingIds)
+      const parsedTracks = await nativeTracksFromPaths(
+        filePaths,
+        combinedLookup,
+        existingIds,
+        nativeCoverPathsRef.current,
+      )
       if (parsedTracks.length > 0) {
         addTracks(parsedTracks)
         showNotice(
@@ -258,9 +279,10 @@ export function useLibraryImport() {
     try {
       const { coverPaths } = await scanNativeFolder(folderPath)
       if (coverPaths.length > 0) {
-        const { lookup, urls } = nativeCoversFromPaths(coverPaths)
+        const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+        for (const [key, path] of paths.entries()) nativeCoverPathsRef.current.set(key, path)
         if (urls.length > 0) {
-          addCovers(lookup, urls)
+          addCovers(lookup, urls, paths)
           showNotice(
             urls.length === 1
               ? '1 cover artwork imported successfully'
@@ -292,7 +314,7 @@ export function useLibraryImport() {
       try {
         const { coverPaths } = await scanNativeFolder(currentPath)
         if (coverPaths.length > 0) {
-          const { lookup, urls } = nativeCoversFromPaths(coverPaths)
+          const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
           const existingLookup = useMusicStore.getState().coverLookup
           let newCoversCount = 0
           for (const key of lookup.keys()) {
@@ -300,8 +322,12 @@ export function useLibraryImport() {
               newCoversCount++
             }
           }
-          if (newCoversCount > 0) {
-            addCovers(lookup, urls)
+          const pathsChanged = Array.from(paths.entries()).some(
+            ([key, path]) => nativeCoverPathsRef.current.get(key) !== path,
+          )
+          for (const [key, path] of paths.entries()) nativeCoverPathsRef.current.set(key, path)
+          if (newCoversCount > 0 || pathsChanged) {
+            addCovers(lookup, urls, paths)
             showNotice(
               newCoversCount === 1
                 ? '1 new cover artwork imported'
