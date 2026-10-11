@@ -54,8 +54,9 @@ function normalizePlaylists(value: unknown): Playlist[] {
   })
 }
 
-function normalizeTheme(value: unknown): ThemeMode | undefined {
-  return value === 'ambient' || value === 'normal' ? value : undefined
+function normalizeTheme(_value: unknown): ThemeMode {
+  // Keep older saved libraries compatible while removing the Ambient Mode option.
+  return 'normal'
 }
 
 function normalizeThemePreset(value: unknown): ThemePreset | undefined {
