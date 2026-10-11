@@ -17,7 +17,7 @@ Automated CI coverage is also provided by `.github/workflows/verify.yml`: on a W
 - [ ] Play, pause, seek, adjust volume, skip next/previous, and confirm playback errors are visible rather than silently failing.
 - [ ] Create, rename, and delete a playlist; add/remove tracks and verify Favorites.
 - [ ] Edit a song's title, artist, album, and cover art; verify edits remain after restart.
-- [ ] Change theme mode, theme preset, accent color, volume, shuffle/repeat, and selected folders; restart and verify preferences persist.
+- [ ] Change theme preset, accent color, volume, shuffle/repeat, and selected folders; restart and verify preferences persist.
 - [ ] Close the app fully, relaunch it, and verify the library, playlist membership, metadata edits, artwork, and settings restore.
 - [ ] Move or temporarily remove an imported source file and confirm the failure is understandable and does not corrupt the rest of the library.
 - [ ] Test selecting and rescanning a folder, drag-and-drop, and a path containing spaces and non-ASCII characters.
