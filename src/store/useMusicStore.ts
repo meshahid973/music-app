@@ -28,7 +28,7 @@ type MusicState = {
   setCoverFolder: (path?: string, name?: string) => void
   initDesktopStorage: () => Promise<void>
   addTracks: (tracks: Track[]) => void
-  addCovers: (covers: Map<string, string>, extraUrls?: string[]) => void
+  addCovers: (covers: Map<string, string>, extraUrls?: string[], coverPaths?: Map<string, string>) => void
   createPlaylist: (name: string) => void
   deletePlaylist: (playlistId: string) => void
   renamePlaylist: (playlistId: string, name: string) => void
@@ -236,7 +236,7 @@ export const useMusicStore = create<MusicState>()(
           return next
         }),
 
-      addCovers: (covers, extraUrls = []) =>
+      addCovers: (covers, extraUrls = [], coverPaths = new Map()) =>
         set((state) => {
           const mergedLookup = new Map(state.coverLookup)
           for (const [key, value] of covers.entries()) {
@@ -244,7 +244,23 @@ export const useMusicStore = create<MusicState>()(
           }
           const incomingCovers = Array.from(new Set([...Array.from(covers.values()), ...extraUrls]))
           const updatedPool = Array.from(new Set([...state.coverPool, ...incomingCovers]))
-          const tracks = syncTracksWithCovers(state.tracks, mergedLookup, updatedPool)
+          const tracksWithCovers = syncTracksWithCovers(state.tracks, mergedLookup, updatedPool)
+
+          // Keep the original file path beside the asset URL. Asset URLs alone are not
+          // enough to rebuild artwork reliably after a desktop restart or scope refresh.
+          const pathsByUrl = new Map<string, string>()
+          for (const [key, path] of coverPaths.entries()) {
+            const url = covers.get(key)
+            if (url) pathsByUrl.set(url, path)
+          }
+
+          const tracks = tracksWithCovers.map((track) => {
+            if (!track.coverUrl || track.coverSource === 'embedded' || track.coverSource === 'custom') {
+              return track
+            }
+            const path = pathsByUrl.get(track.coverUrl)
+            return path && path !== track.coverPath ? { ...track, coverPath: path } : track
+          })
           const next = {
             coverLookup: mergedLookup,
             coverPool: updatedPool,
