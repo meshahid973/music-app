@@ -213,8 +213,6 @@ export function PlayerBar({
           <motion.button
             className={shuffle ? 'control active' : 'control'}
             type="button"
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
             onClick={onShuffle}
             aria-label="Toggle shuffle"
           >
@@ -223,8 +221,6 @@ export function PlayerBar({
           <motion.button
             className="control"
             type="button"
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
             onClick={onPrevious}
             aria-label="Previous track"
           >
@@ -233,8 +229,6 @@ export function PlayerBar({
           <motion.button
             className="play-button"
             type="button"
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.92 }}
             onClick={onTogglePlay}
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
@@ -243,8 +237,6 @@ export function PlayerBar({
           <motion.button
             className="control"
             type="button"
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
             onClick={onNext}
             aria-label="Next track"
           >
@@ -253,8 +245,6 @@ export function PlayerBar({
           <motion.button
             className={repeat !== 'off' ? 'control active' : 'control'}
             type="button"
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
             onClick={onRepeat}
             aria-label="Cycle repeat mode"
           >
