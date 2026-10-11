@@ -1,6 +1,6 @@
 # Resonance Music Player
 
-A local-first browser music player built with React 19, TypeScript, Vite, Zustand, Howler.js and Framer Motion.
+A local-first music player for the browser and Windows desktop, built with React 19, TypeScript, Vite, Zustand, Howler.js, Framer Motion, and Tauri.
 
 ## Local development
 
@@ -49,7 +49,7 @@ The NSIS installer will be output to:
 
 ## Using Resonance
 
-Import local audio files from **Add songs** or choose a **Music folder**. The app extracts supported ID3 tags and can match album art by filename or folder. Add tracks to playlists and Favorites, search your library, and use the player controls to shuffle or repeat songs.
+Import local audio files from **Add songs** or choose a **Music folder**. Embedded metadata extraction currently reads ID3 tags; files using other tag systems may fall back to filename-based guesses. Use **Edit song info** if a title or artist is wrong. Album art can be matched by filename or folder. Add tracks to playlists and Favorites, search your library, and use the player controls to shuffle or repeat songs. Audio format recognition does not guarantee every codec can be decoded by the installed Windows WebView.
 
 In the **Windows desktop app**, the library, playlists, playback preferences, and durable artwork references are saved to the app's local AppData storage, with a localStorage backup for recovery. The app stores file paths and metadata rather than copying your music into its database; the original audio files must remain available at those paths. If a source file is moved or deleted, its saved entry may no longer be playable until you locate or re-import it.
 
