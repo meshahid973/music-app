@@ -38,7 +38,7 @@ function App() {
   const [editingTrack, setEditingTrack] = useState<Track | null>(null)
   const [playlistToAddSongs, setPlaylistToAddSongs] = useState<Playlist | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isFirstRunSetupOpen, setIsFirstRunSetupOpen] = useState(false)
+  const [isFirstRunSetupInProgress, setIsFirstRunSetupInProgress] = useState(false)
   const [firstRunSetupStep, setFirstRunSetupStep] = useState<'music' | 'covers'>('music')
   const [firstRunBusyAction, setFirstRunBusyAction] = useState<'music' | 'covers' | null>(null)
 
@@ -122,35 +122,25 @@ function App() {
     handleDrop,
   } = useLibraryImport()
 
-  // First-run setup is only for a new desktop library. Existing libraries are left alone.
-  useEffect(() => {
-    if (!isDesktop || !isInitialized || firstRunSetupCompleted) return
-
-    if (tracks.length > 0 && !isFirstRunSetupOpen) {
-      setFirstRunSetupCompleted(true)
-      return
-    }
-
-    if (tracks.length === 0) {
-      setFirstRunSetupStep(configuredMusicFolderPath ? 'covers' : 'music')
-      setIsFirstRunSetupOpen(true)
-    }
-  }, [
-    configuredMusicFolderPath,
-    firstRunSetupCompleted,
-    isDesktop,
-    isFirstRunSetupOpen,
-    isInitialized,
-    setFirstRunSetupCompleted,
-    tracks.length,
-  ])
+  // Existing libraries are never interrupted. New, empty desktop libraries see setup
+  // immediately after storage initialization; the dialog remains open during folder scans.
+  const shouldShowFirstRunSetup =
+    isDesktop &&
+    isInitialized &&
+    !firstRunSetupCompleted &&
+    (tracks.length === 0 || isFirstRunSetupInProgress)
+  const visibleFirstRunStep =
+    configuredMusicFolderPath && !isFirstRunSetupInProgress && firstRunSetupStep === 'music'
+      ? 'covers'
+      : firstRunSetupStep
 
   const finishFirstRunSetup = () => {
     setFirstRunSetupCompleted(true)
-    setIsFirstRunSetupOpen(false)
+    setIsFirstRunSetupInProgress(false)
   }
 
   const handleFirstRunChooseMusic = async () => {
+    setIsFirstRunSetupInProgress(true)
     setFirstRunBusyAction('music')
     try {
       await handleNativeMusicFolder()
@@ -159,10 +149,12 @@ function App() {
       }
     } finally {
       setFirstRunBusyAction(null)
+      setIsFirstRunSetupInProgress(false)
     }
   }
 
   const handleFirstRunChooseCovers = async () => {
+    setIsFirstRunSetupInProgress(true)
     setFirstRunBusyAction('covers')
     try {
       await handleNativeCoverFolder()
@@ -171,6 +163,7 @@ function App() {
       }
     } finally {
       setFirstRunBusyAction(null)
+      setIsFirstRunSetupInProgress(false)
     }
   }
 
@@ -494,17 +487,17 @@ function App() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {isFirstRunSetupOpen && (
+        {shouldShowFirstRunSetup && (
           <FirstRunSetupModal
             key="first-run-setup-modal"
-            step={firstRunSetupStep}
+            step={visibleFirstRunStep}
             musicFolderName={musicFolderName}
             coverFolderName={coverFolderName}
             busyAction={firstRunBusyAction}
             onChooseMusicFolder={handleFirstRunChooseMusic}
             onChooseCoverFolder={handleFirstRunChooseCovers}
             onSkipCoverArt={finishFirstRunSetup}
-            onSetUpLater={finishFirstRunSetup}
+            onSetUpLater={() => { setIsFirstRunSetupInProgress(true); finishFirstRunSetup() }}
           />
         )}
       </AnimatePresence>
