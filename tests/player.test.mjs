@@ -1055,6 +1055,15 @@ test('ambient mode is removed and legacy preferences normalize to normal', () =>
     themeMode: 'ambient',
   })
   assert.equal(migrated?.themeMode, 'normal')
+
+  const heroSource = fs.readFileSync(
+    new URL('../src/components/HeroPlayer.tsx', import.meta.url),
+    'utf8',
+  )
+  const heroStyles = fs.readFileSync(new URL('../src/App.css', import.meta.url), 'utf8')
+  assert.equal(heroSource.includes('hero-acrylic-backdrop'), true)
+  assert.equal(heroStyles.includes('.hero-acrylic-backdrop-img'), true)
+  assert.equal(heroStyles.includes('.app-shell.theme-normal .hero-acrylic-backdrop'), false)
 })
 
 
