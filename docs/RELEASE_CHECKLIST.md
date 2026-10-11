@@ -4,6 +4,8 @@ Use this checklist for each candidate release of Resonance. A successful CI buil
 
 Record the Windows version, app version, test date, and tester alongside the release notes. Mark a case as passed only after performing it on the target machine.
 
+Automated CI coverage is also provided by `.github/workflows/verify.yml`: on a Windows runner it builds the NSIS installer, installs it silently, locates the installed executable, launches it, and checks that the process remains running briefly. This validates installation and startup only; it does not mark the interactive audio, permission, artwork, persistence, upgrade, or uninstall checks below as passed.
+
 ## Clean-install smoke test
 
 - [ ] Use a clean Windows 10/11 user profile or disposable VM without an earlier Resonance install.
