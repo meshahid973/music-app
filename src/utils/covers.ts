@@ -177,14 +177,14 @@ export function syncTracksWithCovers(
   }
 
   const step1Tracks = tracks.map((track) => {
-    if (
-      track.coverSource === 'direct' ||
-      track.coverSource === 'embedded' ||
-      track.coverSource === 'custom'
-    ) {
+    // Embedded and manually chosen artwork should never be replaced by folder matches.
+    if (track.coverSource === 'embedded' || track.coverSource === 'custom') {
       return track
     }
 
+    // Re-resolve direct artwork on import/rescan. A track may still hold a stale asset URL
+    // after a cover folder moves or its permissions are refreshed, even though its filename
+    // still matches a valid image in the newly scanned folder.
     const directMatch = findDirectCoverMatch(track, covers)
     if (directMatch) {
       if (usageCounts.has(directMatch)) {

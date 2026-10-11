@@ -1042,3 +1042,69 @@ test('theme presets and accent colors are normalized for persistence', async () 
   assert.equal(invalid?.accentColor, undefined)
 })
 
+
+
+test('cover-folder imports store durable paths and refresh stale direct artwork URLs', () => {
+  const track = {
+    id: 'native:C:\\Music\\Song.mp3',
+    title: 'Song',
+    artist: 'Artist',
+    album: 'Album',
+    duration: 180,
+    fileName: 'Song.mp3',
+    filePath: 'C:\\Music\\Song.mp3',
+    audioUrl: 'asset:///C:/Music/Song.mp3',
+    accent: 'hsl(220 14% 62%)',
+  }
+  const staleTrack = {
+    ...track,
+    id: 'native:C:\\Music\\Another Song.mp3',
+    title: 'Another Song',
+    fileName: 'Another Song.mp3',
+    filePath: 'C:\\Music\\Another Song.mp3',
+    audioUrl: 'asset:///C:/Music/Another%20Song.mp3',
+    coverUrl: 'asset:///C:/Old/Another%20Song.jpg',
+    coverPath: 'C:\\Old\\Another Song.jpg',
+    coverSource: 'direct',
+  }
+  const songCoverUrl = 'asset:///C:/Music/Covers/Song.jpg'
+  const otherCoverUrl = 'asset:///C:/Music/Covers/Another%20Song.jpg'
+  const songCoverPath = 'C:\\Music\\Covers\\Song.jpg'
+  const otherCoverPath = 'C:\\Music\\Covers\\Another Song.jpg'
+
+  useMusicStore.setState({
+    tracks: [track, staleTrack],
+    coverPool: [],
+    coverLookup: new Map(),
+  })
+  useMusicStore.getState().addCovers(
+    new Map([
+      ['song', songCoverUrl],
+      ['another song', otherCoverUrl],
+    ]),
+    [songCoverUrl, otherCoverUrl],
+    new Map([
+      ['song', songCoverPath],
+      ['another song', otherCoverPath],
+    ]),
+  )
+
+  const updatedTracks = useMusicStore.getState().tracks
+  const updated = updatedTracks.find((item) => item.id === track.id)
+  const refreshed = updatedTracks.find((item) => item.id === staleTrack.id)
+  assert.equal(updated?.coverUrl, songCoverUrl)
+  assert.equal(updated?.coverPath, songCoverPath)
+  assert.equal(updated?.coverSource, 'direct')
+  assert.equal(refreshed?.coverUrl, otherCoverUrl)
+  assert.equal(refreshed?.coverPath, otherCoverPath)
+  assert.equal(refreshed?.coverSource, 'direct')
+
+  // The durable path is used to rebuild cover URLs after a desktop restart.
+  for (const item of [updated, refreshed]) {
+    assert.ok(item)
+    const sanitized = sanitizeTrackForPersistence(item)
+    const hydrated = hydrateTrackArtwork(sanitized)
+    assert.equal(hydrated.coverPath, item.coverPath)
+    assert.equal(hydrated.coverUrl, item.coverPath)
+  }
+})
