@@ -879,8 +879,8 @@ test('hover interactions avoid transform scaling that softens text and controls'
 
   const rules = styles.flatMap(readCssRules)
   const transformedInteractionRules = rules
-    .filter((rule) => /:(?:hover|active|focus-within)\\b/.test(rule.selector))
-    .filter((rule) => /\\btransform\\s*:/.test(rule.body))
+    .filter((rule) => /:(?:hover|active|focus-within)\b/.test(rule.selector))
+    .filter((rule) => /\btransform\s*:/.test(rule.body))
     .map((rule) => rule.selector)
 
   assert.deepEqual(
@@ -890,8 +890,8 @@ test('hover interactions avoid transform scaling that softens text and controls'
   )
 
   const scaledHoverThumbs = rules
-    .filter((rule) => /\\.scrubber-hitbox\\.active.*\\.scrubber-thumb|\\.volume-track-container\\.active.*\\.volume-track-thumb/.test(rule.selector))
-    .filter((rule) => /\\btransform\\s*:/.test(rule.body))
+    .filter((rule) => /\.scrubber-hitbox\.active.*\.scrubber-thumb|\.volume-track-container\.active.*\.volume-track-thumb/.test(rule.selector))
+    .filter((rule) => /\btransform\s*:/.test(rule.body))
     .map((rule) => rule.selector)
   assert.deepEqual(scaledHoverThumbs, [], 'hovering sliders should not scale their handles')
 
@@ -901,7 +901,7 @@ test('hover interactions avoid transform scaling that softens text and controls'
     '../src/components/modals/AddToPlaylistModal.tsx',
   ]) {
     const source = fs.readFileSync(new URL(path, import.meta.url), 'utf8')
-    assert.doesNotMatch(source, /\\bwhileHover\\s*=|\\bwhileTap\\s*=/, path)
+    assert.doesNotMatch(source, /\bwhileHover\s*=|\bwhileTap\s*=/, path)
   }
 })
 
