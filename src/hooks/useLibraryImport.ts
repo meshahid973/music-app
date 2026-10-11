@@ -64,7 +64,7 @@ export function useLibraryImport() {
       let addedCoversCount = 0
 
       if (coverPaths.length > 0) {
-        const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+        const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
         for (const [k, v] of lookup.entries()) {
           if (!combinedLookup.has(k)) {
             addedCoversCount++
@@ -105,9 +105,10 @@ export function useLibraryImport() {
     let cancelled = false
 
     void scanNativeFolder(coverFolderPath)
-      .then(({ coverPaths }) => {
+      .then(async ({ coverPaths }) => {
         if (cancelled || coverPaths.length === 0) return
-        const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+        const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
+        if (cancelled) return
         for (const [key, path] of paths.entries()) nativeCoverPathsRef.current.set(key, path)
         addCovers(lookup, urls, paths)
       })
@@ -164,7 +165,7 @@ export function useLibraryImport() {
       if (storeState.coverFolderPath) {
         const { coverPaths } = await scanNativeFolder(storeState.coverFolderPath)
         if (coverPaths.length > 0) {
-          const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+          const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
           for (const [key, value] of lookup.entries()) combinedLookup.set(key, value)
           for (const [key, path] of paths.entries()) nativeCoverPathsRef.current.set(key, path)
           addCovers(lookup, urls, paths)
@@ -303,7 +304,7 @@ export function useLibraryImport() {
     try {
       const { coverPaths } = await scanNativeFolder(folderPath)
       if (coverPaths.length > 0) {
-        const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+        const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
         for (const [key, path] of paths.entries()) nativeCoverPathsRef.current.set(key, path)
         if (urls.length > 0) {
           addCovers(lookup, urls, paths)
@@ -338,7 +339,7 @@ export function useLibraryImport() {
       try {
         const { coverPaths } = await scanNativeFolder(currentPath)
         if (coverPaths.length > 0) {
-          const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+          const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
           const existingLookup = useMusicStore.getState().coverLookup
           let newCoversCount = 0
           for (const key of lookup.keys()) {
