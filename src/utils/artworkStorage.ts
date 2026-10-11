@@ -102,9 +102,10 @@ export async function saveCustomArtwork(
 ): Promise<string | null> {
   if (!isDesktopApp()) return null
 
-  // If already a local file path on disk, it is already durable
+  // Native paths outside AppData are durable on disk but cannot be loaded by the
+  // WebView's restricted asset protocol. Copy them into AppData just like folder covers.
   if (!source.startsWith('data:') && !source.startsWith('blob:')) {
-    return source
+    return saveFolderArtwork(source)
   }
 
   // If a data: URL, convert to bytes and save to disk
