@@ -30,16 +30,26 @@ function getParentDirName(filePath: string): string {
 export interface NativeScanResult {
   audioPaths: string[]
   coverPaths: string[]
+  /** Paths the scanner could not read or deliberately skipped. */
+  errors: string[]
 }
 
-export async function scanNativeFolder(folderPath: string): Promise<NativeScanResult> {
+export async function scanNativeFolder(
+  folderPath: string,
+  readDirectory: typeof readDir = readDir,
+): Promise<NativeScanResult> {
   const audioPaths: string[] = []
   const coverPaths: string[] = []
+  const errors: string[] = []
 
   async function traverse(currentPath: string, depth = 0) {
-    if (depth > 8) return // Guard against excessive recursion
+    if (depth > 8) {
+      errors.push(currentPath)
+      console.warn(`Skipping deeply nested directory (depth limit reached): ${currentPath}`)
+      return
+    }
     try {
-      const entries = await readDir(currentPath)
+      const entries = await readDirectory(currentPath)
       for (const entry of entries) {
         const fullPath = joinPath(currentPath, entry.name)
         if (entry.isDirectory) {
@@ -54,17 +64,19 @@ export async function scanNativeFolder(folderPath: string): Promise<NativeScanRe
         }
       }
     } catch (err) {
+      errors.push(currentPath)
       console.warn(`Could not read directory ${currentPath}:`, err)
     }
   }
 
   await traverse(folderPath)
-  return { audioPaths, coverPaths }
+  return { audioPaths, coverPaths, errors }
 }
 
 export async function scanNativeDroppedPaths(droppedPaths: string[]): Promise<NativeScanResult> {
   const audioPaths: string[] = []
   const coverPaths: string[] = []
+  const errors: string[] = []
 
   for (const itemPath of droppedPaths) {
     const ext = getExtension(itemPath)
@@ -76,10 +88,11 @@ export async function scanNativeDroppedPaths(droppedPaths: string[]): Promise<Na
       const folderScan = await scanNativeFolder(itemPath)
       audioPaths.push(...folderScan.audioPaths)
       coverPaths.push(...folderScan.coverPaths)
+      errors.push(...folderScan.errors)
     }
   }
 
-  return { audioPaths, coverPaths }
+  return { audioPaths, coverPaths, errors }
 }
 
 export async function nativeCoversFromPaths(coverPaths: string[]): Promise<{

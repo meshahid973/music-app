@@ -58,6 +58,19 @@ export function useLibraryImport() {
     [],
   )
 
+  const showScanErrors = useCallback(
+    (paths: string[]) => {
+      const count = new Set(paths).size
+      if (count === 0) return
+      showNotice(
+        `${count} folder(s) could not be scanned. Check folder permissions; accessible files were still imported.`,
+        'warning',
+        'Folder Scan Incomplete',
+      )
+    },
+    [showNotice],
+  )
+
   const importNativeScanResult = useCallback(
     async (audioPaths: string[], coverPaths: string[]) => {
       const storeLookup = useMusicStore.getState().coverLookup
@@ -140,8 +153,10 @@ export function useLibraryImport() {
     let cancelled = false
 
     void scanNativeFolder(coverFolderPath)
-      .then(async ({ coverPaths }) => {
-        if (cancelled || coverPaths.length === 0) return
+      .then(async ({ coverPaths, errors }) => {
+        if (cancelled) return
+        if (errors.length > 0) showScanErrors(errors)
+        if (coverPaths.length === 0) return
         const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
         if (cancelled) return
         for (const [key, path] of paths.entries()) nativeCoverPathsRef.current.set(key, path)
@@ -154,7 +169,7 @@ export function useLibraryImport() {
     return () => {
       cancelled = true
     }
-  }, [addCovers, coverFolderPath, isDesktop, isInitialized])
+  }, [addCovers, coverFolderPath, isDesktop, isInitialized, showScanErrors])
 
   useEffect(() => {
     if (!isDesktop) return
@@ -164,9 +179,15 @@ export function useLibraryImport() {
     getCurrentWebview()
       .onDragDropEvent((event) => {
         if (event.payload.type === 'drop' && event.payload.paths.length > 0) {
-          void scanNativeDroppedPaths(event.payload.paths).then(({ audioPaths, coverPaths }) =>
-            importNativeScanResult(audioPaths, coverPaths),
-          )
+          void scanNativeDroppedPaths(event.payload.paths)
+            .then(async ({ audioPaths, coverPaths, errors }) => {
+              await importNativeScanResult(audioPaths, coverPaths)
+              showScanErrors(errors)
+            })
+            .catch((err) => {
+              console.warn('Importing dropped files or folders failed:', err)
+              showNotice('Could not import the dropped files or folders', 'error', 'Import Failed')
+            })
         }
       })
       .then((fn) => {
@@ -184,7 +205,7 @@ export function useLibraryImport() {
       cancelled = true
       unlisten?.()
     }
-  }, [isDesktop, importNativeScanResult])
+  }, [isDesktop, importNativeScanResult, showNotice, showScanErrors])
 
   // Native desktop handlers using OS dialogs
   async function handleNativeAddSongs() {
@@ -197,8 +218,10 @@ export function useLibraryImport() {
 
       // Rebuild the selected cover folder's path index before parsing individually selected songs.
       // The in-memory maps are lost on restart, while the folder itself is persisted.
+      let coverScanErrors: string[] = []
       if (storeState.coverFolderPath) {
-        const { coverPaths } = await scanNativeFolder(storeState.coverFolderPath)
+        const { coverPaths, errors } = await scanNativeFolder(storeState.coverFolderPath)
+        coverScanErrors = errors
         if (coverPaths.length > 0) {
           const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
           for (const [key, value] of lookup.entries()) combinedLookup.set(key, value)
@@ -226,6 +249,7 @@ export function useLibraryImport() {
       } else {
         showNotice('All selected songs are already in your library', 'info', 'Library Up to Date')
       }
+      showScanErrors(coverScanErrors)
     } catch (err) {
       console.warn('Importing selected audio files failed:', err)
       showNotice('Could not import the selected audio files', 'error', 'Import Failed')
@@ -241,7 +265,7 @@ export function useLibraryImport() {
 
     setIsScanningMusic(true)
     try {
-      const { audioPaths, coverPaths } = await scanNativeFolder(folderPath)
+      const { audioPaths, coverPaths, errors } = await scanNativeFolder(folderPath)
       const result = await importNativeScanResult(audioPaths, coverPaths)
       if (result.addedTracksCount > 0) {
         showNotice(
@@ -254,6 +278,7 @@ export function useLibraryImport() {
       } else {
         showNotice(`Library is up to date (${audioPaths.length} songs found)`, 'info', 'Folder Scanned')
       }
+      showScanErrors(errors)
     } catch (err) {
       console.warn('Importing the selected music folder failed:', err)
       showNotice('Could not import the selected music folder', 'error', 'Import Failed')
@@ -272,7 +297,7 @@ export function useLibraryImport() {
 
       setIsScanningMusic(true)
       try {
-        const { audioPaths, coverPaths } = await scanNativeFolder(currentPath)
+        const { audioPaths, coverPaths, errors } = await scanNativeFolder(currentPath)
         const result = await importNativeScanResult(audioPaths, coverPaths)
         if (result.addedTracksCount > 0) {
           showNotice(
@@ -285,6 +310,7 @@ export function useLibraryImport() {
         } else {
           showNotice('Music folder is up to date (no new files)', 'info', 'Library Up to Date')
         }
+        showScanErrors(errors)
       } catch (err) {
         console.warn('Rescan music folder failed:', err)
         showNotice('Failed to scan music folder', 'error', 'Scan Error')
@@ -320,6 +346,7 @@ export function useLibraryImport() {
         } catch (err: any) {
           if (err?.name !== 'AbortError') {
             console.warn('Web directory picker error:', err)
+            showNotice('Could not access the selected music folder. Check its permissions and try again.', 'error', 'Folder Access Failed')
           }
         } finally {
           setIsScanningMusic(false)
@@ -337,7 +364,7 @@ export function useLibraryImport() {
 
     setIsScanningCovers(true)
     try {
-      const { coverPaths } = await scanNativeFolder(folderPath)
+      const { coverPaths, errors } = await scanNativeFolder(folderPath)
       if (coverPaths.length > 0) {
         const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
         for (const [key, path] of paths.entries()) nativeCoverPathsRef.current.set(key, path)
@@ -351,9 +378,10 @@ export function useLibraryImport() {
             'Covers Imported',
           )
         }
-      } else {
+      } else if (errors.length === 0) {
         showNotice('No cover artwork files found', 'info', 'Covers Notice')
       }
+      showScanErrors(errors)
     } catch (err) {
       console.warn('Importing the selected cover folder failed:', err)
       showNotice('Could not import the selected cover folder', 'error', 'Import Failed')
@@ -372,7 +400,7 @@ export function useLibraryImport() {
 
       setIsScanningCovers(true)
       try {
-        const { coverPaths } = await scanNativeFolder(currentPath)
+        const { coverPaths, errors } = await scanNativeFolder(currentPath)
         if (coverPaths.length > 0) {
           const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
           const existingLookup = useMusicStore.getState().coverLookup
@@ -398,9 +426,10 @@ export function useLibraryImport() {
           } else {
             showNotice('Cover folder is up to date (no new files)', 'info', 'Covers Up to Date')
           }
-        } else {
+        } else if (errors.length === 0) {
           showNotice('Cover folder is up to date (no new files)', 'info', 'Covers Up to Date')
         }
+        showScanErrors(errors)
       } catch (err) {
         console.warn('Rescan cover folder failed:', err)
         showNotice('Failed to scan cover folder', 'error', 'Scan Error')
@@ -436,6 +465,7 @@ export function useLibraryImport() {
         } catch (err: any) {
           if (err?.name !== 'AbortError') {
             console.warn('Web directory picker error:', err)
+            showNotice('Could not access the selected cover folder. Check its permissions and try again.', 'error', 'Folder Access Failed')
           }
         } finally {
           setIsScanningCovers(false)

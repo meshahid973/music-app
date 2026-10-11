@@ -19,7 +19,7 @@ import {
   sanitizeArtworkFilename,
 } from '../src/utils/artworkStorage.ts'
 import { migrateDesktopLibraryPayload } from '../src/utils/desktopDatabase.ts'
-import { nativeTracksFromPaths, scanNativeDroppedPaths } from '../src/utils/nativeFileSystem.ts'
+import { nativeTracksFromPaths, scanNativeDroppedPaths, scanNativeFolder } from '../src/utils/nativeFileSystem.ts'
 import { useMusicStore } from '../src/store/useMusicStore.ts'
 import { syncPlaylistQueue } from '../src/hooks/usePlaylistManager.ts'
 import { processTrackEdit } from '../src/utils/trackEdit.ts'
@@ -842,6 +842,23 @@ test('Windows setup.exe Tauri configuration and capabilities include required NS
   assert.notEqual(scopeEntry, undefined)
   assert.deepEqual(scopeEntry.allow, [{ path: '$APPDATA/**' }])
   assert.deepEqual(tauriConf.app?.security?.assetProtocol?.scope, ['$APPDATA/**'])
+})
+
+test('native folder scan reports inaccessible subfolders without discarding accessible files', async () => {
+  const result = await scanNativeFolder('root', async (currentPath) => {
+    if (currentPath === 'root') {
+      return [
+        { name: 'Track.mp3', isDirectory: false, isFile: true },
+        { name: 'cover.jpg', isDirectory: false, isFile: true },
+        { name: 'restricted', isDirectory: true, isFile: false },
+      ]
+    }
+    throw new Error('Permission denied')
+  })
+
+  assert.deepEqual(result.audioPaths, ['root/Track.mp3'])
+  assert.deepEqual(result.coverPaths, ['root/cover.jpg'])
+  assert.deepEqual(result.errors, ['root/restricted'])
 })
 
 test('scanNativeDroppedPaths classifies dropped audio and cover files and nativeTracksFromPaths deduplicates batch paths', async () => {

@@ -34,6 +34,14 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build Tauri Windows desktop installer
         run: npx tauri build
+      - name: Smoke-test per-user installation and app startup
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*-setup.exe" | Select-Object -First 1
+          if (-not $installer) {
+            throw "The NSIS setup.exe was not produced by the build."
+          }
+          ./scripts/windows-install-smoke.ps1 -InstallerPath $installer.FullName
       - name: Upload Windows desktop installer
         uses: actions/upload-artifact@v4
         with:
