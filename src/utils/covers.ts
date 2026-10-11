@@ -183,8 +183,7 @@ export function syncTracksWithCovers(
     }
 
     // Re-resolve direct artwork on import/rescan. A track may still hold a stale asset URL
-    // after a cover folder moves or its permissions are refreshed, even though its filename
-    // still matches a valid image in the newly scanned folder.
+    // after a folder was moved or its images were copied into AppData.
     const directMatch = findDirectCoverMatch(track, covers)
     if (directMatch) {
       if (usageCounts.has(directMatch)) {
@@ -195,6 +194,12 @@ export function syncTracksWithCovers(
         coverUrl: directMatch,
         coverSource: 'direct' as const,
       }
+    }
+
+    // A direct cover that is no longer in the refreshed pool is stale. Let the fallback
+    // pool assign a currently accessible image instead of preserving a guaranteed broken URL.
+    if (track.coverSource === 'direct' && (!track.coverUrl || !usageCounts.has(track.coverUrl))) {
+      return { ...track, coverSource: 'pool' as const }
     }
 
     return track
@@ -214,10 +219,16 @@ export function syncTracksWithCovers(
     }
 
     const currentCover = track.coverUrl
-    const isDuplicate = currentCover ? seenPoolCovers.has(currentCover) : true
+    const currentCoverIsAvailable = Boolean(currentCover && usageCounts.has(currentCover))
+    const isDuplicate = currentCoverIsAvailable ? seenPoolCovers.has(currentCover!) : true
     const unusedCovers = allAvailableCovers.filter((url) => (usageCounts.get(url) || 0) === 0)
 
-    if (currentCover && !isDuplicate && (!track.coverSource || track.coverSource === 'pool')) {
+    if (
+      currentCover &&
+      currentCoverIsAvailable &&
+      !isDuplicate &&
+      (!track.coverSource || track.coverSource === 'pool')
+    ) {
       seenPoolCovers.add(currentCover)
       usageCounts.set(currentCover, (usageCounts.get(currentCover) || 0) + 1)
       finalTracks.push({
@@ -237,10 +248,13 @@ export function syncTracksWithCovers(
         coverUrl: selectedCover,
         coverSource: 'pool',
       })
-    } else if (currentCover) {
+    } else if (currentCover && currentCoverIsAvailable) {
       seenPoolCovers.add(currentCover)
       usageCounts.set(currentCover, (usageCounts.get(currentCover) || 0) + 1)
-      finalTracks.push(track)
+      finalTracks.push({
+        ...track,
+        coverSource: 'pool',
+      })
     } else {
       let minUsage = Infinity
       for (const url of allAvailableCovers) {
