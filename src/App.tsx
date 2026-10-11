@@ -12,6 +12,7 @@ import {
   AddToPlaylistModal,
   DeletePlaylistModal,
   EditTrackModal,
+  FirstRunSetupModal,
   HeroPlayer,
   NotificationToast,
   PlayerBar,
@@ -37,6 +38,9 @@ function App() {
   const [editingTrack, setEditingTrack] = useState<Track | null>(null)
   const [playlistToAddSongs, setPlaylistToAddSongs] = useState<Playlist | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isFirstRunSetupOpen, setIsFirstRunSetupOpen] = useState(false)
+  const [firstRunSetupStep, setFirstRunSetupStep] = useState<'music' | 'covers'>('music')
+  const [firstRunBusyAction, setFirstRunBusyAction] = useState<'music' | 'covers' | null>(null)
 
   const {
     tracks,
@@ -49,6 +53,11 @@ function App() {
     themePreset,
     accentColor,
     volume,
+    isInitialized,
+    musicFolderPath: configuredMusicFolderPath,
+    coverFolderPath: configuredCoverFolderPath,
+    firstRunSetupCompleted,
+    setFirstRunSetupCompleted,
     initDesktopStorage,
     setActivePlaylist,
     addTrackToPlaylist,
@@ -113,6 +122,58 @@ function App() {
     handleCoverFolder,
     handleDrop,
   } = useLibraryImport()
+
+  // First-run setup is only for a new desktop library. Existing libraries are left alone.
+  useEffect(() => {
+    if (!isDesktop || !isInitialized || firstRunSetupCompleted) return
+
+    if (tracks.length > 0 && !isFirstRunSetupOpen) {
+      setFirstRunSetupCompleted(true)
+      return
+    }
+
+    if (tracks.length === 0) {
+      setFirstRunSetupStep(configuredMusicFolderPath ? 'covers' : 'music')
+      setIsFirstRunSetupOpen(true)
+    }
+  }, [
+    configuredMusicFolderPath,
+    firstRunSetupCompleted,
+    isDesktop,
+    isFirstRunSetupOpen,
+    isInitialized,
+    setFirstRunSetupCompleted,
+    tracks.length,
+  ])
+
+  const finishFirstRunSetup = () => {
+    setFirstRunSetupCompleted(true)
+    setIsFirstRunSetupOpen(false)
+  }
+
+  const handleFirstRunChooseMusic = async () => {
+    setFirstRunBusyAction('music')
+    try {
+      await handleNativeMusicFolder()
+      if (useMusicStore.getState().musicFolderPath) {
+        setFirstRunSetupStep('covers')
+      }
+    } finally {
+      setFirstRunBusyAction(null)
+    }
+  }
+
+  const handleFirstRunChooseCovers = async () => {
+    setFirstRunBusyAction('covers')
+    try {
+      await handleNativeCoverFolder()
+      if (useMusicStore.getState().coverFolderPath) {
+        finishFirstRunSetup()
+      }
+    } finally {
+      setFirstRunBusyAction(null)
+    }
+  }
 
   // 5. Global keyboard shortcuts
   const previousVolumeRef = useRef<number>(0.82)
@@ -429,6 +490,22 @@ function App() {
           <SettingsModal
             key="settings-modal"
             onClose={() => setIsSettingsOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isFirstRunSetupOpen && (
+          <FirstRunSetupModal
+            key="first-run-setup-modal"
+            step={firstRunSetupStep}
+            musicFolderName={musicFolderName}
+            coverFolderName={coverFolderName}
+            busyAction={firstRunBusyAction}
+            onChooseMusicFolder={handleFirstRunChooseMusic}
+            onChooseCoverFolder={handleFirstRunChooseCovers}
+            onSkipCoverArt={finishFirstRunSetup}
+            onSetUpLater={finishFirstRunSetup}
           />
         )}
       </AnimatePresence>
