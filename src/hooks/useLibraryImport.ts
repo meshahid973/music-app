@@ -218,9 +218,10 @@ export function useLibraryImport() {
 
       // Rebuild the selected cover folder's path index before parsing individually selected songs.
       // The in-memory maps are lost on restart, while the folder itself is persisted.
+      let coverScanErrors: string[] = []
       if (storeState.coverFolderPath) {
         const { coverPaths, errors } = await scanNativeFolder(storeState.coverFolderPath)
-        if (errors.length > 0) showScanErrors(errors)
+        coverScanErrors = errors
         if (coverPaths.length > 0) {
           const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
           for (const [key, value] of lookup.entries()) combinedLookup.set(key, value)
@@ -248,6 +249,7 @@ export function useLibraryImport() {
       } else {
         showNotice('All selected songs are already in your library', 'info', 'Library Up to Date')
       }
+      showScanErrors(coverScanErrors)
     } catch (err) {
       console.warn('Importing selected audio files failed:', err)
       showNotice('Could not import the selected audio files', 'error', 'Import Failed')
@@ -265,7 +267,6 @@ export function useLibraryImport() {
     try {
       const { audioPaths, coverPaths, errors } = await scanNativeFolder(folderPath)
       const result = await importNativeScanResult(audioPaths, coverPaths)
-      showScanErrors(errors)
       if (result.addedTracksCount > 0) {
         showNotice(
           result.addedTracksCount === 1
@@ -277,6 +278,7 @@ export function useLibraryImport() {
       } else {
         showNotice(`Library is up to date (${audioPaths.length} songs found)`, 'info', 'Folder Scanned')
       }
+      showScanErrors(errors)
     } catch (err) {
       console.warn('Importing the selected music folder failed:', err)
       showNotice('Could not import the selected music folder', 'error', 'Import Failed')
@@ -297,7 +299,6 @@ export function useLibraryImport() {
       try {
         const { audioPaths, coverPaths, errors } = await scanNativeFolder(currentPath)
         const result = await importNativeScanResult(audioPaths, coverPaths)
-        showScanErrors(errors)
         if (result.addedTracksCount > 0) {
           showNotice(
             result.addedTracksCount === 1
@@ -309,6 +310,7 @@ export function useLibraryImport() {
         } else {
           showNotice('Music folder is up to date (no new files)', 'info', 'Library Up to Date')
         }
+        showScanErrors(errors)
       } catch (err) {
         console.warn('Rescan music folder failed:', err)
         showNotice('Failed to scan music folder', 'error', 'Scan Error')
