@@ -1042,3 +1042,42 @@ test('theme presets and accent colors are normalized for persistence', async () 
   assert.equal(invalid?.accentColor, undefined)
 })
 
+
+
+test('adding a cover folder stores durable artwork paths for existing native tracks', () => {
+  const track = {
+    id: 'native:C:\\Music\\Song.mp3',
+    title: 'Song',
+    artist: 'Artist',
+    album: 'Album',
+    duration: 180,
+    fileName: 'Song.mp3',
+    filePath: 'C:\\Music\\Song.mp3',
+    audioUrl: 'asset:///C:/Music/Song.mp3',
+    accent: 'hsl(220 14% 62%)',
+  }
+  const coverUrl = 'asset:///C:/Music/Covers/Song.jpg'
+  const coverPath = 'C:\\Music\\Covers\\Song.jpg'
+
+  useMusicStore.setState({
+    tracks: [track],
+    coverPool: [],
+    coverLookup: new Map(),
+  })
+  useMusicStore.getState().addCovers(
+    new Map([['song', coverUrl]]),
+    [coverUrl],
+    new Map([['song', coverPath]]),
+  )
+
+  const updated = useMusicStore.getState().tracks[0]
+  assert.equal(updated.coverUrl, coverUrl)
+  assert.equal(updated.coverPath, coverPath)
+  assert.equal(updated.coverSource, 'direct')
+
+  // The path is the durable source used to reconstruct the cover URL after restart.
+  const sanitized = sanitizeTrackForPersistence(updated)
+  const hydrated = hydrateTrackArtwork(sanitized)
+  assert.equal(hydrated.coverPath, coverPath)
+  assert.equal(hydrated.coverUrl, coverPath)
+})
