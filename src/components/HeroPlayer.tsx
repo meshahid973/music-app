@@ -99,11 +99,11 @@ export function HeroPlayer({
             transition={{ duration: 0.35, ease: 'easeOut' }}
             aria-hidden="true"
           >
-            <div className="hero-banner-ambient">
+            <div className="hero-acrylic-backdrop">
               <img
                 src={currentTrack.coverUrl}
                 alt=""
-                className="hero-banner-ambient-img"
+                className="hero-acrylic-backdrop-img"
               />
             </div>
             <div className="hero-banner-cover">
