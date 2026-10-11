@@ -85,7 +85,7 @@ export function migrateDesktopLibraryPayload(raw: unknown): DesktopLibraryPayloa
   const themeMode = normalizeTheme(raw.themeMode)
   const themePreset = normalizeThemePreset(raw.themePreset)
   const accentColor = normalizeAccentColor(raw.accentColor)
-  const firstRunSetupCompleted = normalizeBoolean(raw.firstRunSetupCompleted, false)
+  const firstRunSetupCompleted = normalizeBoolean(raw.firstRunSetupCompleted, tracks.length > 0)
 
   const payload: DesktopLibraryPayload = {
     version: STORAGE_VERSION,
