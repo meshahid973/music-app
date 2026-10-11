@@ -497,7 +497,7 @@ function App() {
             onChooseMusicFolder={handleFirstRunChooseMusic}
             onChooseCoverFolder={handleFirstRunChooseCovers}
             onSkipCoverArt={finishFirstRunSetup}
-            onSetUpLater={() => { setIsFirstRunSetupInProgress(true); finishFirstRunSetup() }}
+            onSetUpLater={finishFirstRunSetup}
           />
         )}
       </AnimatePresence>
