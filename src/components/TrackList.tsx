@@ -193,8 +193,6 @@ export function TrackList({
                 ease: [0.22, 1, 0.36, 1],
                 delay: Math.min((index % 8) * 0.025, 0.12),
               }}
-              whileHover={{ y: -2, scale: 1.003, transition: { duration: 0.15 } }}
-              whileTap={{ scale: 0.996 }}
               onClick={() => onPlay(track.id)}
               role="button"
               tabIndex={0}
@@ -210,8 +208,6 @@ export function TrackList({
               <motion.button
                 className="track-play"
                 type="button"
-                whileHover={{ scale: 1.08 }}
-                whileTap={{ scale: 0.92 }}
                 onClick={(e) => {
                   e.stopPropagation()
                   onPlay(track.id)
@@ -248,8 +244,6 @@ export function TrackList({
               <motion.button
                 type="button"
                 className={`track-heart-btn ${isFavorited ? 'is-favorited' : ''}`}
-                whileHover={{ scale: 1.15 }}
-                whileTap={{ scale: 0.85 }}
                 onClick={(e) => {
                   e.stopPropagation()
                   onToggleFavorite(track.id)
@@ -276,8 +270,6 @@ export function TrackList({
                 <motion.button
                   type="button"
                   className="track-edit-btn"
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.92 }}
                   onClick={(e) => {
                     e.stopPropagation()
                     onEditTrack(track)
@@ -291,8 +283,6 @@ export function TrackList({
                   <motion.button
                     type="button"
                     className="track-remove-from-playlist-btn"
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.92 }}
                     onClick={(e) => {
                       e.stopPropagation()
                       onRemoveFromPlaylist?.(activePlaylistId, track.id)

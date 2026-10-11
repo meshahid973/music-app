@@ -129,7 +129,6 @@
   overflow: hidden;
   box-sizing: border-box;
   transition:
-    transform 180ms ease,
     background 180ms ease,
     color 180ms ease,
     border-color 180ms ease;
@@ -140,7 +139,6 @@
   color: var(--text);
   background: var(--panel-strong);
   border-color: var(--line-strong);
-  transform: translateX(4px);
 }
 
 .nav-item::before {
@@ -185,22 +183,21 @@
 }
 
 .nav-item em {
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform;
+  transition: opacity 180ms ease;
 }
 
 .playlist-add-btn {
   cursor: pointer;
-  transition: transform 180ms ease, background 180ms ease;
+  transition: background 180ms ease, box-shadow 180ms ease;
 }
 
 .playlist-add-btn:hover {
-  transform: scale(1.12);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
 }
 
 .nav-playlist-item:hover em,
 .nav-playlist-item:focus-within em {
-  transform: translateX(-62px);
+  opacity: 0;
 }
 
 .playlist-form {
@@ -213,7 +210,6 @@
   color: var(--text);
   background: var(--panel-strong);
   border-color: var(--line-strong);
-  transform: none;
 }
 
 .playlist-form-icon {
@@ -251,16 +247,16 @@
   color: var(--text);
   cursor: pointer;
   transition:
-    transform 180ms ease,
     background 180ms ease,
-    color 180ms ease;
+    color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .play-button:hover,
 .track-play:hover,
 .icon-button:hover,
 .control:hover {
-  transform: translateY(-2px);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
 }
 
 .content {
@@ -400,7 +396,6 @@ h3 {
   padding: 0;
   flex-shrink: 0;
   transition:
-    transform 160ms ease,
     background 160ms ease,
     color 160ms ease,
     border-color 160ms ease;
@@ -410,11 +405,11 @@ h3 {
   color: var(--text);
   background: rgba(255, 255, 255, 0.14);
   border-color: rgba(255, 255, 255, 0.3);
-  transform: scale(1.08);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.04);
 }
 
 .nav-rescan-btn:active:not(:disabled) {
-  transform: scale(0.96);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .nav-rescan-btn.scanning {
@@ -615,11 +610,10 @@ h3 {
   place-items: center;
   cursor: pointer;
   outline: none;
-  transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .cd-wrapper:hover {
-  transform: scale(1.025);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .cd-wrapper:focus-visible {
@@ -1087,15 +1081,13 @@ h3 {
   user-select: none;
   transition:
     background 190ms ease,
-    border-color 190ms ease,
-    transform 190ms ease;
+    border-color 190ms ease;
 }
 
 .track-row:hover,
 .track-row.active {
   background: var(--panel-strong);
   border-color: var(--line-strong);
-  transform: translateY(-2px);
 }
 
 .track-play,
@@ -1169,7 +1161,6 @@ h3 {
 .track-heart-btn:hover {
   color: #ff4d6d;
   background: rgba(255, 77, 109, 0.12);
-  transform: scale(1.08);
 }
 
 .track-heart-btn.is-favorited {
@@ -1180,7 +1171,6 @@ h3 {
 .track-heart-btn.is-favorited:hover {
   color: #ff1f54;
   background: rgba(255, 31, 84, 0.22);
-  transform: scale(1.12);
 }
 
 .heart-icon-filled {
@@ -1357,7 +1347,6 @@ h3 {
   color: var(--text);
   background: var(--line);
   border-color: var(--line-strong);
-  transform: scale(1.06);
 }
 
 /* ==================== EDIT TRACK MODAL ==================== */
@@ -1527,7 +1516,7 @@ h3 {
 }
 
 .upload-file-btn:hover {
-  filter: brightness(1.08);
+  background: #ffffff;
 }
 
 .upload-file-btn input {
@@ -1618,8 +1607,7 @@ h3 {
 }
 
 .btn-primary:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
+  background: #ffffff;
 }
 
 .empty-state {
@@ -1668,7 +1656,6 @@ h3 {
   position: relative;
   overflow: hidden;
   transition:
-    transform 160ms ease,
     background 160ms ease,
     border-color 160ms ease,
     color 160ms ease;
@@ -1677,7 +1664,6 @@ h3 {
 .empty-state-btn:hover {
   background: var(--line-strong);
   border-color: var(--muted);
-  transform: translateY(-1px);
 }
 
 .empty-state-btn.subtle {
@@ -1844,18 +1830,14 @@ h3 {
   box-shadow:
     0 1px 4px rgba(0, 0, 0, 0.5),
     0 0 8px rgba(255, 255, 255, 0.3);
-  transform: translate(-50%, -50%) scale(0.8);
+  transform: translate(-50%, -50%);
   opacity: 0.85;
   pointer-events: none;
-  transition:
-    transform 150ms cubic-bezier(0.2, 0, 0, 1),
-    opacity 150ms ease,
-    background 150ms ease;
+  transition: opacity 150ms ease, background 150ms ease;
 }
 
 .scrubber-hitbox.active .scrubber-thumb,
 .scrubber-hitbox:focus-visible .scrubber-thumb {
-  transform: translate(-50%, -50%) scale(1.18);
   opacity: 1;
   box-shadow:
     0 2px 6px rgba(0, 0, 0, 0.65),
@@ -2041,7 +2023,6 @@ h3 {
 .add-to-playlist-header-btn:hover {
   background: #ffffff;
   color: #0b0c0b;
-  transform: translateY(-1px);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
@@ -2065,7 +2046,6 @@ h3 {
   color: #0b0c0b;
   background: var(--lime);
   border-color: var(--lime);
-  transform: translateY(-1px);
 }
 
 .edit-playlist-header-btn {
@@ -2087,7 +2067,6 @@ h3 {
   background: var(--line);
   border-color: var(--line-strong);
   color: #ffffff;
-  transform: translateY(-1px);
 }
 
 .delete-playlist-header-btn {
@@ -2109,7 +2088,6 @@ h3 {
   background: rgba(255, 107, 107, 0.2);
   border-color: rgba(255, 107, 107, 0.45);
   color: #ff8585;
-  transform: translateY(-1px);
 }
 
 .nav-playlist-name {
@@ -2128,10 +2106,7 @@ h3 {
   gap: 5px;
   opacity: 0;
   pointer-events: none;
-  transform: translateX(10px) scale(0.9);
-  transition:
-    opacity 180ms ease,
-    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 180ms ease;
   z-index: 2;
 }
 
@@ -2139,7 +2114,6 @@ h3 {
 .nav-playlist-item:focus-within .nav-item-actions {
   opacity: 1;
   pointer-events: auto;
-  transform: translateX(0) scale(1);
 }
 
 .nav-action-btn {
@@ -2159,31 +2133,27 @@ h3 {
   color: #0b0c0b;
   background: var(--lime);
   border-color: var(--lime);
-  transform: scale(1.12);
 }
 
 .nav-action-btn.edit:hover {
   color: var(--neutral-accent);
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.28);
-  transform: scale(1.12);
 }
 
 .nav-action-btn.delete:hover {
   color: #ff5c5c;
   background: rgba(255, 92, 92, 0.2);
   border-color: rgba(255, 92, 92, 0.45);
-  transform: scale(1.12);
 }
 
 @media (hover: none) {
   .nav-playlist-item em {
-    transform: translateX(-88px);
+    opacity: 0;
   }
   .nav-item-actions {
     opacity: 0.85;
     pointer-events: auto;
-    transform: translateX(0) scale(1);
   }
 }
 
@@ -2331,7 +2301,6 @@ h3 {
 
 .add-song-toggle-btn.add:hover {
   background: #ffffff;
-  transform: scale(1.05);
 }
 
 .add-song-toggle-btn.added {
@@ -2399,7 +2368,6 @@ h3 {
   color: #ff6b6b;
   background: rgba(255, 107, 107, 0.16);
   border-color: rgba(255, 107, 107, 0.4);
-  transform: scale(1.06);
 }
 
 .rename-modal-icon-badge {
@@ -2471,7 +2439,6 @@ h3 {
 
 .btn-danger:hover {
   background: #f03e3e;
-  transform: translateY(-1px);
   box-shadow: 0 4px 14px rgba(224, 49, 49, 0.4);
 }
 
@@ -2528,13 +2495,13 @@ h3 {
   }
 }
 
-/* Subtle image scale on track hover */
+/* Keep artwork at its native scale on hover to prevent WebView resampling. */
 .mini-cover img {
-  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: box-shadow 0.28s ease;
 }
 
 .track-row:hover .mini-cover img {
-  transform: scale(1.06);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
 /* Pop-up Notification Toasts ("X songs imported successfully", etc.) */
@@ -2929,7 +2896,6 @@ h3 {
 .theme-mode-card:hover {
   border-color: var(--line-strong);
   background: rgba(255, 255, 255, 0.04);
-  transform: translateY(-2px);
 }
 
 .theme-mode-card.selected {
@@ -3354,11 +3320,11 @@ h3 {
   font-size: 12px;
   font-weight: 750;
   cursor: pointer;
-  transition: transform 150ms ease, opacity 150ms ease;
+  transition: opacity 150ms ease, background 150ms ease, border-color 150ms ease;
 }
 
 .first-run-primary-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
+  background: #ffffff;
 }
 
 .first-run-primary-btn:disabled {

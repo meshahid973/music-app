@@ -169,8 +169,6 @@ export function AddToPlaylistModal({
                       <motion.button
                         type="button"
                         className="add-song-toggle-btn added"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
                         onClick={() => {
                           if (onRemoveTrack) {
                             onRemoveTrack(playlist.id, track.id)
@@ -186,8 +184,6 @@ export function AddToPlaylistModal({
                       <motion.button
                         type="button"
                         className="add-song-toggle-btn add"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
                         onClick={() => onAddTrack(playlist.id, track.id)}
                         title={`Add "${cleanDisplayTitle(track.title)}" to ${playlist.name}`}
                         aria-label={`Add "${cleanDisplayTitle(track.title)}" to ${playlist.name}`}
