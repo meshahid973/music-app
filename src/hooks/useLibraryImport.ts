@@ -136,8 +136,9 @@ export function useLibraryImport() {
       const storeState = useMusicStore.getState()
       const combinedLookup = new Map(storeState.coverLookup)
 
-      // Restore the filename-to-path index after a restart before parsing individual songs.
-      if (nativeCoverPathsRef.current.size === 0 && storeState.coverFolderPath) {
+      // Rebuild the selected cover folder's path index before parsing individually selected songs.
+      // The in-memory maps are lost on restart, while the folder itself is persisted.
+      if (storeState.coverFolderPath) {
         const { coverPaths } = await scanNativeFolder(storeState.coverFolderPath)
         if (coverPaths.length > 0) {
           const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
