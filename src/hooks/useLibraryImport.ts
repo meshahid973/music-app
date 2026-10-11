@@ -23,6 +23,7 @@ export function useLibraryImport() {
     addCovers,
     musicFolderPath,
     coverFolderPath,
+    isInitialized,
     musicFolderName,
     coverFolderName,
     setMusicFolder,
@@ -96,6 +97,28 @@ export function useLibraryImport() {
     },
     [addCovers, addTracks],
   )
+
+  // Restore durable cover paths before rendering persisted tracks. This repairs older
+  // library entries that saved an asset URL but did not save the corresponding image path.
+  useEffect(() => {
+    if (!isDesktop || !isInitialized || !coverFolderPath) return
+    let cancelled = false
+
+    void scanNativeFolder(coverFolderPath)
+      .then(({ coverPaths }) => {
+        if (cancelled || coverPaths.length === 0) return
+        const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+        for (const [key, path] of paths.entries()) nativeCoverPathsRef.current.set(key, path)
+        addCovers(lookup, urls, paths)
+      })
+      .catch((err) => {
+        console.warn('Could not restore cover paths from the saved cover folder:', err)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [addCovers, coverFolderPath, isDesktop, isInitialized])
 
   useEffect(() => {
     if (!isDesktop) return
