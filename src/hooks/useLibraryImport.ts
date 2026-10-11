@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { appDataDir } from '@tauri-apps/api/path'
 import { useMusicStore } from '../store/useMusicStore'
+import { saveFolderArtwork } from '../utils/artworkStorage'
 import { showToast, type ToastType } from '../store/useToastStore'
 import {
   extractCovers,
@@ -9,7 +11,7 @@ import {
   isCoverFile,
   tracksFromFiles,
 } from '../utils/library'
-import { isDesktopApp, pickNativeAudioFiles, pickNativeFolder } from '../utils/platform'
+import { isDesktopApp, pickNativeAudioFiles, pickNativeFolder, toNativeAssetUrl } from '../utils/platform'
 import {
   nativeCoversFromPaths,
   nativeTracksFromPaths,
@@ -64,7 +66,7 @@ export function useLibraryImport() {
       let addedCoversCount = 0
 
       if (coverPaths.length > 0) {
-        const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+        const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
         for (const [k, v] of lookup.entries()) {
           if (!combinedLookup.has(k)) {
             addedCoversCount++
@@ -98,6 +100,39 @@ export function useLibraryImport() {
     [addCovers, addTracks],
   )
 
+  // Migrate older manual/direct cover paths that pointed outside AppData. The asset
+  // protocol cannot load those paths, so copy them once into the allowed artwork directory.
+  useEffect(() => {
+    if (!isDesktop || !isInitialized) return
+    let cancelled = false
+
+    void (async () => {
+      const appDataPath = (await appDataDir()).replace(/\\/g, '/').replace(/\/$/, '').toLowerCase()
+      const savedTracks = useMusicStore.getState().tracks
+      for (const track of savedTracks) {
+        if (!track.coverPath) continue
+        const normalizedPath = track.coverPath.replace(/\\/g, '/').replace(/\/$/, '').toLowerCase()
+        if (normalizedPath === appDataPath || normalizedPath.startsWith(`${appDataPath}/`)) continue
+
+        const savedPath = await saveFolderArtwork(track.coverPath)
+        if (cancelled) return
+        if (savedPath) {
+          useMusicStore.getState().updateTrack(track.id, {
+            coverPath: savedPath,
+            coverUrl: toNativeAssetUrl(savedPath),
+            coverSource: track.coverSource,
+          })
+        }
+      }
+    })().catch((err) => {
+      console.warn('Could not repair legacy cover paths:', err)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isDesktop, isInitialized])
+
   // Restore durable cover paths before rendering persisted tracks. This repairs older
   // library entries that saved an asset URL but did not save the corresponding image path.
   useEffect(() => {
@@ -105,9 +140,10 @@ export function useLibraryImport() {
     let cancelled = false
 
     void scanNativeFolder(coverFolderPath)
-      .then(({ coverPaths }) => {
+      .then(async ({ coverPaths }) => {
         if (cancelled || coverPaths.length === 0) return
-        const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+        const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
+        if (cancelled) return
         for (const [key, path] of paths.entries()) nativeCoverPathsRef.current.set(key, path)
         addCovers(lookup, urls, paths)
       })
@@ -164,7 +200,7 @@ export function useLibraryImport() {
       if (storeState.coverFolderPath) {
         const { coverPaths } = await scanNativeFolder(storeState.coverFolderPath)
         if (coverPaths.length > 0) {
-          const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+          const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
           for (const [key, value] of lookup.entries()) combinedLookup.set(key, value)
           for (const [key, path] of paths.entries()) nativeCoverPathsRef.current.set(key, path)
           addCovers(lookup, urls, paths)
@@ -303,7 +339,7 @@ export function useLibraryImport() {
     try {
       const { coverPaths } = await scanNativeFolder(folderPath)
       if (coverPaths.length > 0) {
-        const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+        const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
         for (const [key, path] of paths.entries()) nativeCoverPathsRef.current.set(key, path)
         if (urls.length > 0) {
           addCovers(lookup, urls, paths)
@@ -338,7 +374,7 @@ export function useLibraryImport() {
       try {
         const { coverPaths } = await scanNativeFolder(currentPath)
         if (coverPaths.length > 0) {
-          const { lookup, paths, urls } = nativeCoversFromPaths(coverPaths)
+          const { lookup, paths, urls } = await nativeCoversFromPaths(coverPaths)
           const existingLookup = useMusicStore.getState().coverLookup
           let newCoversCount = 0
           for (const key of lookup.keys()) {

@@ -24,6 +24,8 @@ type MusicState = {
   musicFolderName?: string
   coverFolderName?: string
   isInitialized: boolean
+  firstRunSetupCompleted: boolean
+  setFirstRunSetupCompleted: (completed: boolean) => void
   setMusicFolder: (path?: string, name?: string) => void
   setCoverFolder: (path?: string, name?: string) => void
   initDesktopStorage: () => Promise<void>
@@ -70,6 +72,7 @@ function queueSave(state: MusicState) {
       coverFolderPath: state.coverFolderPath,
       musicFolderName: state.musicFolderName,
       coverFolderName: state.coverFolderName,
+      firstRunSetupCompleted: state.firstRunSetupCompleted,
     })
   }, 400)
 }
@@ -107,6 +110,7 @@ export const useMusicStore = create<MusicState>()(
       musicFolderName: undefined,
       coverFolderName: undefined,
       isInitialized: false,
+      firstRunSetupCompleted: false,
 
       setMusicFolder: (path, name) =>
         set((state) => {
@@ -127,6 +131,11 @@ export const useMusicStore = create<MusicState>()(
           queueSave({ ...state, ...next })
           return next
         }),
+
+      setFirstRunSetupCompleted: (firstRunSetupCompleted) => {
+        set({ firstRunSetupCompleted })
+        queueSave(get())
+      },
 
       initDesktopStorage: async () => {
         if (get().isInitialized) return
@@ -191,6 +200,7 @@ export const useMusicStore = create<MusicState>()(
                   coverFolderPath: state.coverFolderPath || loaded.coverFolderPath,
                   musicFolderName: state.musicFolderName || loaded.musicFolderName,
                   coverFolderName: state.coverFolderName || loaded.coverFolderName,
+                  firstRunSetupCompleted: loaded.firstRunSetupCompleted ?? state.firstRunSetupCompleted,
                   isInitialized: true,
                 }
 
@@ -212,6 +222,7 @@ export const useMusicStore = create<MusicState>()(
 
           set((state) => ({
             tracks: hydrateTracksArtwork(state.tracks),
+            firstRunSetupCompleted: state.firstRunSetupCompleted || state.tracks.length > 0,
             isInitialized: true,
           }))
         })()
@@ -418,6 +429,7 @@ export const useMusicStore = create<MusicState>()(
         coverFolderPath: state.coverFolderPath,
         musicFolderName: state.musicFolderName,
         coverFolderName: state.coverFolderName,
+        firstRunSetupCompleted: state.firstRunSetupCompleted,
       }),
     },
   ),

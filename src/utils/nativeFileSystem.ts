@@ -5,7 +5,7 @@ import { colorFromString, normalizeName } from './covers.ts'
 import { autoDetectTrackMetadata } from './metadata.ts'
 import { cleanDisplayTitle } from './tracks.ts'
 import { readBoundedNativeFile } from './boundedMetadata.ts'
-import { saveEmbeddedArtwork } from './artworkStorage.ts'
+import { saveEmbeddedArtwork, saveFolderArtwork } from './artworkStorage.ts'
 import { objectUrlForBlob } from './objectUrls.ts'
 import type { CoverLookup, Track } from '../types.ts'
 
@@ -82,30 +82,36 @@ export async function scanNativeDroppedPaths(droppedPaths: string[]): Promise<Na
   return { audioPaths, coverPaths }
 }
 
-export function nativeCoversFromPaths(coverPaths: string[]): {
+export async function nativeCoversFromPaths(coverPaths: string[]): Promise<{
   lookup: CoverLookup
   paths: Map<string, string>
   urls: string[]
-} {
+}> {
   const lookup: CoverLookup = new Map()
   const paths: Map<string, string> = new Map()
   const urls: string[] = []
 
-  for (const path of coverPaths) {
-    const url = toNativeAssetUrl(path)
+  for (const sourcePath of coverPaths) {
+    // Arbitrary user folders are outside Tauri's asset-protocol scope. Copy images into
+    // AppData first, then only publish URLs the WebView is allowed to load.
+    const durablePath = await saveFolderArtwork(sourcePath)
+    if (!durablePath) continue
+
+    const url = toNativeAssetUrl(durablePath)
     urls.push(url)
 
-    const fileName = getFileName(path)
+    // Keep matching based on the original file name/folder, but persist the copied path.
+    const fileName = getFileName(sourcePath)
     const baseName = normalizeName(fileName)
     if (baseName && !lookup.has(baseName)) {
       lookup.set(baseName, url)
-      paths.set(baseName, path)
+      paths.set(baseName, durablePath)
     }
 
-    const parentFolder = normalizeName(getParentDirName(path))
+    const parentFolder = normalizeName(getParentDirName(sourcePath))
     if (parentFolder && !lookup.has(parentFolder)) {
       lookup.set(parentFolder, url)
-      paths.set(parentFolder, path)
+      paths.set(parentFolder, durablePath)
     }
   }
 

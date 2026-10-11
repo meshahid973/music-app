@@ -1,4 +1,4 @@
-import { BaseDirectory, exists, mkdir, writeFile } from '@tauri-apps/plugin-fs'
+import { BaseDirectory, exists, mkdir, readFile, writeFile } from '@tauri-apps/plugin-fs'
 import { appDataDir, join } from '@tauri-apps/api/path'
 import { isDesktopApp, toNativeAssetUrl } from './platform.ts'
 import type { Track } from '../types.ts'
@@ -50,6 +50,49 @@ export async function saveEmbeddedArtwork(
   }
 }
 
+
+/**
+ * Copy artwork selected from an arbitrary user folder into AppData.
+ *
+ * Tauri's asset protocol is intentionally scoped to AppData, so external image paths
+ * cannot be used directly as <img src> URLs. A content fingerprint also gives changed
+ * artwork a new URL, avoiding stale WebView image-cache entries after a rescan.
+ */
+export async function saveFolderArtwork(sourcePath: string): Promise<string | null> {
+  if (!isDesktopApp()) return null
+
+  try {
+    const bytes = await readFile(sourcePath)
+    if (bytes.length === 0 || bytes.length > 25 * 1024 * 1024) {
+      console.warn('Skipping artwork that is empty or larger than 25 MiB:', sourcePath)
+      return null
+    }
+
+    let hash = 2166136261
+    for (const byte of bytes) {
+      hash = Math.imul(hash ^ byte, 16777619)
+    }
+    const fingerprint = (hash >>> 0).toString(16)
+    const extension = sourcePath.match(/\.([a-z0-9]{2,5})$/i)?.[1]?.toLowerCase()
+    const allowedExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'avif', 'bmp', 'gif', 'svg'])
+    const ext = extension && allowedExtensions.has(extension) ? extension : 'img'
+    const fileName = `folder_${sanitizeArtworkFilename(sourcePath)}_${fingerprint}.${ext}`
+    const relativePath = `artwork/${fileName}`
+
+    const artworkDirExists = await exists('artwork', { baseDir: BaseDirectory.AppData })
+    if (!artworkDirExists) {
+      await mkdir('artwork', { baseDir: BaseDirectory.AppData, recursive: true })
+    }
+
+    await writeFile(relativePath, bytes, { baseDir: BaseDirectory.AppData })
+    const appData = await appDataDir()
+    return await join(appData, 'artwork', fileName)
+  } catch (err) {
+    console.warn('Failed to copy cover-folder artwork into AppData:', sourcePath, err)
+    return null
+  }
+}
+
 /**
  * Save custom artwork to the AppData artwork directory or retain local file path.
  */
@@ -59,9 +102,10 @@ export async function saveCustomArtwork(
 ): Promise<string | null> {
   if (!isDesktopApp()) return null
 
-  // If already a local file path on disk, it is already durable
+  // Native paths outside AppData are durable on disk but cannot be loaded by the
+  // WebView's restricted asset protocol. Copy them into AppData just like folder covers.
   if (!source.startsWith('data:') && !source.startsWith('blob:')) {
-    return source
+    return saveFolderArtwork(source)
   }
 
   // If a data: URL, convert to bytes and save to disk

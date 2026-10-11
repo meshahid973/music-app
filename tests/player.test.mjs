@@ -5,6 +5,7 @@ import { trackIdForFile } from '../src/utils/trackIdentity.ts'
 import { objectUrlForFile, revokeOwnedObjectUrls } from '../src/utils/objectUrls.ts'
 import { readID3Metadata, detectSongAndArtist, autoDetectTrackMetadata } from '../src/utils/metadata.ts'
 import { uniqueTracks, tracksFromFiles } from '../src/utils/library.ts'
+import { syncTracksWithCovers } from '../src/utils/covers.ts'
 import {
   parseId3Header,
   readBoundedMetadataFromReader,
@@ -1107,4 +1108,68 @@ test('cover-folder imports store durable paths and refresh stale direct artwork 
     assert.equal(hydrated.coverPath, item.coverPath)
     assert.equal(hydrated.coverUrl, item.coverPath)
   }
+})
+
+
+test('refreshed cover pools replace inaccessible persisted artwork URLs', () => {
+  const oldCoverUrl = 'http://asset.localhost/C:/Users/test/Music/covers/old.jpg'
+  const freshCoverA = 'http://asset.localhost/C:/Users/test/AppData/artwork/fresh-a.jpg'
+  const freshCoverB = 'http://asset.localhost/C:/Users/test/AppData/artwork/fresh-b.jpg'
+  const tracks = [
+    {
+      id: 'one',
+      title: 'Song One',
+      artist: 'Artist',
+      album: 'Record One',
+      duration: 180,
+      fileName: 'song-one.mp3',
+      filePath: 'C:\\Music\\song-one.mp3',
+      coverUrl: oldCoverUrl,
+      coverSource: 'pool',
+      accent: '#555555',
+    },
+    {
+      id: 'two',
+      title: 'Song Two',
+      artist: 'Artist',
+      album: 'Record Two',
+      duration: 180,
+      fileName: 'song-two.mp3',
+      filePath: 'C:\\Music\\song-two.mp3',
+      coverUrl: oldCoverUrl,
+      coverPath: 'C:\\Old Covers\\old.jpg',
+      coverSource: 'direct',
+      accent: '#555555',
+    },
+  ]
+
+  const refreshed = syncTracksWithCovers(
+    tracks,
+    new Map([['cover-one', freshCoverA], ['cover-two', freshCoverB]]),
+    [freshCoverA, freshCoverB],
+  )
+
+  assert.equal(refreshed.length, 2)
+  for (const track of refreshed) {
+    assert.ok([freshCoverA, freshCoverB].includes(track.coverUrl))
+    assert.notEqual(track.coverUrl, oldCoverUrl)
+    assert.equal(track.coverSource, 'pool')
+  }
+})
+
+test('first-run setup completion is normalized and persisted in desktop payloads', () => {
+  const base = {
+    tracks: [],
+    playlists: [],
+    activePlaylistId: 'library',
+    volume: 0.82,
+    shuffle: false,
+    repeat: 'off',
+  }
+
+  const complete = migrateDesktopLibraryPayload({ ...base, firstRunSetupCompleted: true })
+  assert.equal(complete?.firstRunSetupCompleted, true)
+
+  const incomplete = migrateDesktopLibraryPayload({ ...base, firstRunSetupCompleted: false })
+  assert.equal(incomplete?.firstRunSetupCompleted, false)
 })

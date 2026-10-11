@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, FormEvent } from 'react'
 import { motion } from 'framer-motion'
 import {
@@ -9,7 +9,8 @@ import {
   UploadFilled,
 } from '../icons'
 import { cleanDisplayTitle } from '../../utils/library'
-import { isDesktopApp, pickNativeImageFile, toNativeAssetUrl } from '../../utils/platform'
+import { readFile } from '@tauri-apps/plugin-fs'
+import { isDesktopApp, pickNativeImageFile } from '../../utils/platform'
 import { processTrackEdit } from '../../utils/trackEdit'
 import type { Track } from '../../types'
 
@@ -30,15 +31,45 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const previewObjectUrlRef = useRef<string | null>(null)
   const isDesktop = isDesktopApp()
+
+  useEffect(() => () => {
+    if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current)
+  }, [])
 
   async function handleNativeChooseImage() {
     setErrorMessage(null)
     const selected = await pickNativeImageFile()
-    if (selected) {
+    if (!selected) return
+
+    try {
+      // Use a temporary Blob URL for the preview. Direct paths outside AppData are
+      // intentionally blocked by Tauri's asset protocol and should not be used as img src.
+      const bytes = await readFile(selected)
+      const extension = selected.split('.').pop()?.toLowerCase()
+      const mimeByExtension: Record<string, string> = {
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        webp: 'image/webp',
+        avif: 'image/avif',
+        bmp: 'image/bmp',
+        gif: 'image/gif',
+        svg: 'image/svg+xml',
+      }
+      const blob = new Blob([bytes as unknown as BlobPart], {
+        type: mimeByExtension[extension ?? ''] ?? 'image/jpeg',
+      })
+      if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current)
+      const previewUrl = URL.createObjectURL(blob)
+      previewObjectUrlRef.current = previewUrl
       setCoverPath(selected)
-      setCoverUrl(toNativeAssetUrl(selected))
+      setCoverUrl(previewUrl)
       setPendingImageSource(selected)
+    } catch (err) {
+      console.warn('Could not preview the selected cover image:', err)
+      setErrorMessage('Could not read that image. Try choosing another file.')
     }
   }
 
@@ -60,6 +91,10 @@ export function EditTrackModal({ track, isPlaying, onClose, onSave }: EditTrackM
 
   function handleRemoveCover() {
     setErrorMessage(null)
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current)
+      previewObjectUrlRef.current = null
+    }
     setCoverUrl(undefined)
     setCoverPath(undefined)
     setPendingImageSource(undefined)
