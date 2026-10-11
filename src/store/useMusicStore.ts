@@ -51,6 +51,32 @@ type MusicState = {
 export const libraryId = 'library'
 export const favoritesId = 'favorites'
 
+function ensureFavoritesPlaylist(playlists: Playlist[]): Playlist[] {
+  const firstFavoriteIndex = playlists.findIndex((playlist) => playlist.id === favoritesId)
+
+  if (firstFavoriteIndex === -1) {
+    return [
+      { id: favoritesId, name: 'Favorites', trackIds: [], createdAt: Date.now() },
+      ...playlists,
+    ]
+  }
+
+  const existing = playlists[firstFavoriteIndex]
+  const favorite: Playlist = {
+    ...existing,
+    name: 'Favorites',
+    trackIds: Array.isArray(existing.trackIds) ? existing.trackIds : [],
+  }
+
+  return playlists.flatMap((playlist, index) =>
+    playlist.id !== favoritesId
+      ? [playlist]
+      : index === firstFavoriteIndex
+        ? [favorite]
+        : [],
+  )
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let initPromise: Promise<void> | null = null
 
@@ -101,7 +127,7 @@ export const useMusicStore = create<MusicState>()(
       isPlaying: false,
       shuffle: false,
       repeat: 'off',
-      themeMode: 'ambient',
+      themeMode: 'normal',
       themePreset: 'midnight',
       accentColor: '#e6eaee',
       volume: 0.82,
@@ -175,7 +201,7 @@ export const useMusicStore = create<MusicState>()(
                     playlistMap.set(p.id, p)
                   }
                 }
-                const mergedPlaylists = Array.from(playlistMap.values())
+                const mergedPlaylists = ensureFavoritesPlaylist(Array.from(playlistMap.values()))
 
                 const activePlaylistId =
                   state.activePlaylistId !== libraryId && state.activePlaylistId
@@ -206,7 +232,12 @@ export const useMusicStore = create<MusicState>()(
 
                 // If tracks or playlists were added concurrently while loading from disk,
                 // queue a save so disk storage reflects the merged state.
-                if (state.tracks.length > 0 || state.playlists.length > loaded.playlists.length) {
+                if (
+                  state.tracks.length > 0 ||
+                  state.playlists.length > loaded.playlists.length ||
+                  !state.playlists.some((playlist) => playlist.id === favoritesId) ||
+                  !loaded.playlists.some((playlist) => playlist.id === favoritesId)
+                ) {
                   queueSave({ ...state, ...nextState })
                 }
 
@@ -220,11 +251,18 @@ export const useMusicStore = create<MusicState>()(
             initPromise = null
           }
 
-          set((state) => ({
-            tracks: hydrateTracksArtwork(state.tracks),
-            firstRunSetupCompleted: state.firstRunSetupCompleted || state.tracks.length > 0,
-            isInitialized: true,
-          }))
+          set((state) => {
+            const playlists = ensureFavoritesPlaylist(state.playlists)
+            const nextState = {
+              tracks: hydrateTracksArtwork(state.tracks),
+              playlists,
+              themeMode: 'normal' as const,
+              firstRunSetupCompleted: state.firstRunSetupCompleted || state.tracks.length > 0,
+              isInitialized: true,
+            }
+            if (playlists !== state.playlists) queueSave({ ...state, ...nextState })
+            return nextState
+          })
         })()
 
         return initPromise
@@ -298,6 +336,8 @@ export const useMusicStore = create<MusicState>()(
 
       deletePlaylist: (playlistId) =>
         set((state) => {
+          if (playlistId === favoritesId) return {}
+
           const playlists = state.playlists.filter((playlist) => playlist.id !== playlistId)
           const activePlaylistId =
             state.activePlaylistId === playlistId ? libraryId : state.activePlaylistId
@@ -307,6 +347,8 @@ export const useMusicStore = create<MusicState>()(
 
       renamePlaylist: (playlistId, name) =>
         set((state) => {
+          if (playlistId === favoritesId) return {}
+
           const playlists = state.playlists.map((playlist) =>
             playlist.id === playlistId
               ? { ...playlist, name: name.trim() || playlist.name }
@@ -318,7 +360,11 @@ export const useMusicStore = create<MusicState>()(
 
       addTrackToPlaylist: (playlistId, trackId) =>
         set((state) => {
-          const playlists = state.playlists.map((playlist) =>
+          const basePlaylists =
+            playlistId === favoritesId
+              ? ensureFavoritesPlaylist(state.playlists)
+              : state.playlists
+          const playlists = basePlaylists.map((playlist) =>
             playlist.id === playlistId && !playlist.trackIds.includes(trackId)
               ? { ...playlist, trackIds: [...playlist.trackIds, trackId] }
               : playlist,
@@ -329,7 +375,11 @@ export const useMusicStore = create<MusicState>()(
 
       removeTrackFromPlaylist: (playlistId, trackId) =>
         set((state) => {
-          const playlists = state.playlists.map((playlist) =>
+          const basePlaylists =
+            playlistId === favoritesId
+              ? ensureFavoritesPlaylist(state.playlists)
+              : state.playlists
+          const playlists = basePlaylists.map((playlist) =>
             playlist.id === playlistId
               ? { ...playlist, trackIds: playlist.trackIds.filter((id) => id !== trackId) }
               : playlist,
