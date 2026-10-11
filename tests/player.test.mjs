@@ -844,6 +844,67 @@ test('Windows setup.exe Tauri configuration and capabilities include required NS
   assert.deepEqual(tauriConf.app?.security?.assetProtocol?.scope, ['$APPDATA/**'])
 })
 
+test('hover interactions avoid transform scaling that softens text and controls', () => {
+  const appCss = fs.readFileSync(new URL('../src/App.css', import.meta.url), 'utf8')
+  const sliderCss = fs.readFileSync(new URL('../src/components/ElasticSlider.css', import.meta.url), 'utf8')
+  const styles = [appCss, sliderCss]
+
+  // Read CSS rule blocks, including rules nested inside media queries.
+  function readCssRules(source) {
+    const stack = []
+    const rules = []
+    let tokenStart = 0
+
+    for (let i = 0; i < source.length; i++) {
+      if (source.startsWith('/*', i)) {
+        const commentEnd = source.indexOf('*/', i + 2)
+        if (commentEnd >= 0) {
+          i = commentEnd + 1
+          continue
+        }
+      }
+      if (source[i] === '{') {
+        stack.push({ selector: source.slice(tokenStart, i).trim(), bodyStart: i + 1 })
+        tokenStart = i + 1
+      } else if (source[i] === '}') {
+        const block = stack.pop()
+        if (block) {
+          rules.push({ selector: block.selector, body: source.slice(block.bodyStart, i) })
+        }
+        tokenStart = i + 1
+      }
+    }
+    return rules
+  }
+
+  const rules = styles.flatMap(readCssRules)
+  const transformedInteractionRules = rules
+    .filter((rule) => /:(?:hover|active|focus-within)\\b/.test(rule.selector))
+    .filter((rule) => /\\btransform\\s*:/.test(rule.body))
+    .map((rule) => rule.selector)
+
+  assert.deepEqual(
+    transformedInteractionRules,
+    [],
+    'hover/focus interaction rules should not move or scale UI elements',
+  )
+
+  const scaledHoverThumbs = rules
+    .filter((rule) => /\\.scrubber-hitbox\\.active.*\\.scrubber-thumb|\\.volume-track-container\\.active.*\\.volume-track-thumb/.test(rule.selector))
+    .filter((rule) => /\\btransform\\s*:/.test(rule.body))
+    .map((rule) => rule.selector)
+  assert.deepEqual(scaledHoverThumbs, [], 'hovering sliders should not scale their handles')
+
+  for (const path of [
+    '../src/components/TrackList.tsx',
+    '../src/components/PlayerBar.tsx',
+    '../src/components/modals/AddToPlaylistModal.tsx',
+  ]) {
+    const source = fs.readFileSync(new URL(path, import.meta.url), 'utf8')
+    assert.doesNotMatch(source, /\\bwhileHover\\s*=|\\bwhileTap\\s*=/, path)
+  }
+})
+
 test('native folder scan reports inaccessible subfolders without discarding accessible files', async () => {
   const result = await scanNativeFolder('root', async (currentPath) => {
     if (currentPath === 'root') {
