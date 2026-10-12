@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Download, ExternalLink, FolderMusic, LoaderCircle, Music2 } from 'lucide-react'
+import { Download, ExternalLink, FolderOpen, LoaderCircle, Music2 } from 'lucide-react'
 
 type AudioFormat = 'best' | 'mp3' | 'm4a' | 'opus' | 'flac' | 'wav'
 
@@ -117,7 +117,7 @@ export function DownloadSection({
         <p className="download-format-description">{formats.find((option) => option.value === format)?.description}</p>
 
         <div className="download-destination">
-          <FolderMusic size={19} />
+          <FolderOpen size={19} />
           <div className="download-destination-copy">
             <strong>Save location</strong>
             <span title={musicFolderPath || 'No music folder selected'}>
