@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { StatusBanner } from '../StatusBanner'
 import {
   AudioLinesFilled,
   CheckFilled,
@@ -102,13 +103,13 @@ export function FirstRunSetupModal({
           </div>
         ) : (
           <>
-            <div className="first-run-selected-folder">
-              <CheckFilled size={17} />
-              <div>
-                <strong>Music folder selected</strong>
-                <span>{musicFolderName || 'Your music folder'}</span>
-              </div>
-            </div>
+            <StatusBanner
+              variant="success"
+              className="first-run-selected-folder"
+              icon={<CheckFilled size={17} />}
+              title="Music folder selected"
+              description={musicFolderName || 'Your music folder'}
+            />
 
             <div className="first-run-folder-card">
               <div className="first-run-folder-icon cover">
