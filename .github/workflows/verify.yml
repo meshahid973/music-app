@@ -4,12 +4,16 @@ on:
     branches: [main, 'feat/**', 'fix/**']
   pull_request:
   workflow_dispatch:
+env:
+  GIT_CONFIG_COUNT: 1
+  GIT_CONFIG_KEY_0: init.defaultBranch
+  GIT_CONFIG_VALUE_0: main
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - run: npm install --no-audit --no-fund
@@ -20,8 +24,8 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - name: Install Rust stable
@@ -43,7 +47,7 @@ jobs:
           }
           ./scripts/windows-install-smoke.ps1 -InstallerPath $installer.FullName
       - name: Upload Windows desktop installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Resonance-Windows-Setup
           path: |
@@ -52,3 +56,15 @@ jobs:
             src-tauri/target/release/resonance.exe
           if-no-files-found: error
 
+  test-cover-art-worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare/cover-art
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund
+      - run: npm test

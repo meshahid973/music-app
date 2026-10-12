@@ -1,0 +1,54 @@
+.community-art-page { padding: 28px 34px 150px; overflow-y: auto; height: 100%; }
+.community-art-header { display: flex; align-items: center; gap: 15px; margin-bottom: 26px; }
+.community-art-heading-icon { width: 48px; height: 48px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 14px; background: var(--panel-strong); border: 1px solid var(--line); color: var(--text); }
+.community-art-header h1 { margin: 3px 0 5px; font-size: clamp(24px, 2.2vw, 32px); letter-spacing: -.035em; }
+.community-art-header p:last-child { margin: 0; color: var(--muted); font-size: 14px; }
+.community-art-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.community-art-filters button, .community-art-feature-actions button, .community-art-empty-details button, .community-art-load-more { border: 1px solid var(--line); background: var(--panel); color: var(--muted); padding: 10px 13px; border-radius: 10px; cursor: pointer; font: inherit; font-size: 13px; }
+.community-art-filters button.selected, .community-art-feature-actions button:hover, .community-art-empty-details button:hover, .community-art-load-more:hover { background: var(--panel-strong); color: var(--text); border-color: var(--line-strong); }
+.community-art-message { margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.community-art-message code { color: var(--text); }
+.community-art-message.error { color: #fca5a5; }
+.community-art-message button { margin-left: 8px; border: 0; background: transparent; color: var(--text); text-decoration: underline; cursor: pointer; }
+.community-art-layout { display: grid; grid-template-columns: minmax(240px, 1.05fr) minmax(260px, .95fr); gap: 24px; align-items: start; }
+.community-art-feature, .community-art-details { min-width: 0; }
+.community-art-preview { width: 100%; aspect-ratio: 1 / 1; max-height: 460px; display: grid; place-items: center; overflow: hidden; border-radius: 16px; border: 1px solid var(--line); background: #101112; }
+.community-art-preview img { width: 100%; height: 100%; object-fit: contain; }
+.community-art-placeholder { display: grid; place-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.community-art-feature-actions { display: flex; gap: 9px; margin-top: 12px; flex-wrap: wrap; }
+.community-art-feature-actions button { display: inline-flex; align-items: center; gap: 8px; }
+.community-art-feature-actions .community-art-primary, .community-art-download { background: var(--text); color: #101112; border: 1px solid var(--text); }
+.community-art-feature-actions button:disabled, .community-art-download:disabled { opacity: .55; cursor: not-allowed; }
+.community-art-details { padding: 6px 0; }
+.community-art-category { display: inline-flex; padding: 5px 8px; border-radius: 6px; background: var(--panel-strong); color: var(--muted); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+.community-art-details h2 { margin: 14px 0 4px; font-size: 25px; line-height: 1.2; overflow-wrap: anywhere; }
+.community-art-creator { margin: 0 0 24px; color: var(--muted); }
+.community-art-details dl { margin: 0; display: grid; gap: 15px; }
+.community-art-details dl div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; font-size: 13px; line-height: 1.45; }
+.community-art-details dt { color: var(--muted); }
+.community-art-details dd { margin: 0; overflow-wrap: anywhere; color: var(--text); }
+.community-art-download { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 24px; padding: 11px 15px; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+.community-art-status { margin-top: 13px; font-size: 12px; overflow-wrap: anywhere; line-height: 1.5; }
+.community-art-status.success { color: #86efac; }
+.community-art-status.error { color: #fca5a5; }
+.community-art-status.info, .community-art-note { color: var(--muted); }
+.community-art-note { display: flex; gap: 6px; align-items: center; font-size: 11px; line-height: 1.5; }
+.community-art-empty-details { min-height: 240px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; color: var(--muted); }
+.community-art-empty-details h2 { color: var(--text); }
+.community-art-catalogue { margin-top: 34px; }
+.community-art-catalogue-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; }
+.community-art-catalogue-heading h2 { margin: 0 0 5px; font-size: 17px; }
+.community-art-catalogue-heading p { margin: 0; font-size: 12px; color: var(--muted); }
+.community-art-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.community-art-tile { min-width: 0; padding: 8px; display: grid; gap: 7px; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; color: var(--text); cursor: pointer; }
+.community-art-tile.selected { border-color: var(--line-strong); background: var(--panel-strong); }
+.community-art-tile img { width: 100%; aspect-ratio: 1; object-fit: cover; background: #101112; border-radius: 7px; }
+.community-art-tile span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.community-art-tile small { color: var(--muted); font-size: 10px; }
+.community-art-catalogue-empty { min-height: 100px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); border: 1px dashed var(--line); border-radius: 12px; font-size: 13px; }
+.community-art-load-more { display: block; margin: 16px auto 0; }
+.community-art-spinner { animation: community-art-spin 1s linear infinite; }
+@keyframes community-art-spin { to { transform: rotate(360deg); } }
+@media (max-width: 1050px) { .community-art-page { padding: 24px 22px 150px; } .community-art-layout { grid-template-columns: minmax(220px, .9fr) minmax(230px, 1fr); gap: 18px; } }
+@media (max-width: 760px) { .community-art-page { padding: 20px 16px 150px; } .community-art-layout { grid-template-columns: 1fr; } .community-art-preview { max-height: 360px; } .community-art-details dl div { grid-template-columns: 84px minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .community-art-spinner { animation: none; } }
