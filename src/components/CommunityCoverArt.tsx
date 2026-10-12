@@ -77,11 +77,6 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
   }, [category, configured, endpoint])
 
   useEffect(() => {
-    setArtwork(null)
-    setItems([])
-    setPage(1)
-    setHasMore(false)
-    setStatus(null)
     void loadCatalogue(1, true)
     void chooseRandom()
   }, [category, chooseRandom, loadCatalogue])
@@ -135,7 +130,17 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
 
       <div className="community-art-filters" role="group" aria-label="Artwork category">
         {([{ value: 'all', label: 'All artwork' }, { value: 'community', label: 'Community Artwork' }, { value: 'album', label: 'Album Covers' }] as const).map((option) => (
-          <button key={option.value} type="button" className={category === option.value ? 'selected' : ''} aria-pressed={category === option.value} onClick={() => setCategory(option.value)}>{option.label}</button>
+          <button key={option.value} type="button" className={category === option.value ? 'selected' : ''} aria-pressed={category === option.value} onClick={() => {
+            if (category !== option.value) {
+              setArtwork(null)
+              setItems([])
+              setPage(1)
+              setHasMore(false)
+              setStatus(null)
+              setError(null)
+              setCategory(option.value)
+            }
+          }}>{option.label}</button>
         ))}
       </div>
 
