@@ -8,42 +8,29 @@ import type { PlaybackQueue } from '../utils/queue'
 
 export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
   const audioRef = useRef<Howl | null>(null)
-  const progressTimer = useRef<number | null>(null)
   const volumeRef = useRef(0.82)
   const playNextRef = useRef<() => void>(() => {})
   const [seek, setSeek] = useState(0)
 
-  const {
-    tracks,
-    currentTrackId,
-    isPlaying,
-    shuffle,
-    repeat,
-    volume,
-    setCurrentTrack,
-    setIsPlaying,
-  } = useMusicStore()
+  const tracks = useMusicStore((state) => state.tracks)
+  const currentTrackId = useMusicStore((state) => state.currentTrackId)
+  const isPlaying = useMusicStore((state) => state.isPlaying)
+  const shuffle = useMusicStore((state) => state.shuffle)
+  const repeat = useMusicStore((state) => state.repeat)
+  const volume = useMusicStore((state) => state.volume)
+  const setCurrentTrack = useMusicStore((state) => state.setCurrentTrack)
+  const setIsPlaying = useMusicStore((state) => state.setIsPlaying)
 
   const currentTrack = tracks.find((track) => track.id === currentTrackId)
   const currentAudioUrl = currentTrack?.audioUrl
   const currentId = currentTrack?.id
 
-  function startProgress() {
-    stopProgress()
-    progressTimer.current = window.setInterval(() => {
-      const howl = audioRef.current
-      if (!howl) return
-      const position = howl.seek()
-      setSeek(typeof position === 'number' ? position : 0)
-    }, 350)
-  }
+  // PlayerBar reads the Howler position with requestAnimationFrame and updates
+  // its scrubber DOM directly. Avoid a 350ms React state update here: this hook is
+  // mounted by App, so that timer previously rerendered the entire screen ~3x/sec.
+  function startProgress() {}
 
-  function stopProgress() {
-    if (progressTimer.current) {
-      window.clearInterval(progressTimer.current)
-      progressTimer.current = null
-    }
-  }
+  function stopProgress() {}
 
   useEffect(() => {
     volumeRef.current = volume

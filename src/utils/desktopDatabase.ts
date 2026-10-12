@@ -125,14 +125,20 @@ export async function saveDesktopLibrary(data: DesktopLibraryPayload): Promise<v
     tracks: sanitizeTracksForPersistence(Array.isArray(data.tracks) ? data.tracks : []),
   }
 
-  const json = JSON.stringify(payload, null, 2)
+  // Compact JSON reduces CPU spent formatting large libraries and disk size.
+  const json = JSON.stringify(payload)
 
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(WEB_STORAGE_KEY, json)
+  // Browser builds need a localStorage fallback. In the Windows desktop app,
+  // keep the full library in AppData only: synchronous localStorage writes of a
+  // large JSON library can block the WebView2 UI thread during frequent edits.
+  if (!isDesktopApp()) {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(WEB_STORAGE_KEY, json)
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
   if (isDesktopApp()) {

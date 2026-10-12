@@ -1054,6 +1054,9 @@ h3 {
 }
 
 .track-row {
+  /* Let Chromium/WebView2 skip layout and paint work for off-screen song rows. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 76px;
   min-height: 76px;
   display: grid;
   grid-template-columns: 42px 52px minmax(140px, 1.2fr) minmax(100px, 0.8fr) 56px 40px auto;

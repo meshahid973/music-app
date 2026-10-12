@@ -20,17 +20,15 @@ import {
 } from '../utils/nativeFileSystem'
 
 export function useLibraryImport() {
-  const {
-    addTracks,
-    addCovers,
-    musicFolderPath,
-    coverFolderPath,
-    isInitialized,
-    musicFolderName,
-    coverFolderName,
-    setMusicFolder,
-    setCoverFolder,
-  } = useMusicStore()
+  const addTracks = useMusicStore((state) => state.addTracks)
+  const addCovers = useMusicStore((state) => state.addCovers)
+  const musicFolderPath = useMusicStore((state) => state.musicFolderPath)
+  const coverFolderPath = useMusicStore((state) => state.coverFolderPath)
+  const isInitialized = useMusicStore((state) => state.isInitialized)
+  const musicFolderName = useMusicStore((state) => state.musicFolderName)
+  const coverFolderName = useMusicStore((state) => state.coverFolderName)
+  const setMusicFolder = useMusicStore((state) => state.setMusicFolder)
+  const setCoverFolder = useMusicStore((state) => state.setCoverFolder)
   const isDesktop = isDesktopApp()
 
   const [isScanningMusic, setIsScanningMusic] = useState(false)

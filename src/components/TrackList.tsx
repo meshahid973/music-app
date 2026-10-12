@@ -179,20 +179,13 @@ export function TrackList({
         exit={{ opacity: 0, y: -6 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       >
-        {tracks.map((track, index) => {
+        {tracks.map((track) => {
           const isFavorited = favoriteTrackIds.has(track.id)
           return (
             <motion.article
               className={currentTrackId === track.id ? 'track-row active' : 'track-row'}
               key={track.id}
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '60px 0px' }}
-              transition={{
-                duration: 0.25,
-                ease: [0.22, 1, 0.36, 1],
-                delay: Math.min((index % 8) * 0.025, 0.12),
-              }}
+              // Keep rows lightweight: the list can contain thousands of tracks.
               onClick={() => onPlay(track.id)}
               role="button"
               tabIndex={0}
