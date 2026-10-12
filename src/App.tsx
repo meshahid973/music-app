@@ -242,11 +242,13 @@ function App() {
         onRenamePlaylist={setPlaylistToRename}
         onDeletePlaylist={setPlaylistToDelete}
         onOpenAddToPlaylist={setPlaylistToAddSongs}
+        onAddSongs={handleMusicFiles}
         playlistName={newPlaylistName}
         setPlaylistName={setNewPlaylistName}
         onAddMusicFolder={handleMusicFolder}
         onAddCoverFolder={handleCoverFolder}
         isDesktop={isDesktop}
+        onNativeAddSongs={handleNativeAddSongs}
         onNativeMusicFolder={handleNativeMusicFolder}
         onNativeCoverFolder={handleNativeCoverFolder}
         onRescanMusicFolder={handleRescanMusicFolder}
