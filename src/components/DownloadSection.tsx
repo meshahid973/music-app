@@ -1,12 +1,12 @@
 import { invoke } from '@tauri-apps/api/core'
 import { useState } from 'react'
+import type { FormEvent } from 'react'
 import { Download, ExternalLink, FolderMusic, LoaderCircle, Music2 } from 'lucide-react'
 
 type AudioFormat = 'best' | 'mp3' | 'm4a' | 'opus' | 'flac' | 'wav'
 
 type DownloadSectionProps = {
   musicFolderPath?: string
-  musicFolderName?: string
   isDesktop: boolean
   onChooseMusicFolder: () => void
   onRefreshLibrary: () => Promise<unknown> | unknown
@@ -23,7 +23,6 @@ const formats: { value: AudioFormat; label: string; description: string }[] = [
 
 export function DownloadSection({
   musicFolderPath,
-  musicFolderName,
   isDesktop,
   onChooseMusicFolder,
   onRefreshLibrary,
@@ -34,7 +33,7 @@ export function DownloadSection({
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null)
   const [lastDownloaded, setLastDownloaded] = useState('')
 
-  const handleDownload = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleDownload = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const trimmedUrl = url.trim()
     if (!trimmedUrl) {
