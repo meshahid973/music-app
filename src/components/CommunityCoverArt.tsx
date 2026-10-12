@@ -3,7 +3,6 @@ import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 import { Download, ExternalLink, ImageOff, LoaderCircle, RefreshCw, Shuffle } from 'lucide-react'
 import {
-  isArtworkId,
   isCommunityArtwork,
   isAllowedArtworkApiUrl,
   artworkLoadErrorMessage,
