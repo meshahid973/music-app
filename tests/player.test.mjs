@@ -1143,7 +1143,7 @@ test('editing text metadata preserves existing embedded artwork provenance', asy
   assert.equal(result.updates?.coverSource, 'embedded')
 })
 
-test('theme presets and accent colors are normalized for persistence', async () => {
+test('removed Looks preferences are ignored during desktop library migration', async () => {
   const { migrateDesktopLibraryPayload } = await import('../src/utils/desktopDatabase.ts')
   const base = {
     tracks: [],
@@ -1154,13 +1154,19 @@ test('theme presets and accent colors are normalized for persistence', async () 
     repeat: 'off',
     themeMode: 'ambient',
   }
-  const valid = migrateDesktopLibraryPayload({ ...base, themePreset: 'ocean', accentColor: '#12abef' })
-  assert.equal(valid?.themePreset, 'ocean')
-  assert.equal(valid?.accentColor, '#12abef')
+  const legacy = migrateDesktopLibraryPayload({ ...base, themePreset: 'ocean', accentColor: '#12abef' })
+  assert.equal(legacy?.themePreset, undefined)
+  assert.equal(legacy?.accentColor, undefined)
+  assert.equal('themePreset' in (legacy ?? {}), false)
+  assert.equal('accentColor' in (legacy ?? {}), false)
 
-  const invalid = migrateDesktopLibraryPayload({ ...base, themePreset: 'untrusted-class-name', accentColor: 'red; background:url(x)' })
-  assert.equal(invalid?.themePreset, undefined)
-  assert.equal(invalid?.accentColor, undefined)
+  const settingsSource = fs.readFileSync(
+    new URL('../src/components/modals/SettingsModal.tsx', import.meta.url),
+    'utf8',
+  )
+  assert.equal(settingsSource.includes('Looks'), false)
+  assert.equal(settingsSource.includes('themePreset'), false)
+  assert.equal(settingsSource.includes('accentColor'), false)
 })
 
 
