@@ -170,7 +170,7 @@ async fn save_community_artwork(
     if artwork_id.is_empty()
         || artwork_id.len() > 80
         || !artwork_id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_' || c == b'-')
-        || !artwork_id.as_bytes()[0].is_ascii_lowercase() && !artwork_id.as_bytes()[0].is_ascii_digit()
+        || !(artwork_id.as_bytes()[0].is_ascii_lowercase() || artwork_id.as_bytes()[0].is_ascii_digit())
     {
         return Err("The artwork ID is invalid.".into());
     }
