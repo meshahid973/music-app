@@ -41,10 +41,32 @@ export function isArtworkId(value: string): boolean {
 export function isAllowedArtworkApiUrl(value: string): boolean {
   try {
     const url = new URL(value)
-    return url.protocol === 'https:' && (url.hostname.endsWith('.workers.dev') || url.hostname === 'workers.dev')
+    return url.protocol === 'https:' &&
+      url.hostname.endsWith('.workers.dev') &&
+      !url.username && !url.password && !url.port &&
+      (url.pathname === '/' || url.pathname === '') &&
+      !url.search && !url.hash
   } catch {
     return false
   }
+}
+
+export function isCommunityArtwork(value: unknown, apiBase: string): value is CommunityArtwork {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Partial<CommunityArtwork>
+  return typeof item.id === 'string' && isArtworkId(item.id) &&
+    typeof item.title === 'string' && item.title.trim().length > 0 && item.title.length <= 160 &&
+    (item.category === 'community' || item.category === 'album') &&
+    (item.format === 'png' || item.format === 'jpeg' || item.format === 'webp') &&
+    typeof item.source === 'string' && typeof item.licence === 'string' &&
+    (item.creator === undefined || typeof item.creator === 'string') &&
+    (item.artist === undefined || typeof item.artist === 'string') &&
+    (item.attribution === undefined || typeof item.attribution === 'string') &&
+    (item.attributionRequired === undefined || typeof item.attributionRequired === 'boolean') &&
+    (item.width === undefined || (Number.isInteger(item.width) && item.width > 0)) &&
+    (item.height === undefined || (Number.isInteger(item.height) && item.height > 0)) &&
+    (item.fileSize === undefined || (Number.isInteger(item.fileSize) && item.fileSize > 0 && item.fileSize <= MAX_COVER_ART_BYTES)) &&
+    item.imageUrl === apiBase + '/api/images/' + item.id
 }
 
 export function validateArtworkResponse(
