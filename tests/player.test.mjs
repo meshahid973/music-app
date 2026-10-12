@@ -6,6 +6,7 @@ import { objectUrlForFile, revokeOwnedObjectUrls } from '../src/utils/objectUrls
 import { readID3Metadata, detectSongAndArtist, autoDetectTrackMetadata } from '../src/utils/metadata.ts'
 import { uniqueTracks, tracksFromFiles } from '../src/utils/library.ts'
 import { syncTracksWithCovers } from '../src/utils/covers.ts'
+import { getVisibleTracks } from '../src/hooks/useTrackFilter.ts'
 import {
   parseId3Header,
   readBoundedMetadataFromReader,
@@ -38,6 +39,18 @@ if (typeof globalThis.localStorage === 'undefined') {
 function fileInfo(path = 'album/song.mp3') {
   return { name: 'song.mp3', size: 123, lastModified: 42, webkitRelativePath: path }
 }
+
+test('playlist filtering keeps only playlist members and search still applies', () => {
+  const tracks = [
+    { id: 'a', title: 'First Song', artist: 'Artist', album: 'Album', fileName: 'first.mp3', duration: 100 },
+    { id: 'b', title: 'Second Song', artist: 'Artist', album: 'Album', fileName: 'second.mp3', duration: 120 },
+    { id: 'c', title: 'Third Song', artist: 'Other', album: 'Elsewhere', fileName: 'third.mp3', duration: 140 },
+  ]
+  const playlist = { id: 'mix', name: 'Mix', trackIds: ['b', 'c'], createdAt: 1 }
+  assert.deepEqual(getVisibleTracks(tracks, 'mix', playlist, '').map((track) => track.id), ['b', 'c'])
+  assert.deepEqual(getVisibleTracks(tracks, 'mix', playlist, 'third').map((track) => track.id), ['c'])
+  assert.deepEqual(getVisibleTracks(tracks, 'library', undefined, '').map((track) => track.id), ['a', 'b', 'c'])
+})
 
 test('stable IDs survive reordered imports and distinguish folders', () => {
   assert.equal(trackIdForFile(fileInfo()), trackIdForFile(fileInfo()))
