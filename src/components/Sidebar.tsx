@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import type { ChangeEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { Download } from 'lucide-react'
 import {
   AudioLinesFilled,
   CheckFilled,
@@ -45,6 +46,8 @@ export type SidebarProps = {
   coverFolderName?: string
   scanNotice?: string | null
   onOpenSettings?: () => void
+  isDownloadsActive?: boolean
+  onOpenDownloads?: () => void
 }
 
 export function Sidebar({
@@ -73,6 +76,8 @@ export function Sidebar({
   coverFolderName,
   scanNotice,
   onOpenSettings,
+  isDownloadsActive = false,
+  onOpenDownloads,
 }: SidebarProps) {
   const musicInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
@@ -328,6 +333,17 @@ export function Sidebar({
             <RefreshFilled size={14} className={isScanningCovers ? 'spinning' : ''} />
           </button>
         </div>
+
+        <button
+          type="button"
+          className={`nav-item ${isDownloadsActive ? 'active' : ''}`}
+          title="Download audio with yt-dlp"
+          aria-current={isDownloadsActive ? 'page' : undefined}
+          onClick={onOpenDownloads}
+        >
+          <Download size={18} />
+          <span>Downloads</span>
+        </button>
 
         <div className="sidebar-divider" role="separator" />
 
