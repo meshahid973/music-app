@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { DownloadSection } from './components/DownloadSection'
+import { CommunityCoverArt } from './components/CommunityCoverArt'
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import './App.css'
@@ -39,7 +40,7 @@ function App() {
   const [editingTrack, setEditingTrack] = useState<Track | null>(null)
   const [playlistToAddSongs, setPlaylistToAddSongs] = useState<Playlist | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [activeSection, setActiveSection] = useState<'library' | 'downloads'>('library')
+  const [activeSection, setActiveSection] = useState<'library' | 'downloads' | 'community-art'>('library')
   const [isFirstRunSetupInProgress, setIsFirstRunSetupInProgress] = useState(false)
   const [firstRunSetupStep, setFirstRunSetupStep] = useState<'music' | 'covers'>('music')
   const [firstRunBusyAction, setFirstRunBusyAction] = useState<'music' | 'covers' | null>(null)
@@ -242,6 +243,8 @@ function App() {
         onSelect={(playlistId) => { setActiveSection('library'); setActivePlaylist(playlistId) }}
         isDownloadsActive={activeSection === 'downloads'}
         onOpenDownloads={() => setActiveSection('downloads')}
+        isCommunityArtActive={activeSection === 'community-art'}
+        onOpenCommunityArt={() => setActiveSection('community-art')}
         onCreate={handleCreatePlaylist}
         onRenamePlaylist={setPlaylistToRename}
         onDeletePlaylist={setPlaylistToDelete}
@@ -266,7 +269,9 @@ function App() {
       />
 
       <section className="content">
-        {activeSection === 'downloads' ? (
+        {activeSection === 'community-art' ? (
+          <CommunityCoverArt isDesktop={isDesktop} />
+        ) : activeSection === 'downloads' ? (
           <DownloadSection
             musicFolderPath={configuredMusicFolderPath}
             isDesktop={isDesktop}
