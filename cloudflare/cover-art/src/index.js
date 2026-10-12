@@ -25,8 +25,8 @@ function publicEntry(entry, apiBase) {
   return { ...metadata, imageUrl: apiBase + "/api/images/" + entry.id };
 }
 
-function entriesFor(category) {
-  return catalogue.artworks.filter((entry) =>
+export function entriesFor(category, source = catalogue.artworks) {
+  return source.filter((entry) =>
     (category === null || entry.category === category) &&
     entry.redistributionAllowed === true &&
     ID_PATTERN.test(entry.id) &&
@@ -36,7 +36,7 @@ function entriesFor(category) {
   );
 }
 
-function categoryFrom(url) {
+export function selectRandom(entries, randomValue) {\n  if (!entries.length) return null;\n  const value = Number.isFinite(randomValue) ? Math.min(Math.max(randomValue, 0), 0.999999999) : 0;\n  return entries[Math.floor(value * entries.length)];\n}\n\nexport function paginate(entries, page, limit) {\n  const start = (page - 1) * limit;\n  const items = entries.slice(start, start + limit);\n  return { page, limit, total: entries.length, items, hasMore: start + items.length < entries.length };\n}\n\nfunction categoryFrom(url) {
   const value = url.searchParams.get("category");
   if (value === null || value === "all") return null;
   return value === "community" || value === "album" ? value : "invalid";
