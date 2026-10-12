@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { entriesFor, paginate, selectRandom } from "../src/index.js";
 
-const original = await import("../catalog.json", { with: { type: "json" } });
 const env = { ALLOWED_ORIGIN: "*", ARTWORK_BUCKET: { get: async () => null } };
 
 test("health endpoint reports an empty sample catalogue", async () => {
