@@ -4,6 +4,7 @@ import type { Playlist, RepeatMode, ThemeMode, ThemePreset, Track } from '../typ
 import { assignCoversToTracks, syncTracksWithCovers, uniqueTracks } from '../utils/library.ts'
 import { loadDesktopLibrary, saveDesktopLibrary } from '../utils/desktopDatabase.ts'
 import { hydrateTracksArtwork, sanitizeTracksForPersistence } from '../utils/artworkStorage.ts'
+import { isDesktopApp } from '../utils/platform.ts'
 
 type MusicState = {
   tracks: Track[]
@@ -462,25 +463,34 @@ export const useMusicStore = create<MusicState>()(
     {
       name: 'resonance-playlists-v1',
       version: 1,
-      // Persist playlists, settings, and native persistent tracks
-      partialize: (state) => ({
-        tracks: sanitizeTracksForPersistence(
-          state.tracks.filter((track) => Boolean(track.filePath)),
-        ),
-        playlists: state.playlists,
-        activePlaylistId: state.activePlaylistId,
-        volume: state.volume,
-        shuffle: state.shuffle,
-        repeat: state.repeat,
-        themeMode: state.themeMode,
-        themePreset: state.themePreset,
-        accentColor: state.accentColor,
-        musicFolderPath: state.musicFolderPath,
-        coverFolderPath: state.coverFolderPath,
-        musicFolderName: state.musicFolderName,
-        coverFolderName: state.coverFolderName,
-        firstRunSetupCompleted: state.firstRunSetupCompleted,
-      }),
+      // Desktop libraries are persisted by desktopDatabase.ts. Keeping the full
+      // library out of Zustand's synchronous localStorage write avoids serializing
+      // thousands of tracks and artwork metadata on every store update.
+      // The browser build still persists its library for compatibility.
+      partialize: (state) => {
+        const preferences = {
+          volume: state.volume,
+          shuffle: state.shuffle,
+          repeat: state.repeat,
+          themeMode: state.themeMode,
+          themePreset: state.themePreset,
+          accentColor: state.accentColor,
+          musicFolderPath: state.musicFolderPath,
+          coverFolderPath: state.coverFolderPath,
+          musicFolderName: state.musicFolderName,
+          coverFolderName: state.coverFolderName,
+          firstRunSetupCompleted: state.firstRunSetupCompleted,
+        }
+        if (isDesktopApp()) return preferences
+        return {
+          ...preferences,
+          tracks: sanitizeTracksForPersistence(
+            state.tracks.filter((track) => Boolean(track.filePath)),
+          ),
+          playlists: state.playlists,
+          activePlaylistId: state.activePlaylistId,
+        }
+      },
     },
   ),
 )
