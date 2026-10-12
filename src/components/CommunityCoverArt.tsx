@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 import { Download, ExternalLink, ImageOff, LoaderCircle, RefreshCw, Shuffle } from 'lucide-react'
@@ -30,7 +30,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
   const configured = isAllowedArtworkApiUrl(API_URL)
 
   const categoryParam = category === 'all' ? '' : `&category=${category}`
-  const endpoint = useMemo(() => API_URL, [])
+  const endpoint = API_URL
 
   const loadCatalogue = useCallback(async (nextPage: number, replace = false) => {
     if (!configured) return
