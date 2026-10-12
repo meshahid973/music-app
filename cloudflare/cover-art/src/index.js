@@ -1,4 +1,4 @@
-import catalogue from "../catalog.json";
+import catalogue from "../catalog.json" with { type: "json" };
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const PAGE_SIZE_MAX = 30;
@@ -28,11 +28,16 @@ function publicEntry(entry, apiBase) {
 export function entriesFor(category, source = catalogue.artworks) {
   return source.filter((entry) =>
     (category === null || entry.category === category) &&
+    ["community", "album"].includes(entry.category) &&
     entry.redistributionAllowed === true &&
     ID_PATTERN.test(entry.id) &&
+    typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 160 &&
+    typeof entry.source === "string" && entry.source.trim().length > 0 &&
+    typeof entry.licence === "string" && entry.licence.trim().length > 0 &&
     ALLOWED_FORMATS.has(entry.format) &&
     typeof entry.objectKey === "string" &&
-    /^[a-zA-Z0-9/_-]+\.(png|jpe?g|webp)$/i.test(entry.objectKey)
+    /^[a-zA-Z0-9/_-]+\\.(png|jpe?g|webp)$/i.test(entry.objectKey) &&
+    (entry.fileSize === undefined || (Number.isInteger(entry.fileSize) && entry.fileSize > 0 && entry.fileSize <= MAX_IMAGE_BYTES))
   );
 }
 
