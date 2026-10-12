@@ -266,7 +266,6 @@ function App() {
         {activeSection === 'downloads' ? (
           <DownloadSection
             musicFolderPath={configuredMusicFolderPath}
-            musicFolderName={musicFolderName}
             isDesktop={isDesktop}
             onChooseMusicFolder={handleNativeMusicFolder}
             onRefreshLibrary={handleRescanMusicFolder}
