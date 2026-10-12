@@ -1053,6 +1053,12 @@ h3 {
   gap: 10px;
 }
 
+/* Virtual rows are absolutely positioned inside a spacer with the full list height. */
+.track-list-virtual {
+  position: relative;
+  display: block;
+}
+
 .track-row {
   /* Let Chromium/WebView2 skip layout and paint work for off-screen song rows. */
   content-visibility: auto;
