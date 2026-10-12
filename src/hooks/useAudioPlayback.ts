@@ -12,16 +12,14 @@ export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
   const playNextRef = useRef<() => void>(() => {})
   const [seek, setSeek] = useState(0)
 
-  const {
-    tracks,
-    currentTrackId,
-    isPlaying,
-    shuffle,
-    repeat,
-    volume,
-    setCurrentTrack,
-    setIsPlaying,
-  } = useMusicStore()
+  const tracks = useMusicStore((state) => state.tracks)
+  const currentTrackId = useMusicStore((state) => state.currentTrackId)
+  const isPlaying = useMusicStore((state) => state.isPlaying)
+  const shuffle = useMusicStore((state) => state.shuffle)
+  const repeat = useMusicStore((state) => state.repeat)
+  const volume = useMusicStore((state) => state.volume)
+  const setCurrentTrack = useMusicStore((state) => state.setCurrentTrack)
+  const setIsPlaying = useMusicStore((state) => state.setIsPlaying)
 
   const currentTrack = tracks.find((track) => track.id === currentTrackId)
   const currentAudioUrl = currentTrack?.audioUrl
