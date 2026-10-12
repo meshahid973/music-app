@@ -123,13 +123,16 @@ function App() {
     handleDrop,
   } = useLibraryImport()
 
-  // Existing libraries are never interrupted. New, empty desktop libraries see setup
-  // immediately after storage initialization; the dialog remains open during folder scans.
+  // Always ask for a Music folder if none is configured, even when a library was
+  // imported manually or an older saved setup flag says onboarding was completed.
+  // For existing libraries that already have a Music folder, keep the optional cover-art
+  // step limited to genuinely unfinished first-run setup so users who skipped it aren't nagged.
   const shouldShowFirstRunSetup =
     isDesktop &&
     isInitialized &&
-    !firstRunSetupCompleted &&
-    (tracks.length === 0 || isFirstRunSetupInProgress)
+    (!configuredMusicFolderPath ||
+      (!firstRunSetupCompleted && tracks.length === 0) ||
+      isFirstRunSetupInProgress)
   const visibleFirstRunStep =
     configuredMusicFolderPath && !isFirstRunSetupInProgress && firstRunSetupStep === 'music'
       ? 'covers'
