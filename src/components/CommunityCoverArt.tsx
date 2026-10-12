@@ -18,27 +18,25 @@ type GalleryResponse = { items: CommunityArtwork[]; page: number; total: number;
 type Status = { kind: 'info' | 'success' | 'error'; text: string } | null
 
 export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
+  const configured = isAllowedArtworkApiUrl(API_URL)
   const [category, setCategory] = useState<CoverArtCategory | 'all'>('all')
   const [artwork, setArtwork] = useState<CommunityArtwork | null>(null)
   const [items, setItems] = useState<CommunityArtwork[]>([])
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(configured)
   const [downloading, setDownloading] = useState(false)
   const [status, setStatus] = useState<Status>(null)
   const [error, setError] = useState<string | null>(null)
-  const configured = isAllowedArtworkApiUrl(API_URL)
 
   const categoryParam = category === 'all' ? '' : `&category=${category}`
   const endpoint = API_URL
 
   const loadCatalogue = useCallback(async (nextPage: number, replace = false) => {
     if (!configured) return
-    await Promise.resolve()
-    setLoading(true)
-    setError(null)
     try {
       const response = await fetch(`${endpoint}/api/artworks?page=${nextPage}&limit=12${categoryParam}`, { headers: { accept: 'application/json' } })
+      setError(null)
       if (!response.ok) throw new Error(response.status === 404 ? 'No artwork is available in this category yet.' : `Artwork service returned HTTP ${response.status}.`)
       const data = await response.json() as GalleryResponse
       if (!Array.isArray(data.items)) throw new Error('The artwork service returned an invalid catalogue.')
@@ -56,13 +54,11 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
 
   const chooseRandom = useCallback(async () => {
     if (!configured) return
-    await Promise.resolve()
-    setLoading(true)
-    setStatus(null)
-    setError(null)
     try {
       const suffix = category === 'all' ? '' : `?category=${category}`
       const response = await fetch(`${endpoint}/api/random${suffix}`, { headers: { accept: 'application/json' } })
+      setStatus(null)
+      setError(null)
       if (response.status === 404) { setArtwork(null); setError(null); return }
       if (!response.ok) throw new Error(`Artwork service returned HTTP ${response.status}.`)
       const data = await response.json() as { artwork?: CommunityArtwork }
@@ -140,6 +136,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
               setHasMore(false)
               setStatus(null)
               setError(null)
+              setLoading(true)
               setCategory(option.value)
             }
           }}>{option.label}</button>
@@ -147,7 +144,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
       </div>
 
       {!configured && <div className="community-art-message" role="status">The gallery is not configured yet. Set <code>VITE_COVER_ART_API_URL</code> to your deployed Cloudflare Worker URL, then rebuild Resonance.</div>}
-      {error && <div className="community-art-message error" role="alert">{error} <button type="button" onClick={() => { void loadCatalogue(1, true); void chooseRandom() }}>Retry</button></div>}
+      {error && <div className="community-art-message error" role="alert">{error} <button type="button" onClick={() => { setLoading(true); setError(null); void loadCatalogue(1, true); void chooseRandom() }}>Retry</button></div>}
 
       <div className="community-art-layout">
         <section className="community-art-feature" aria-label="Featured artwork">
@@ -156,8 +153,8 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
               <div className="community-art-placeholder">{loading ? <LoaderCircle className="community-art-spinner" size={28} /> : <ImageOff size={34} />}<span>{loading ? 'Finding artwork…' : 'No featured artwork'}</span></div>}
           </div>
           <div className="community-art-feature-actions">
-            <button type="button" className="community-art-primary" onClick={() => void chooseRandom()} disabled={!configured || loading}><Shuffle size={16} /> Random Cover</button>
-            <button type="button" onClick={() => void chooseRandom()} disabled={!configured || loading}><RefreshCw size={15} /> Try Another</button>
+            <button type="button" className="community-art-primary" onClick={() => { setLoading(true); setError(null); setStatus(null); void chooseRandom() }} disabled={!configured || loading}><Shuffle size={16} /> Random Cover</button>
+            <button type="button" onClick={() => { setLoading(true); setError(null); setStatus(null); void chooseRandom() }} disabled={!configured || loading}><RefreshCw size={15} /> Try Another</button>
           </div>
         </section>
 
@@ -177,7 +174,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
             {!isDesktop && <p className="community-art-note">Use the installed desktop app to save original artwork.</p>}
             {status && <p className={`community-art-status ${status.kind}`} role="status">{status.text}</p>}
             <p className="community-art-note"><ExternalLink size={13} /> Saved images remain separate from your music library.</p>
-          </> : <div className="community-art-empty-details"><h2>Find your next cover</h2><p>Choose a category and request a random image to explore the gallery.</p>{!loading && !error && configured && <button type="button" onClick={() => void chooseRandom()}>Explore artwork</button>}</div>}
+          </> : <div className="community-art-empty-details"><h2>Find your next cover</h2><p>Choose a category and request a random image to explore the gallery.</p>{!loading && !error && configured && <button type="button" onClick={() => { setLoading(true); setError(null); setStatus(null); void chooseRandom() }}>Explore artwork</button>}</div>}
         </section>
       </div>
 
@@ -186,7 +183,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
         {loading && items.length === 0 ? <div className="community-art-catalogue-empty"><LoaderCircle className="community-art-spinner" size={20} /> Loading catalogue…</div> :
           items.length ? <div className="community-art-grid">{items.map((item) => <button type="button" key={item.id} className={artwork?.id === item.id ? 'community-art-tile selected' : 'community-art-tile'} onClick={() => { setArtwork(item); setStatus(null); setError(null) }}><img src={item.imageUrl} alt="" loading="lazy" /><span>{item.title}</span><small>{label(item.category)}</small></button>)}</div> :
             <div className="community-art-catalogue-empty"><ImageOff size={22} /><span>{configured && !loading && !error ? 'No artwork has been published yet.' : 'The catalogue will appear here when available.'}</span></div>}
-        {hasMore && <button type="button" className="community-art-load-more" disabled={loading} onClick={() => void loadCatalogue(page + 1)}>{loading ? 'Loading…' : 'Load more'}</button>}
+        {hasMore && <button type="button" className="community-art-load-more" disabled={loading} onClick={() => { setLoading(true); void loadCatalogue(page + 1) }}>{loading ? 'Loading…' : 'Load more'}</button>}
       </section>
     </section>
   )
