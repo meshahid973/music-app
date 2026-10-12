@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { libraryId } from '../store/useMusicStore'
+import { libraryId } from '../store/useMusicStore.ts'
 import type { Playlist, Track } from '../types'
 
 export function getVisibleTracks(
