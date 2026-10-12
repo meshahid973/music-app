@@ -25,6 +25,7 @@ export function sanitizeArtworkFilename(title: string, format: CoverArtFormat): 
   const base = title
     .normalize('NFKC')
     .replace(/[<>:"\/\\|?*\u0000-\u001f]/g, '')
+    .replace(/^[.]+/g, '')
     .replace(/[. ]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -85,7 +86,7 @@ export function validateArtworkResponse(
     String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' &&
     String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP'
   if (!(expectedFormat === 'png' && isPng) && !(expectedFormat === 'jpeg' && isJpeg) && !(expectedFormat === 'webp' && isWebp)) {
-    return 'The downloaded bytes do not match a supported image file.'
+    return 'The downloaded bytes do not match the expected image format.'
   }
   return null
 }
