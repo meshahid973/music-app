@@ -1,9 +1,54 @@
 use serde_json::Value;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
+fn yt_dlp_executable(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    // Prefer a normal installation if the user already has yt-dlp on PATH.
+    if Command::new("yt-dlp").arg("--version").output().is_ok() {
+        return Ok(PathBuf::from("yt-dlp"));
+    }
+
+    // Otherwise, keep a private copy in Resonance's app data directory and
+    // install it automatically on first use.
+    let app_data = app.path().app_data_dir()
+        .map_err(|error| format!("Could not locate Resonance's app data folder: {error}"))?;
+    let tools_dir = app_data.join("tools");
+    fs::create_dir_all(&tools_dir)
+        .map_err(|error| format!("Could not prepare the downloader folder: {error}"))?;
+    let executable = tools_dir.join("yt-dlp.exe");
+
+    if executable.is_file() {
+        return Ok(executable);
+    }
+
+    let escaped_path = executable.to_string_lossy().replace('\'', "''");
+    let script = format!(
+        "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe' -OutFile '{escaped_path}'"
+    );
+    let result = Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", &script])
+        .output()
+        .map_err(|error| format!("Resonance could not download yt-dlp automatically: {error}. Check your internet connection and try again."))?;
+
+    if !result.status.success() || !executable.is_file() {
+        let _ = fs::remove_file(&executable);
+        let detail = String::from_utf8_lossy(&result.stderr);
+        let detail = detail.lines().rev().find(|line| !line.trim().is_empty())
+            .unwrap_or("The download did not complete.");
+        return Err(format!("Resonance could not install yt-dlp automatically: {detail} Check your internet connection and try again."));
+    }
+
+    Ok(executable)
+}
+
 #[tauri::command]
-fn download_audio(url: String, output_dir: String, format: String) -> Result<String, String> {
+fn download_audio(
+    app: tauri::AppHandle,
+    url: String,
+    output_dir: String,
+    format: String,
+) -> Result<String, String> {
     let url = url.trim();
     if !(url.starts_with("https://") || url.starts_with("http://")) {
         return Err("Enter a valid http:// or https:// URL.".into());
@@ -19,7 +64,8 @@ fn download_audio(url: String, output_dir: String, format: String) -> Result<Str
         return Err("That audio format is not supported.".into());
     }
 
-    let mut command = Command::new("yt-dlp");
+    let executable = yt_dlp_executable(&app)?;
+    let mut command = Command::new(executable);
     command
         .arg("--no-warnings")
         .arg("--no-playlist")
@@ -47,11 +93,7 @@ fn download_audio(url: String, output_dir: String, format: String) -> Result<Str
     }
 
     let result = command.arg(url).output().map_err(|error| {
-        if error.kind() == std::io::ErrorKind::NotFound {
-            "yt-dlp was not found. Install yt-dlp and make sure it is available on your Windows PATH, then restart Resonance.".to_string()
-        } else {
-            format!("Could not start yt-dlp: {error}")
-        }
+        format!("Could not start yt-dlp: {error}")
     })?;
 
     if !result.status.success() {
@@ -74,26 +116,21 @@ fn download_audio(url: String, output_dir: String, format: String) -> Result<Str
 }
 
 #[tauri::command]
-fn inspect_media_url(url: String) -> Result<String, String> {
+fn inspect_media_url(app: tauri::AppHandle, url: String) -> Result<String, String> {
     let url = url.trim();
     if !(url.starts_with("https://") || url.starts_with("http://")) {
         return Err("Enter a valid http:// or https:// URL.".into());
     }
 
-    let result = Command::new("yt-dlp")
+    let executable = yt_dlp_executable(&app)?;
+    let result = Command::new(executable)
         .arg("--dump-single-json")
         .arg("--no-warnings")
         .arg("--no-playlist")
         .arg("--skip-download")
         .arg(url)
         .output()
-        .map_err(|error| {
-            if error.kind() == std::io::ErrorKind::NotFound {
-                "yt-dlp was not found. Install it and make sure it is available on your Windows PATH.".to_string()
-            } else {
-                format!("Could not start yt-dlp: {error}")
-            }
-        })?;
+        .map_err(|error| format!("Could not start yt-dlp: {error}"))?;
 
     if !result.status.success() {
         let stderr = String::from_utf8_lossy(&result.stderr);
