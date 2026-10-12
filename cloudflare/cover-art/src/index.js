@@ -20,6 +20,13 @@ function responseJson(data, status = 200, origin = "*", extraHeaders = {}) {
   });
 }
 
+function validImageSignature(bytes, format) {
+  if (format === "png") return bytes.length >= 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((value, index) => bytes[index] === value);
+  if (format === "jpeg") return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (format === "webp") return bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+  return false;
+}
+
 function publicEntry(entry, apiBase) {
   const { objectKey, ...metadata } = entry;
   return { ...metadata, imageUrl: apiBase + "/api/images/" + entry.id };
@@ -128,7 +135,10 @@ export default {
         "access-control-allow-origin": origin,
       });
       if (request.method === "HEAD") return new Response(null, { status: 200, headers });
-      return new Response(object.body, { status: 200, headers });
+      const bytes = new Uint8Array(await object.arrayBuffer());
+      if (bytes.length > MAX_IMAGE_BYTES) return responseJson({ error: "image_too_large" }, 413, origin);
+      if (!validImageSignature(bytes, entry.format)) return responseJson({ error: "invalid_image_format" }, 415, origin);
+      return new Response(bytes, { status: 200, headers });
     }
 
     return responseJson({ error: "not_found" }, 404, origin);
