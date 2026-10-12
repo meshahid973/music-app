@@ -8,8 +8,8 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - run: npm install --no-audit --no-fund
@@ -20,8 +20,8 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - name: Install Rust stable
@@ -43,7 +43,7 @@ jobs:
           }
           ./scripts/windows-install-smoke.ps1 -InstallerPath $installer.FullName
       - name: Upload Windows desktop installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Resonance-Windows-Setup
           path: |
@@ -58,8 +58,8 @@ jobs:
       run:
         working-directory: cloudflare/cover-art
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - run: npm install --no-audit --no-fund
