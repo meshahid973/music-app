@@ -42,29 +42,29 @@ function App() {
   const [firstRunSetupStep, setFirstRunSetupStep] = useState<'music' | 'covers'>('music')
   const [firstRunBusyAction, setFirstRunBusyAction] = useState<'music' | 'covers' | null>(null)
 
-  const {
-    tracks,
-    playlists,
-    activePlaylistId,
-    isPlaying,
-    shuffle,
-    repeat,
-    themePreset,
-    accentColor,
-    volume,
-    isInitialized,
-    musicFolderPath: configuredMusicFolderPath,
-    firstRunSetupCompleted,
-    setFirstRunSetupCompleted,
-    initDesktopStorage,
-    setActivePlaylist,
-    addTrackToPlaylist,
-    removeTrackFromPlaylist,
-    toggleShuffle,
-    cycleRepeat,
-    setVolume,
-    updateTrack,
-  } = useMusicStore()
+  // Narrow subscriptions prevent unrelated store updates (for example volume or
+  // repeat changes) from forcing the whole application shell to rerender.
+  const tracks = useMusicStore((state) => state.tracks)
+  const playlists = useMusicStore((state) => state.playlists)
+  const activePlaylistId = useMusicStore((state) => state.activePlaylistId)
+  const isPlaying = useMusicStore((state) => state.isPlaying)
+  const shuffle = useMusicStore((state) => state.shuffle)
+  const repeat = useMusicStore((state) => state.repeat)
+  const themePreset = useMusicStore((state) => state.themePreset)
+  const accentColor = useMusicStore((state) => state.accentColor)
+  const volume = useMusicStore((state) => state.volume)
+  const isInitialized = useMusicStore((state) => state.isInitialized)
+  const configuredMusicFolderPath = useMusicStore((state) => state.musicFolderPath)
+  const firstRunSetupCompleted = useMusicStore((state) => state.firstRunSetupCompleted)
+  const setFirstRunSetupCompleted = useMusicStore((state) => state.setFirstRunSetupCompleted)
+  const initDesktopStorage = useMusicStore((state) => state.initDesktopStorage)
+  const setActivePlaylist = useMusicStore((state) => state.setActivePlaylist)
+  const addTrackToPlaylist = useMusicStore((state) => state.addTrackToPlaylist)
+  const removeTrackFromPlaylist = useMusicStore((state) => state.removeTrackFromPlaylist)
+  const toggleShuffle = useMusicStore((state) => state.toggleShuffle)
+  const cycleRepeat = useMusicStore((state) => state.cycleRepeat)
+  const setVolume = useMusicStore((state) => state.setVolume)
+  const updateTrack = useMusicStore((state) => state.updateTrack)
 
   // Initialize desktop local database storage on launch
   useEffect(() => {
