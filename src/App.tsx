@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { DownloadSection } from './components/DownloadSection'
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import './App.css'
@@ -38,6 +39,7 @@ function App() {
   const [editingTrack, setEditingTrack] = useState<Track | null>(null)
   const [playlistToAddSongs, setPlaylistToAddSongs] = useState<Playlist | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [activeSection, setActiveSection] = useState<'library' | 'downloads'>('library')
   const [isFirstRunSetupInProgress, setIsFirstRunSetupInProgress] = useState(false)
   const [firstRunSetupStep, setFirstRunSetupStep] = useState<'music' | 'covers'>('music')
   const [firstRunBusyAction, setFirstRunBusyAction] = useState<'music' | 'covers' | null>(null)
@@ -234,7 +236,9 @@ function App() {
         activePlaylistId={activePlaylistId}
         playlists={playlists}
         tracks={tracks}
-        onSelect={setActivePlaylist}
+        onSelect={(playlistId) => { setActiveSection('library'); setActivePlaylist(playlistId) }}
+        isDownloadsActive={activeSection === 'downloads'}
+        onOpenDownloads={() => setActiveSection('downloads')}
         onCreate={handleCreatePlaylist}
         onRenamePlaylist={setPlaylistToRename}
         onDeletePlaylist={setPlaylistToDelete}
@@ -259,6 +263,14 @@ function App() {
       />
 
       <section className="content">
+        {activeSection === 'downloads' ? (
+          <DownloadSection
+            musicFolderPath={configuredMusicFolderPath}
+            isDesktop={isDesktop}
+            onChooseMusicFolder={handleNativeMusicFolder}
+            onRefreshLibrary={handleRescanMusicFolder}
+          />
+        ) : <>
         <header className="topbar">
           <div>
             <AnimatePresence mode="wait" initial={false}>
@@ -371,6 +383,7 @@ function App() {
           onNativeMusicFolder={handleNativeMusicFolder}
           onNativeCoverFolder={handleNativeCoverFolder}
         />
+        </>}
       </section>
 
       <PlayerBar
