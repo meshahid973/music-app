@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { DownloadSection } from './components/DownloadSection'
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import './App.css'
 import {
   PencilFilled,
@@ -52,8 +51,6 @@ function App() {
   const isPlaying = useMusicStore((state) => state.isPlaying)
   const shuffle = useMusicStore((state) => state.shuffle)
   const repeat = useMusicStore((state) => state.repeat)
-  const themePreset = useMusicStore((state) => state.themePreset)
-  const accentColor = useMusicStore((state) => state.accentColor)
   const volume = useMusicStore((state) => state.volume)
   const isInitialized = useMusicStore((state) => state.isInitialized)
   const configuredMusicFolderPath = useMusicStore((state) => state.musicFolderPath)
@@ -229,8 +226,7 @@ function App() {
 
   return (
     <main
-      className={`app-shell theme-normal theme-preset-${themePreset}`}
-      style={{ '--user-accent': accentColor } as CSSProperties}
+      className="app-shell theme-normal"
       onContextMenu={(event) => event.preventDefault()}
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
@@ -248,11 +244,9 @@ function App() {
         onOpenAddToPlaylist={setPlaylistToAddSongs}
         playlistName={newPlaylistName}
         setPlaylistName={setNewPlaylistName}
-        onAddSongs={handleMusicFiles}
         onAddMusicFolder={handleMusicFolder}
         onAddCoverFolder={handleCoverFolder}
         isDesktop={isDesktop}
-        onNativeAddSongs={handleNativeAddSongs}
         onNativeMusicFolder={handleNativeMusicFolder}
         onNativeCoverFolder={handleNativeCoverFolder}
         onRescanMusicFolder={handleRescanMusicFolder}
