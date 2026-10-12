@@ -1,8 +1,7 @@
 use serde_json::Value;
 use tauri::Manager;
 use std::fs;
-use std::io::Write;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn yt_dlp_executable(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -147,137 +146,13 @@ fn inspect_media_url(app: tauri::AppHandle, url: String) -> Result<String, Strin
     Ok(serde_json::json!({ "title": title, "duration": duration }).to_string())
 }
 
-
-
-const MAX_COMMUNITY_ART_BYTES: usize = 15 * 1024 * 1024;
-
-fn valid_artwork_format(bytes: &[u8], format: &str) -> bool {
-    match format {
-        "png" => bytes.starts_with(&[137, 80, 78, 71, 13, 10, 26, 10]),
-        "jpeg" => bytes.starts_with(&[0xff, 0xd8, 0xff]),
-        "webp" => bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP",
-        _ => false,
-    }
-}
-
-#[tauri::command]
-async fn save_community_artwork(
-    api_url: String,
-    artwork_id: String,
-    destination: String,
-    expected_format: String,
-) -> Result<String, String> {
-    if artwork_id.is_empty()
-        || artwork_id.len() > 80
-        || !artwork_id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_' || c == b'-')
-        || !(artwork_id.as_bytes()[0].is_ascii_lowercase() || artwork_id.as_bytes()[0].is_ascii_digit())
-    {
-        return Err("The artwork ID is invalid.".into());
-    }
-    if !["png", "jpeg", "webp"].contains(&expected_format.as_str()) {
-        return Err("That image format is not supported.".into());
-    }
-
-    let parsed = reqwest::Url::parse(&api_url)
-        .map_err(|_| "The artwork API URL is invalid.".to_string())?;
-    let host = parsed.host_str().unwrap_or("");
-    let worker_host = parsed.scheme() == "https" && host.ends_with(".workers.dev") && parsed.port().is_none()
-        && parsed.username().is_empty() && parsed.password().is_none();
-    let local_dev_host = cfg!(debug_assertions)
-        && parsed.scheme() == "http"
-        && (host == "127.0.0.1" || host == "localhost");
-    if !(worker_host || local_dev_host)
-        || !matches!(parsed.path(), "" | "/")
-        || parsed.query().is_some()
-        || parsed.fragment().is_some()
-    {
-        return Err("Artwork downloads must come from the configured HTTPS Cloudflare Worker.".into());
-    }
-
-    let path = PathBuf::from(&destination);
-    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or("").to_ascii_lowercase();
-    let extension_matches = match expected_format.as_str() {
-        "png" => extension == "png",
-        "jpeg" => extension == "jpg" || extension == "jpeg",
-        "webp" => extension == "webp",
-        _ => false,
-    };
-    if !path.is_absolute() || path.components().any(|component| matches!(component, Component::ParentDir)) {
-        return Err("Choose an absolute save location without parent-directory segments.".into());
-    }
-    if !extension_matches || path.file_name().is_none() {
-        return Err("Choose a filename with the correct image extension.".into());
-    }
-
-    let image_url = format!("{}/api/images/{}", parsed.as_str().trim_end_matches('/'), artwork_id);
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(std::time::Duration::from_secs(45))
-        .build()
-        .map_err(|error| format!("Could not prepare the artwork download: {error}"))?;
-    let mut response = client.get(image_url).header("accept", "image/png,image/jpeg,image/webp").send().await
-        .map_err(|_| "Could not reach the artwork service. Check your internet connection.".to_string())?;
-    if response.status() == reqwest::StatusCode::NOT_FOUND {
-        return Err("This artwork is no longer available.".into());
-    }
-    if !response.status().is_success() {
-        return Err(format!("Artwork download failed (HTTP {}).", response.status().as_u16()));
-    }
-
-    let expected_mime = match expected_format.as_str() {
-        "png" => "image/png",
-        "jpeg" => "image/jpeg",
-        "webp" => "image/webp",
-        _ => unreachable!(),
-    };
-    let content_type = response.headers().get(reqwest::header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("")
-        .split(';').next().unwrap_or("").trim();
-    if content_type != expected_mime {
-        return Err("The artwork service returned an unexpected image format.".into());
-    }
-    if response.content_length().is_some_and(|length| length > MAX_COMMUNITY_ART_BYTES as u64) {
-        return Err("This image is larger than the 15 MiB download limit.".into());
-    }
-
-    let mut bytes = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|_| "The artwork download was interrupted.".to_string())? {
-        if bytes.len().saturating_add(chunk.len()) > MAX_COMMUNITY_ART_BYTES {
-            return Err("This image is larger than the 15 MiB download limit.".into());
-        }
-        bytes.extend_from_slice(&chunk);
-    }
-    if !valid_artwork_format(&bytes, &expected_format) {
-        return Err("The downloaded file is not a valid supported image signature.".into());
-    }
-
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path)
-        .map_err(|error| {
-            if error.kind() == std::io::ErrorKind::AlreadyExists {
-                "A file with that name already exists. Choose a different filename.".to_string()
-            } else {
-                format!("Could not save the image to the selected location: {error}")
-            }
-        })?;
-    if let Err(error) = file.write_all(&bytes) {
-        drop(file);
-        let _ = fs::remove_file(&path);
-        return Err(format!("Could not finish saving the artwork: {error}"));
-    }
-    Ok(path.to_string_lossy().into_owned())
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
-        .invoke_handler(tauri::generate_handler![download_audio, inspect_media_url, save_community_artwork])
+        .invoke_handler(tauri::generate_handler![download_audio, inspect_media_url])
         .run(tauri::generate_context!())
         .expect("error while running Resonance native music player");
 }

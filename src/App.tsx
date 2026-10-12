@@ -1,6 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { DownloadSection } from './components/DownloadSection'
-import { CommunityCoverArt } from './components/CommunityCoverArt'
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import {
@@ -39,7 +38,7 @@ function App() {
   const [editingTrack, setEditingTrack] = useState<Track | null>(null)
   const [playlistToAddSongs, setPlaylistToAddSongs] = useState<Playlist | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [activeSection, setActiveSection] = useState<'library' | 'downloads' | 'community-art'>('library')
+  const [activeSection, setActiveSection] = useState<'library' | 'downloads'>('library')
   const [isFirstRunSetupInProgress, setIsFirstRunSetupInProgress] = useState(false)
   const [firstRunSetupStep, setFirstRunSetupStep] = useState<'music' | 'covers'>('music')
   const [firstRunBusyAction, setFirstRunBusyAction] = useState<'music' | 'covers' | null>(null)
@@ -239,17 +238,17 @@ function App() {
         onSelect={(playlistId) => { setActiveSection('library'); setActivePlaylist(playlistId) }}
         isDownloadsActive={activeSection === 'downloads'}
         onOpenDownloads={() => setActiveSection('downloads')}
-        isCommunityArtActive={activeSection === 'community-art'}
-        onOpenCommunityArt={() => setActiveSection('community-art')}
         onCreate={handleCreatePlaylist}
         onRenamePlaylist={setPlaylistToRename}
         onDeletePlaylist={setPlaylistToDelete}
         onOpenAddToPlaylist={setPlaylistToAddSongs}
+        onAddSongs={handleMusicFiles}
         playlistName={newPlaylistName}
         setPlaylistName={setNewPlaylistName}
         onAddMusicFolder={handleMusicFolder}
         onAddCoverFolder={handleCoverFolder}
         isDesktop={isDesktop}
+        onNativeAddSongs={handleNativeAddSongs}
         onNativeMusicFolder={handleNativeMusicFolder}
         onNativeCoverFolder={handleNativeCoverFolder}
         onRescanMusicFolder={handleRescanMusicFolder}
@@ -263,9 +262,7 @@ function App() {
       />
 
       <section className="content">
-        {activeSection === 'community-art' ? (
-          <CommunityCoverArt isDesktop={isDesktop} />
-        ) : activeSection === 'downloads' ? (
+        {activeSection === 'downloads' ? (
           <DownloadSection
             musicFolderPath={configuredMusicFolderPath}
             isDesktop={isDesktop}

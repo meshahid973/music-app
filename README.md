@@ -28,12 +28,6 @@ npm run build
 npm run preview
 ```
 
-## Community Cover Art
-
-Community Cover Art is an optional, separate gallery. It never assigns artwork to tracks or edits audio files. To enable it, deploy the Worker described in [cloudflare/cover-art/README.md](cloudflare/cover-art/README.md), then set `VITE_COVER_ART_API_URL` to its HTTPS `workers.dev` URL in a local `.env.local` file or your release build environment. See [`.env.example`](.env.example) for the variable name. The gallery remains unavailable (without affecting playback) until configured, and the initial catalogue is intentionally empty until you upload artwork with documented redistribution rights.
-
-Downloads in the installed desktop app use a native Save As dialog and a native command that validates the image type and 15 MiB limit before creating a new file. Existing files are never silently overwritten, and downloaded images remain outside the music library.
-
 ## Building Windows `setup.exe` (Tauri Desktop)
 
 ### Option 1: Build locally on Windows
