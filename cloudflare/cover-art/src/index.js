@@ -94,8 +94,8 @@ export default {
 
     if (url.pathname === "/api/random") {
       if (!entries.length) return responseJson({ error: "catalogue_empty", message: "No artwork is available in this category yet." }, 404, origin);
-      const random = crypto.getRandomValues(new Uint32Array(1))[0] % entries.length;
-      return responseJson({ artwork: publicEntry(entries[random], url.origin) }, 200, origin);
+      const random = crypto.getRandomValues(new Uint32Array(1))[0] / 0x100000000;
+      return responseJson({ artwork: publicEntry(selectRandom(entries, random), url.origin) }, 200, origin);
     }
 
     if (url.pathname === "/api/artworks") {
@@ -107,9 +107,9 @@ export default {
       if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > PAGE_SIZE_MAX) {
         return responseJson({ error: "invalid_pagination" }, 400, origin);
       }
-      const start = (page - 1) * limit;
-      const selected = entries.slice(start, start + limit).map((entry) => publicEntry(entry, url.origin));
-      return responseJson({ page, limit, total: entries.length, items: selected, hasMore: start + selected.length < entries.length }, 200, origin);
+      const result = paginate(entries, page, limit);
+      result.items = result.items.map((entry) => publicEntry(entry, url.origin));
+      return responseJson(result, 200, origin);
     }
 
     const match = url.pathname.match(/^\/api\/images\/([a-z0-9][a-z0-9_-]{0,79})$/);
