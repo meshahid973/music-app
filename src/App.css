@@ -3435,3 +3435,48 @@ h3 {
 .download-note a { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; color: var(--text); font-size: 12px; text-decoration: none; }
 .download-note a:hover { text-decoration: underline; }
 @media (max-width: 620px) { .download-url-row { flex-direction: column; } .download-submit { min-height: 46px; } .download-page-header { gap: 12px; } .download-heading-icon { width: 44px; height: 44px; flex-basis: 44px; } }
+
+
+/* Reusable status banner component */
+.status-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.status-banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.status-banner-title {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+.status-banner-description {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.status-banner-success { color: #6ee7b7; }
+.status-banner-error { color: #fca5a5; }
+.status-banner-warning { color: #fcd34d; }
+.status-banner-info { color: var(--muted); }
+.status-banner-icon { display: inline-flex; flex: 0 0 auto; align-items: center; }
+.first-run-selected-folder .status-banner-content { flex: 1; }
+.first-run-selected-folder .status-banner-title { color: #d1fae5; }
+.first-run-selected-folder .status-banner-description {
+  max-width: 490px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .first-run-selected-folder .status-banner-description {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
