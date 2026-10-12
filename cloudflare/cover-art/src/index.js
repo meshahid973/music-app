@@ -46,12 +46,14 @@ function publicEntry(entry, apiBase) {
   };
 }
 
-export function entriesFor(category, source = catalogue.artworks) {
+export function entriesFor(category, source = (Array.isArray(catalogue.artworks) ? catalogue.artworks : [])) {
+  if (!Array.isArray(source)) return [];
   return source.filter((entry) =>
+    entry && typeof entry === "object" &&
     (category === null || entry.category === category) &&
     ["community", "album"].includes(entry.category) &&
     entry.redistributionAllowed === true &&
-    ID_PATTERN.test(entry.id) &&
+    typeof entry.id === "string" && ID_PATTERN.test(entry.id) &&
     typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 160 &&
     typeof entry.source === "string" && entry.source.trim().length > 0 &&
     typeof entry.licence === "string" && entry.licence.trim().length > 0 &&
@@ -108,7 +110,7 @@ export default {
     if (counts.size > 5000) counts.clear();
     if (count > 120) return responseJson({ error: "rate_limited", message: "Please wait before trying again." }, 429, origin, { "retry-after": "60" });
 
-    const catalogueEntries = Array.isArray(env.CATALOGUE_FOR_TESTS) ? env.CATALOGUE_FOR_TESTS : catalogue.artworks;
+    const catalogueEntries = Array.isArray(env.CATALOGUE_FOR_TESTS) ? env.CATALOGUE_FOR_TESTS : (Array.isArray(catalogue.artworks) ? catalogue.artworks : []);
     if (url.pathname === "/api/health") return responseJson({ ok: true, count: catalogueEntries.length }, 200, origin);
     const category = categoryFrom(url);
     if (category === "invalid") return responseJson({ error: "invalid_category" }, 400, origin);
@@ -138,7 +140,12 @@ export default {
     if (match) {
       const entry = entriesFor(null, catalogueEntries).find((item) => item.id === match[1]);
       if (!entry) return responseJson({ error: "image_not_found" }, 404, origin);
-      const object = await env.ARTWORK_BUCKET.get(entry.objectKey);
+      let object;
+      try {
+        object = await env.ARTWORK_BUCKET.get(entry.objectKey);
+      } catch {
+        return responseJson({ error: "image_storage_unavailable" }, 502, origin);
+      }
       if (!object) return responseJson({ error: "image_not_found" }, 404, origin);
       if (object.size > MAX_IMAGE_BYTES) return responseJson({ error: "image_too_large" }, 413, origin);
       const headers = new Headers({
@@ -150,7 +157,12 @@ export default {
         "access-control-allow-origin": origin,
       });
       if (request.method === "HEAD") return new Response(null, { status: 200, headers });
-      const bytes = new Uint8Array(await object.arrayBuffer());
+      let bytes;
+      try {
+        bytes = new Uint8Array(await object.arrayBuffer());
+      } catch {
+        return responseJson({ error: "image_read_failed" }, 502, origin);
+      }
       if (bytes.length > MAX_IMAGE_BYTES) return responseJson({ error: "image_too_large" }, 413, origin);
       if (!validImageSignature(bytes, entry.format)) return responseJson({ error: "invalid_image_format" }, 415, origin);
       return new Response(bytes, { status: 200, headers });
