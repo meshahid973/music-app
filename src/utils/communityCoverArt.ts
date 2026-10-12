@@ -31,7 +31,7 @@ export function sanitizeArtworkFilename(title: string, format: CoverArtFormat): 
     .trim()
     .slice(0, 100)
   let safe = base && base !== '.' && base !== '..' ? base : 'community-cover'
-  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(safe)) safe = '_' + safe
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(safe)) safe = '_' + safe
   return safe + '.' + (format === 'jpeg' ? 'jpg' : format)
 }
 
