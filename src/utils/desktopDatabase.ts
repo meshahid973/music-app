@@ -1,7 +1,7 @@
 import { BaseDirectory, exists, mkdir, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 import { isDesktopApp } from './platform.ts'
 import { hydrateTracksArtwork, sanitizeTracksForPersistence } from './artworkStorage.ts'
-import type { Playlist, RepeatMode, ThemeMode, ThemePreset, Track } from '../types.ts'
+import type { Playlist, RepeatMode, ThemeMode, Track } from '../types.ts'
 
 export interface DesktopLibraryPayload {
   version?: number
@@ -13,8 +13,6 @@ export interface DesktopLibraryPayload {
   shuffle: boolean
   repeat: RepeatMode
   themeMode?: ThemeMode
-  themePreset?: ThemePreset
-  accentColor?: string
   musicFolderPath?: string
   coverFolderPath?: string
   musicFolderName?: string
@@ -59,16 +57,6 @@ function normalizeTheme(_value: unknown): ThemeMode {
   return 'normal'
 }
 
-function normalizeThemePreset(value: unknown): ThemePreset | undefined {
-  return value === 'ocean' || value === 'violet' || value === 'forest' || value === 'midnight'
-    ? value
-    : undefined
-}
-
-function normalizeAccentColor(value: unknown): string | undefined {
-  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : undefined
-}
-
 function normalizeRepeat(value: unknown): RepeatMode {
   return value === 'one' || value === 'all' ? value : 'off'
 }
@@ -84,8 +72,6 @@ export function migrateDesktopLibraryPayload(raw: unknown): DesktopLibraryPayloa
   const shuffle = normalizeBoolean(raw.shuffle, false)
   const repeat = normalizeRepeat(raw.repeat)
   const themeMode = normalizeTheme(raw.themeMode)
-  const themePreset = normalizeThemePreset(raw.themePreset)
-  const accentColor = normalizeAccentColor(raw.accentColor)
   const firstRunSetupCompleted = normalizeBoolean(raw.firstRunSetupCompleted, tracks.length > 0)
 
   const payload: DesktopLibraryPayload = {
@@ -98,8 +84,6 @@ export function migrateDesktopLibraryPayload(raw: unknown): DesktopLibraryPayloa
     shuffle,
     repeat,
     themeMode,
-    themePreset,
-    accentColor,
     musicFolderPath: normalizeString(raw.musicFolderPath),
     coverFolderPath: normalizeString(raw.coverFolderPath),
     musicFolderName: normalizeString(raw.musicFolderName),
