@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  isAllowedArtworkApiUrl,
+  isAllowedArtworkApiUrl,\n  artworkLoadErrorMessage,\n  isSaveDialogCancelled,
   isArtworkId,
   sanitizeArtworkFilename,
   validateArtworkResponse,
@@ -31,4 +31,15 @@ test('download validation checks MIME, size and image signature', () => {
   assert.match(validateArtworkResponse(png, 'image/jpeg', 'jpeg') || '', /format/)
   assert.match(validateArtworkResponse(new Uint8Array(), 'image/png', 'png') || '', /empty/)
   assert.match(validateArtworkResponse(new Uint8Array(15 * 1024 * 1024 + 1), 'image/png', 'png') || '', /15 MiB/)
+})
+
+test('offline errors are described without affecting the local library', () => {
+  assert.match(artworkLoadErrorMessage(new TypeError('fetch failed')), /connection/)
+  assert.equal(artworkLoadErrorMessage(new Error('bad response')), 'bad response')
+})
+
+test('save dialog cancellation is a quiet no-op', () => {
+  assert.equal(isSaveDialogCancelled(null), true)
+  assert.equal(isSaveDialogCancelled(''), true)
+  assert.equal(isSaveDialogCancelled('C:\\\\Art\\\\cover.png'), false)
 })
