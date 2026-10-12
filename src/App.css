@@ -51,8 +51,8 @@
   padding: 28px 22px 140px;
   border-right: 1px solid var(--ambient-border, var(--line));
   background: rgba(14, 16, 17, 0.72);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow: inset -1px 0 20px var(--ambient-shadow, transparent);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -508,7 +508,7 @@ h3 {
   height: 100%;
   object-fit: cover;
   object-position: center;
-  filter: blur(38px) saturate(1.35) brightness(0.72);
+  filter: blur(20px) saturate(1.25) brightness(0.72);
   opacity: 0.72;
   transform: scale(1.18);
 }
@@ -523,8 +523,7 @@ h3 {
     rgba(10, 11, 12, 0.06) 48%,
     rgba(10, 11, 12, 0.22) 100%
   );
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+
 }
 
 .hero-banner-cover {
@@ -624,7 +623,6 @@ h3 {
     0 0 80px rgba(0, 0, 0, 0.16),
     inset 0 0 0 1.5px rgba(255, 255, 255, 0.22);
   transform-origin: 50% 50%;
-  will-change: transform;
   transform: translate3d(0, 0, 0);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -642,6 +640,7 @@ h3 {
 }
 
 .cd-disc.is-playing {
+  will-change: transform;
   animation-play-state: running;
 }
 
