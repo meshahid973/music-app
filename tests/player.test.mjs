@@ -21,8 +21,6 @@ import {
 } from '../src/utils/artworkStorage.ts'
 import { migrateDesktopLibraryPayload } from '../src/utils/desktopDatabase.ts'
 import { nativeTracksFromPaths, scanNativeDroppedPaths, scanNativeFolder } from '../src/utils/nativeFileSystem.ts'
-import { useMusicStore } from '../src/store/useMusicStore.ts'
-import { syncPlaylistQueue } from '../src/hooks/usePlaylistManager.ts'
 import { getVirtualListRange } from '../src/utils/virtualList.ts'
 import { processTrackEdit } from '../src/utils/trackEdit.ts'
 import fs from 'node:fs'
@@ -37,6 +35,9 @@ Object.defineProperty(globalThis, 'localStorage', {
     clear: () => localStorageStore.clear(),
   },
 })
+
+const { useMusicStore } = await import('../src/store/useMusicStore.ts')
+const { syncPlaylistQueue } = await import('../src/hooks/usePlaylistManager.ts')
 
 function fileInfo(path = 'album/song.mp3') {
   return { name: 'song.mp3', size: 123, lastModified: 42, webkitRelativePath: path }
