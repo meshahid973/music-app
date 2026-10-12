@@ -1,4 +1,5 @@
 use serde_json::Value;
+use tauri::Manager;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
