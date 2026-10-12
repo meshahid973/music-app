@@ -67,3 +67,12 @@ export function validateArtworkResponse(
   }
   return null
 }
+
+export function isSaveDialogCancelled(path: string | null): boolean {
+  return path === null || path.length === 0
+}
+
+export function artworkLoadErrorMessage(error: unknown): string {
+  if (error instanceof TypeError) return 'Could not reach the artwork service. Check your connection and try again.'
+  return error instanceof Error ? error.message : 'Could not load artwork.'
+}
