@@ -639,7 +639,7 @@ h3 {
     inset 0 0 0 1.5px rgba(255, 255, 255, 0.25);
 }
 
- .cd-disc.is-playing {
+.cd-disc.is-playing {
   will-change: transform;
   animation-play-state: running;
 }
