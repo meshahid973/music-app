@@ -161,7 +161,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
             <p className="community-art-creator">{creator}</p>
             <dl>
               <div><dt>Licence</dt><dd>{artwork.licence || 'Licence details not provided'}</dd></div>
-              <div><dt>Attribution</dt><dd>{artwork.attributionRequired ? (artwork.attribution || 'Attribution required; details unavailable') : 'Not specified as required'}</dd></div>
+              <div><dt>Attribution</dt><dd>{artwork.attributionRequired === true ? (artwork.attribution || 'Attribution required; details unavailable') : artwork.attributionRequired === false ? 'Not required by the supplied metadata' : 'Attribution status not specified'}</dd></div>
               <div><dt>Source</dt><dd>{artwork.source || 'Source not provided'}</dd></div>
               {artwork.width && artwork.height && <div><dt>Dimensions</dt><dd>{artwork.width} × {artwork.height}</dd></div>}
               {artwork.fileSize && <div><dt>File size</dt><dd>{(artwork.fileSize / 1024 / 1024).toFixed(2)} MiB</dd></div>}
