@@ -5,6 +5,8 @@ import { Download, ExternalLink, ImageOff, LoaderCircle, RefreshCw, Shuffle } fr
 import {
   isArtworkId,
   isAllowedArtworkApiUrl,
+  artworkLoadErrorMessage,
+  isSaveDialogCancelled,
   sanitizeArtworkFilename,
   type CommunityArtwork,
   type CoverArtCategory,
@@ -65,7 +67,8 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
     try {
       const suffix = category === 'all' ? '' : `?category=${category}`
       const response = await fetch(`${endpoint}/api/random${suffix}`, { headers: { accept: 'application/json' } })
-      if (!response.ok) throw new Error(response.status === 404 ? 'No artwork is available in this category yet.' : `Artwork service returned HTTP ${response.status}.`)
+      if (response.status === 404) { setArtwork(null); setError(null); return }
+      if (!response.ok) throw new Error(`Artwork service returned HTTP ${response.status}.`)
       const data = await response.json() as { artwork?: CommunityArtwork }
       const next = data.artwork
       if (!next || !isArtworkId(next.id) || typeof next.title !== 'string' ||
@@ -106,7 +109,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
         defaultPath: sanitizeArtworkFilename(artwork.title, artwork.format),
         filters: [{ name: 'Image', extensions: [artwork.format === 'jpeg' ? 'jpg' : artwork.format] }],
       })
-      if (!path) {
+      if (isSaveDialogCancelled(path)) {
         setStatus(null)
         return
       }
