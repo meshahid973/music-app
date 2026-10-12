@@ -136,7 +136,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
               setHasMore(false)
               setStatus(null)
               setError(null)
-              setLoading(true)
+              setLoading(configured)
               setCategory(option.value)
             }
           }}>{option.label}</button>
