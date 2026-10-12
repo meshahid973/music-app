@@ -17,6 +17,7 @@ import {
 import { favoritesId, libraryId } from '../store/useMusicStore'
 import { cleanDisplayTitle, formatTime } from '../utils/library'
 import type { Playlist, Track } from '../types'
+import { getVirtualListRange } from '../utils/virtualList.ts'
 
 export type TrackListProps = {
   tracks: Track[]
@@ -41,10 +42,6 @@ export type TrackListProps = {
 }
 
 const TRACK_ROW_HEIGHT = 86
-const TRACK_OVERSCAN = 8
-
-type VisibleRange = { start: number; end: number }
-
 export function TrackList({
   tracks,
   playlists,
@@ -66,7 +63,7 @@ export function TrackList({
   onNativeCoverFolder,
 }: TrackListProps) {
   const listRef = useRef<HTMLDivElement | null>(null)
-  const [visibleRange, setVisibleRange] = useState<VisibleRange>({ start: 0, end: 32 })
+  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 32 })
 
   const updateVisibleRange = useCallback(() => {
     const list = listRef.current
@@ -77,15 +74,17 @@ export function TrackList({
       scrollContainer.getBoundingClientRect().top +
       scrollContainer.scrollTop
     const relativeTop = Math.max(0, scrollContainer.scrollTop - listTop)
-    const start = Math.max(0, Math.floor(relativeTop / TRACK_ROW_HEIGHT) - TRACK_OVERSCAN)
-    const end = Math.min(
+    const nextRange = getVirtualListRange(
       tracks.length,
-      Math.ceil((relativeTop + scrollContainer.clientHeight) / TRACK_ROW_HEIGHT) +
-        TRACK_OVERSCAN,
+      relativeTop,
+      scrollContainer.clientHeight,
+      TRACK_ROW_HEIGHT,
     )
 
     setVisibleRange((current) =>
-      current.start === start && current.end === end ? current : { start, end },
+      current.start === nextRange.start && current.end === nextRange.end
+        ? current
+        : nextRange,
     )
   }, [tracks.length])
 
