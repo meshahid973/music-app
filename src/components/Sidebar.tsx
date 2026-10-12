@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import type { ChangeEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Download } from 'lucide-react'
+import { Download, Image as ImageIcon } from 'lucide-react'
 import {
   AudioLinesFilled,
   CheckFilled,
@@ -48,6 +48,8 @@ export type SidebarProps = {
   onOpenSettings?: () => void
   isDownloadsActive?: boolean
   onOpenDownloads?: () => void
+  isCommunityArtActive?: boolean
+  onOpenCommunityArt?: () => void
 }
 
 export function Sidebar({
@@ -78,6 +80,8 @@ export function Sidebar({
   onOpenSettings,
   isDownloadsActive = false,
   onOpenDownloads,
+  isCommunityArtActive = false,
+  onOpenCommunityArt,
 }: SidebarProps) {
   const musicInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
@@ -333,6 +337,17 @@ export function Sidebar({
             <RefreshFilled size={14} className={isScanningCovers ? 'spinning' : ''} />
           </button>
         </div>
+
+        <button
+          type="button"
+          className={`nav-item ${isCommunityArtActive ? 'active' : ''}`}
+          title="Explore community cover artwork"
+          aria-current={isCommunityArtActive ? 'page' : undefined}
+          onClick={onOpenCommunityArt}
+        >
+          <ImageIcon size={18} />
+          <span>Community Cover Art</span>
+        </button>
 
         <button
           type="button"
