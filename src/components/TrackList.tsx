@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties } from 'react'
 import {
   CloseFilled,
@@ -39,6 +40,11 @@ export type TrackListProps = {
   onNativeCoverFolder?: () => void
 }
 
+const TRACK_ROW_HEIGHT = 86
+const TRACK_OVERSCAN = 8
+
+type VisibleRange = { start: number; end: number }
+
 export function TrackList({
   tracks,
   playlists,
@@ -59,6 +65,54 @@ export function TrackList({
   onNativeMusicFolder,
   onNativeCoverFolder,
 }: TrackListProps) {
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const [visibleRange, setVisibleRange] = useState<VisibleRange>({ start: 0, end: 32 })
+
+  const updateVisibleRange = useCallback(() => {
+    const list = listRef.current
+    const scrollContainer = list?.closest<HTMLElement>('.content')
+    if (!list || !scrollContainer) return
+
+    const listTop = list.getBoundingClientRect().top -
+      scrollContainer.getBoundingClientRect().top +
+      scrollContainer.scrollTop
+    const relativeTop = Math.max(0, scrollContainer.scrollTop - listTop)
+    const start = Math.max(0, Math.floor(relativeTop / TRACK_ROW_HEIGHT) - TRACK_OVERSCAN)
+    const end = Math.min(
+      tracks.length,
+      Math.ceil((relativeTop + scrollContainer.clientHeight) / TRACK_ROW_HEIGHT) +
+        TRACK_OVERSCAN,
+    )
+
+    setVisibleRange((current) =>
+      current.start === start && current.end === end ? current : { start, end },
+    )
+  }, [tracks.length])
+
+  useEffect(() => {
+    const list = listRef.current
+    const scrollContainer = list?.closest<HTMLElement>('.content')
+    if (!list || !scrollContainer) return
+
+    let frame = 0
+    const scheduleUpdate = () => {
+      if (frame) cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        updateVisibleRange()
+      })
+    }
+
+    scrollContainer.addEventListener('scroll', scheduleUpdate, { passive: true })
+    window.addEventListener('resize', scheduleUpdate)
+    scheduleUpdate()
+    return () => {
+      scrollContainer.removeEventListener('scroll', scheduleUpdate)
+      window.removeEventListener('resize', scheduleUpdate)
+      if (frame) cancelAnimationFrame(frame)
+    }
+  }, [activePlaylistId, updateVisibleRange])
+
   const favoritesPlaylist = playlists.find((p) => p.id === favoritesId)
   const favoriteTrackIds = new Set(favoritesPlaylist?.trackIds ?? [])
 
@@ -173,19 +227,28 @@ export function TrackList({
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={activePlaylistId}
-        className="track-list"
+        ref={listRef}
+        className="track-list track-list-virtual"
+        style={{ height: Math.max(0, tracks.length * TRACK_ROW_HEIGHT - 10) }}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -6 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       >
-        {tracks.map((track) => {
+        {tracks.slice(visibleRange.start, visibleRange.end).map((track, offset) => {
+          const index = visibleRange.start + offset
           const isFavorited = favoriteTrackIds.has(track.id)
           return (
             <motion.article
               className={currentTrackId === track.id ? 'track-row active' : 'track-row'}
               key={track.id}
-              // Keep rows lightweight: the list can contain thousands of tracks.
+              style={{
+                position: 'absolute',
+                top: index * TRACK_ROW_HEIGHT,
+                left: 0,
+                right: 0,
+                height: TRACK_ROW_HEIGHT - 10,
+              }}
               onClick={() => onPlay(track.id)}
               role="button"
               tabIndex={0}
