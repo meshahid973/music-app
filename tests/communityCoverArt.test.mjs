@@ -14,9 +14,9 @@ test('artwork IDs reject traversal and unsafe characters', () => {
 })
 
 test('filename sanitization removes Windows path and reserved characters', () => {
-  assert.equal(sanitizeArtworkFilename('../A:B? *', 'jpeg'), 'ABC .jpg')
+  assert.equal(sanitizeArtworkFilename('../A:B? *', 'jpeg'), 'AB.jpg')
   assert.equal(sanitizeArtworkFilename('...', 'webp'), 'community-cover.webp')
-  assert.equal(sanitizeArtworkFilename('CON', 'png'), 'CON.png')
+  assert.equal(sanitizeArtworkFilename('CON', 'png'), '_CON.png')
 })
 
 test('API URL accepts HTTPS workers.dev only', () => {
