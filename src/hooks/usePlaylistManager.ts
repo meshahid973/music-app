@@ -91,17 +91,17 @@ export function usePlaylistManager() {
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null)
   const [playlistToRename, setPlaylistToRename] = useState<Playlist | null>(null)
 
-  const {
-    tracks,
-    playlists,
-    activePlaylistId,
-    currentTrackId,
-    isPlaying,
-    createPlaylist,
-    deletePlaylist,
-    renamePlaylist,
-    setCurrentTrack,
-  } = useMusicStore()
+  // Subscribe only to the store slices this hook needs. The former whole-store
+  // subscription rerendered queue management on unrelated changes such as volume.
+  const tracks = useMusicStore((state) => state.tracks)
+  const playlists = useMusicStore((state) => state.playlists)
+  const activePlaylistId = useMusicStore((state) => state.activePlaylistId)
+  const currentTrackId = useMusicStore((state) => state.currentTrackId)
+  const isPlaying = useMusicStore((state) => state.isPlaying)
+  const createPlaylist = useMusicStore((state) => state.createPlaylist)
+  const deletePlaylist = useMusicStore((state) => state.deletePlaylist)
+  const renamePlaylist = useMusicStore((state) => state.renamePlaylist)
+  const setCurrentTrack = useMusicStore((state) => state.setCurrentTrack)
 
   const activePlaylist = playlists.find((playlist) => playlist.id === activePlaylistId)
 
