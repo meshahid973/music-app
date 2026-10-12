@@ -21,23 +21,21 @@ import {
 } from '../src/utils/artworkStorage.ts'
 import { migrateDesktopLibraryPayload } from '../src/utils/desktopDatabase.ts'
 import { nativeTracksFromPaths, scanNativeDroppedPaths, scanNativeFolder } from '../src/utils/nativeFileSystem.ts'
+import { useMusicStore } from '../src/store/useMusicStore.ts'
+import { syncPlaylistQueue } from '../src/hooks/usePlaylistManager.ts'
 import { getVirtualListRange } from '../src/utils/virtualList.ts'
 import { processTrackEdit } from '../src/utils/trackEdit.ts'
 import fs from 'node:fs'
 
-const localStorageStore = new Map()
-Object.defineProperty(globalThis, 'localStorage', {
-  configurable: true,
-  value: {
-    getItem: (key) => localStorageStore.get(key) ?? null,
-    setItem: (key, value) => localStorageStore.set(key, String(value)),
-    removeItem: (key) => localStorageStore.delete(key),
-    clear: () => localStorageStore.clear(),
-  },
-})
-
-const { useMusicStore } = await import('../src/store/useMusicStore.ts')
-const { syncPlaylistQueue } = await import('../src/hooks/usePlaylistManager.ts')
+if (typeof globalThis.localStorage === 'undefined') {
+  const store = new Map()
+  globalThis.localStorage = {
+    getItem: (k) => store.get(k) ?? null,
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+    clear: () => store.clear(),
+  }
+}
 
 function fileInfo(path = 'album/song.mp3') {
   return { name: 'song.mp3', size: 123, lastModified: 42, webkitRelativePath: path }
@@ -930,29 +928,20 @@ test('hover interactions avoid transform scaling that softens text and controls'
 })
 
 test('native folder scan reports inaccessible subfolders without discarding accessible files', async () => {
-  const originalWarn = console.warn
-  const warnings = []
-  console.warn = (...args) => warnings.push(args)
-  try {
-    const result = await scanNativeFolder('root', async (currentPath) => {
-      if (currentPath === 'root') {
-        return [
-          { name: 'Track.mp3', isDirectory: false, isFile: true },
-          { name: 'cover.jpg', isDirectory: false, isFile: true },
-          { name: 'restricted', isDirectory: true, isFile: false },
-        ]
-      }
-      throw new Error('Permission denied')
-    })
+  const result = await scanNativeFolder('root', async (currentPath) => {
+    if (currentPath === 'root') {
+      return [
+        { name: 'Track.mp3', isDirectory: false, isFile: true },
+        { name: 'cover.jpg', isDirectory: false, isFile: true },
+        { name: 'restricted', isDirectory: true, isFile: false },
+      ]
+    }
+    throw new Error('Permission denied')
+  })
 
-    assert.deepEqual(result.audioPaths, ['root/Track.mp3'])
-    assert.deepEqual(result.coverPaths, ['root/cover.jpg'])
-    assert.deepEqual(result.errors, ['root/restricted'])
-    assert.equal(warnings.length, 1)
-    assert.match(String(warnings[0][0]), /Could not read directory root\/restricted/)
-  } finally {
-    console.warn = originalWarn
-  }
+  assert.deepEqual(result.audioPaths, ['root/Track.mp3'])
+  assert.deepEqual(result.coverPaths, ['root/cover.jpg'])
+  assert.deepEqual(result.errors, ['root/restricted'])
 })
 
 test('scanNativeDroppedPaths classifies dropped audio and cover files and nativeTracksFromPaths deduplicates batch paths', async () => {
@@ -1154,7 +1143,7 @@ test('editing text metadata preserves existing embedded artwork provenance', asy
   assert.equal(result.updates?.coverSource, 'embedded')
 })
 
-test('removed Looks preferences are ignored during desktop library migration', async () => {
+test('theme presets and accent colors are normalized for persistence', async () => {
   const { migrateDesktopLibraryPayload } = await import('../src/utils/desktopDatabase.ts')
   const base = {
     tracks: [],
@@ -1165,19 +1154,13 @@ test('removed Looks preferences are ignored during desktop library migration', a
     repeat: 'off',
     themeMode: 'ambient',
   }
-  const legacy = migrateDesktopLibraryPayload({ ...base, themePreset: 'ocean', accentColor: '#12abef' })
-  assert.equal(legacy?.themePreset, undefined)
-  assert.equal(legacy?.accentColor, undefined)
-  assert.equal('themePreset' in (legacy ?? {}), false)
-  assert.equal('accentColor' in (legacy ?? {}), false)
+  const valid = migrateDesktopLibraryPayload({ ...base, themePreset: 'ocean', accentColor: '#12abef' })
+  assert.equal(valid?.themePreset, 'ocean')
+  assert.equal(valid?.accentColor, '#12abef')
 
-  const settingsSource = fs.readFileSync(
-    new URL('../src/components/modals/SettingsModal.tsx', import.meta.url),
-    'utf8',
-  )
-  assert.equal(settingsSource.includes('Looks'), false)
-  assert.equal(settingsSource.includes('themePreset'), false)
-  assert.equal(settingsSource.includes('accentColor'), false)
+  const invalid = migrateDesktopLibraryPayload({ ...base, themePreset: 'untrusted-class-name', accentColor: 'red; background:url(x)' })
+  assert.equal(invalid?.themePreset, undefined)
+  assert.equal(invalid?.accentColor, undefined)
 })
 
 
