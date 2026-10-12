@@ -34,6 +34,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
 
   const loadCatalogue = useCallback(async (nextPage: number, replace = false) => {
     if (!configured) return
+    await Promise.resolve()
     setLoading(true)
     setError(null)
     try {
@@ -55,6 +56,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
 
   const chooseRandom = useCallback(async () => {
     if (!configured) return
+    await Promise.resolve()
     setLoading(true)
     setStatus(null)
     setError(null)
