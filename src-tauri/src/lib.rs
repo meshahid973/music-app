@@ -2,7 +2,7 @@ use serde_json::Value;
 use tauri::Manager;
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
 fn yt_dlp_executable(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -181,7 +181,8 @@ async fn save_community_artwork(
     let parsed = reqwest::Url::parse(&api_url)
         .map_err(|_| "The artwork API URL is invalid.".to_string())?;
     let host = parsed.host_str().unwrap_or("");
-    let worker_host = parsed.scheme() == "https" && host.ends_with(".workers.dev");
+    let worker_host = parsed.scheme() == "https" && host.ends_with(".workers.dev") && parsed.port().is_none()
+        && parsed.username().is_empty() && parsed.password().is_none();
     let local_dev_host = cfg!(debug_assertions)
         && parsed.scheme() == "http"
         && (host == "127.0.0.1" || host == "localhost");
@@ -201,6 +202,9 @@ async fn save_community_artwork(
         "webp" => extension == "webp",
         _ => false,
     };
+    if !path.is_absolute() || path.components().any(|component| matches!(component, Component::ParentDir)) {
+        return Err("Choose an absolute save location without parent-directory segments.".into());
+    }
     if !extension_matches || path.file_name().is_none() {
         return Err("Choose a filename with the correct image extension.".into());
     }
