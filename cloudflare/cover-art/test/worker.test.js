@@ -33,9 +33,9 @@ test("unsupported methods are rejected", async () => {
 });
 
 const fixture = [
-  { id: "community-a", category: "community", format: "png", objectKey: "community/a.png", redistributionAllowed: true },
-  { id: "album-a", category: "album", format: "jpeg", objectKey: "album/a.jpg", redistributionAllowed: true },
-  { id: "community-b", category: "community", format: "webp", objectKey: "community/b.webp", redistributionAllowed: true },
+  { id: "community-a", title: "Community A", source: "Test fixture", licence: "Test permission", category: "community", format: "png", objectKey: "community/a.png", redistributionAllowed: true },
+  { id: "album-a", title: "Album A", source: "Test fixture", licence: "Test permission", category: "album", format: "jpeg", objectKey: "album/a.jpg", redistributionAllowed: true },
+  { id: "community-b", title: "Community B", source: "Test fixture", licence: "Test permission", category: "community", format: "webp", objectKey: "community/b.webp", redistributionAllowed: true },
 ];
 
 test("category filtering only returns permitted entries in the requested category", () => {
