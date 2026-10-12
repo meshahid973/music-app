@@ -8,10 +8,13 @@ export function getVisibleTracks(
   activePlaylist: Playlist | undefined,
   query: string,
 ): Track[] {
+  // Build membership once per filter calculation rather than scanning the
+  // playlist array for every track. This matters for large libraries/playlists.
+  const playlistTrackIds = new Set(activePlaylist?.trackIds ?? [])
   const playlistTracks =
     activePlaylistId === libraryId
       ? tracks
-      : tracks.filter((track) => activePlaylist?.trackIds.includes(track.id))
+      : tracks.filter((track) => playlistTrackIds.has(track.id))
   const normalizedQuery = query.trim().toLowerCase()
 
   if (!normalizedQuery) return playlistTracks
