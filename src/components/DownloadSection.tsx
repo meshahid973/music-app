@@ -31,17 +31,19 @@ export function DownloadSection({
   const [format, setFormat] = useState<AudioFormat>('best')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null)
-  const [lastDownloaded, setLastDownloaded] = useState('')
+  const [downloadedPaths, setDownloadedPaths] = useState<string[]>([])
 
   const handleDownload = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const trimmedUrl = url.trim()
-    if (!trimmedUrl) {
-      setMessage({ type: 'error', text: 'Paste a video or media URL first.' })
+    // Accept one URL per line, or URLs separated by whitespace.
+    const links = url.split(/\s+/).map((item) => item.trim()).filter(Boolean)
+    if (!links.length) {
+      setMessage({ type: 'error', text: 'Paste one or more media URLs first.' })
       return
     }
-    if (!/^https?:\/\//i.test(trimmedUrl)) {
-      setMessage({ type: 'error', text: 'Enter a valid URL starting with http:// or https://.' })
+    const invalid = links.find((link) => !/^https?:\/\//i.test(link))
+    if (invalid) {
+      setMessage({ type: 'error', text: `This doesn't look like a valid URL: ${invalid}` })
       return
     }
     if (!isDesktop) {
@@ -54,58 +56,83 @@ export function DownloadSection({
     }
 
     setBusy(true)
-    setMessage({ type: 'info', text: 'Preparing audio download…' })
-    setLastDownloaded('')
+    setDownloadedPaths([])
+    const savedPaths: string[] = []
+    const failures: string[] = []
     try {
-      const savedPath = await invoke<string>('download_audio', {
-        url: trimmedUrl,
-        outputDir: musicFolderPath,
-        format,
-      })
-      setLastDownloaded(savedPath)
-      setUrl('')
-      setMessage({ type: 'success', text: 'Download complete. Updating your library…' })
-      await onRefreshLibrary()
-      setMessage({ type: 'success', text: 'Downloaded and added to your Resonance library.' })
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: typeof error === 'string' ? error : 'Download failed. Check the URL and downloader setup, then try again.',
-      })
+      for (let index = 0; index < links.length; index += 1) {
+        setMessage({
+          type: 'info',
+          text: `Downloading ${index + 1} of ${links.length}… The first run may also set up yt-dlp automatically.`,
+        })
+        try {
+          const savedPath = await invoke<string>('download_audio', {
+            url: links[index],
+            outputDir: musicFolderPath,
+            format,
+          })
+          savedPaths.push(savedPath)
+          setDownloadedPaths([...savedPaths])
+        } catch (error) {
+          failures.push(`Link ${index + 1}: ${typeof error === 'string' ? error : 'Download failed.'}`)
+        }
+      }
+
+      if (savedPaths.length) {
+        try {
+          await onRefreshLibrary()
+        } catch {
+          // The files are already downloaded; keep their successful status visible.
+        }
+      }
+
+      if (failures.length === 0) {
+        setUrl('')
+        setMessage({
+          type: 'success',
+          text: `All ${savedPaths.length} download${savedPaths.length === 1 ? '' : 's'} complete and added to your library.`,
+        })
+      } else {
+        setMessage({
+          type: 'error',
+          text: `${savedPaths.length} of ${links.length} downloaded. ${failures.join(' · ')}`,
+        })
+      }
     } finally {
       setBusy(false)
     }
   }
+
+  const linkCount = url.trim() ? url.trim().split(/\s+/).filter(Boolean).length : 0
 
   return (
     <section className="download-page">
       <header className="download-page-header">
         <div className="download-heading-icon"><Download size={22} /></div>
         <div>
-          <p className="eyebrow">RESonance · DOWNLOADS</p>
+          <p className="eyebrow">RESONANCE · DOWNLOADS</p>
           <h1>Download audio</h1>
-          <p className="download-subtitle">Save audio from supported media URLs directly to your local library.</p>
+          <p className="download-subtitle">Paste one link or a whole list. Audio is saved directly to your local library.</p>
         </div>
       </header>
 
       <form className="download-card" onSubmit={handleDownload}>
-        <label className="download-field-label" htmlFor="download-url">Media URL</label>
-        <div className="download-url-row">
-          <input
-            id="download-url"
-            className="download-url-input"
-            type="url"
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-            placeholder="Paste a video or media link…"
-            autoComplete="url"
-            disabled={busy}
-          />
-          <button className="download-submit" type="submit" disabled={busy || !url.trim()}>
-            {busy ? <LoaderCircle size={17} className="download-spinner" /> : <Download size={17} />}
-            <span>{busy ? 'Downloading…' : 'Download'}</span>
-          </button>
-        </div>
+        <label className="download-field-label" htmlFor="download-url">Media URLs</label>
+        <textarea
+          id="download-url"
+          className="download-url-input download-url-textarea"
+          value={url}
+          onChange={(event) => setUrl(event.target.value)}
+          placeholder={'Paste one or more links, one per line…\nhttps://…\nhttps://…'}
+          autoComplete="off"
+          rows={4}
+          disabled={busy}
+        />
+        <div className="download-url-hint">Multiple links are downloaded one by one, in order.</div>
+        <button className="download-submit download-submit-full" type="submit" disabled={busy || !url.trim()}>
+          {busy ? <LoaderCircle size={17} className="download-spinner" /> : <Download size={17} />}
+          <span>{busy ? 'Downloading queue…' : `Download ${linkCount} link${linkCount === 1 ? '' : 's'}`}</span>
+        </button>
 
         <label className="download-field-label" htmlFor="download-format">Audio format</label>
         <div className="download-format-wrap">
@@ -134,19 +161,19 @@ export function DownloadSection({
             {message.text}
           </div>
         )}
-        {lastDownloaded && (
+        {downloadedPaths.length > 0 && (
           <div className="download-completed-file">
-            <span>Saved file</span>
-            <code title={lastDownloaded}>{lastDownloaded}</code>
+            <span>Downloaded files ({downloadedPaths.length})</span>
+            {downloadedPaths.map((path) => <code key={path} title={path}>{path}</code>)}
           </div>
         )}
       </form>
 
       <div className="download-note">
         <strong>Powered by yt-dlp</strong>
-        <p>Downloads run locally on your PC. The best-audio option keeps the source audio stream; MP3 and other converted formats require FFmpeg to be installed alongside yt-dlp.</p>
+        <p>Resonance sets up yt-dlp automatically the first time you download. The best-audio option keeps the source audio stream; MP3 and other converted formats require FFmpeg to be installed separately.</p>
         <a href="https://github.com/yt-dlp/yt-dlp#installation" target="_blank" rel="noreferrer">
-          yt-dlp setup instructions <ExternalLink size={13} />
+          yt-dlp project and setup instructions <ExternalLink size={13} />
         </a>
       </div>
     </section>
