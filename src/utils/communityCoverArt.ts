@@ -24,7 +24,7 @@ const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,79}$/
 export function sanitizeArtworkFilename(title: string, format: CoverArtFormat): string {
   const base = title
     .normalize('NFKC')
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
+    .replace(/[<>:"\/\\|?*\u0000-\u001f]/g, '')
     .replace(/[. ]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim()
