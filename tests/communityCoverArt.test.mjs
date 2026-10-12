@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  isAllowedArtworkApiUrl,\n  artworkLoadErrorMessage,\n  isSaveDialogCancelled,
+  isAllowedArtworkApiUrl,
+  artworkLoadErrorMessage,
+  isSaveDialogCancelled,
   isArtworkId,
   sanitizeArtworkFilename,
   validateArtworkResponse,
