@@ -61,11 +61,11 @@ test("pagination returns bounded slices and correct hasMore metadata", () => {
 
 test("image endpoint rejects oversized R2 objects and invalid image signatures", async () => {
   const listed = fixture[0];
-  const oversizedEnv = { ...env, ARTWORK_BUCKET: { get: async () => ({ size: 15 * 1024 * 1024 + 1 }) } };
+  const oversizedEnv = { ...env, CATALOGUE_FOR_TESTS: fixture, ARTWORK_BUCKET: { get: async () => ({ size: 15 * 1024 * 1024 + 1 }) } };
   const tooLarge = await worker.fetch(new Request("https://worker.test/api/images/" + listed.id), oversizedEnv);
   assert.equal(tooLarge.status, 413);
 
-  const invalidEnv = { ...env, ARTWORK_BUCKET: { get: async () => ({
+  const invalidEnv = { ...env, CATALOGUE_FOR_TESTS: fixture, ARTWORK_BUCKET: { get: async () => ({
     size: 4,
     arrayBuffer: async () => Uint8Array.from([1, 2, 3, 4]).buffer,
   }) } };
