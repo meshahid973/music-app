@@ -23,6 +23,7 @@ import { migrateDesktopLibraryPayload } from '../src/utils/desktopDatabase.ts'
 import { nativeTracksFromPaths, scanNativeDroppedPaths, scanNativeFolder } from '../src/utils/nativeFileSystem.ts'
 import { useMusicStore } from '../src/store/useMusicStore.ts'
 import { syncPlaylistQueue } from '../src/hooks/usePlaylistManager.ts'
+import { getVirtualListRange } from '../src/utils/virtualList.ts'
 import { processTrackEdit } from '../src/utils/trackEdit.ts'
 import fs from 'node:fs'
 
@@ -39,6 +40,14 @@ if (typeof globalThis.localStorage === 'undefined') {
 function fileInfo(path = 'album/song.mp3') {
   return { name: 'song.mp3', size: 123, lastModified: 42, webkitRelativePath: path }
 }
+
+test('virtual list range stays bounded and includes visible rows plus overscan', () => {
+  assert.deepEqual(getVirtualListRange(1000, 0, 500), { start: 0, end: 14 })
+  assert.deepEqual(getVirtualListRange(1000, 8600, 500), { start: 92, end: 114 })
+  assert.deepEqual(getVirtualListRange(10, 999999, 500), { start: 10, end: 10 })
+  assert.deepEqual(getVirtualListRange(0, 0, 500), { start: 0, end: 0 })
+  assert.deepEqual(getVirtualListRange(10, -100, -1), { start: 0, end: 8 })
+})
 
 test('playlist filtering keeps only playlist members and search still applies', () => {
   const tracks = [
