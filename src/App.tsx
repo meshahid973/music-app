@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { DownloadSection } from './components/DownloadSection'
-import { CommunityCoverArt } from './components/CommunityCoverArt'
 import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import './App.css'
 import {
   PencilFilled,
@@ -39,7 +39,7 @@ function App() {
   const [editingTrack, setEditingTrack] = useState<Track | null>(null)
   const [playlistToAddSongs, setPlaylistToAddSongs] = useState<Playlist | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [activeSection, setActiveSection] = useState<'library' | 'downloads' | 'community-art'>('library')
+  const [activeSection, setActiveSection] = useState<'library' | 'downloads'>('library')
   const [isFirstRunSetupInProgress, setIsFirstRunSetupInProgress] = useState(false)
   const [firstRunSetupStep, setFirstRunSetupStep] = useState<'music' | 'covers'>('music')
   const [firstRunBusyAction, setFirstRunBusyAction] = useState<'music' | 'covers' | null>(null)
@@ -52,6 +52,8 @@ function App() {
   const isPlaying = useMusicStore((state) => state.isPlaying)
   const shuffle = useMusicStore((state) => state.shuffle)
   const repeat = useMusicStore((state) => state.repeat)
+  const themePreset = useMusicStore((state) => state.themePreset)
+  const accentColor = useMusicStore((state) => state.accentColor)
   const volume = useMusicStore((state) => state.volume)
   const isInitialized = useMusicStore((state) => state.isInitialized)
   const configuredMusicFolderPath = useMusicStore((state) => state.musicFolderPath)
@@ -227,7 +229,8 @@ function App() {
 
   return (
     <main
-      className="app-shell theme-normal"
+      className={`app-shell theme-normal theme-preset-${themePreset}`}
+      style={{ '--user-accent': accentColor } as CSSProperties}
       onContextMenu={(event) => event.preventDefault()}
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
@@ -239,17 +242,17 @@ function App() {
         onSelect={(playlistId) => { setActiveSection('library'); setActivePlaylist(playlistId) }}
         isDownloadsActive={activeSection === 'downloads'}
         onOpenDownloads={() => setActiveSection('downloads')}
-        isCommunityArtActive={activeSection === 'community-art'}
-        onOpenCommunityArt={() => setActiveSection('community-art')}
         onCreate={handleCreatePlaylist}
         onRenamePlaylist={setPlaylistToRename}
         onDeletePlaylist={setPlaylistToDelete}
         onOpenAddToPlaylist={setPlaylistToAddSongs}
         playlistName={newPlaylistName}
         setPlaylistName={setNewPlaylistName}
+        onAddSongs={handleMusicFiles}
         onAddMusicFolder={handleMusicFolder}
         onAddCoverFolder={handleCoverFolder}
         isDesktop={isDesktop}
+        onNativeAddSongs={handleNativeAddSongs}
         onNativeMusicFolder={handleNativeMusicFolder}
         onNativeCoverFolder={handleNativeCoverFolder}
         onRescanMusicFolder={handleRescanMusicFolder}
@@ -263,9 +266,7 @@ function App() {
       />
 
       <section className="content">
-        {activeSection === 'community-art' ? (
-          <CommunityCoverArt isDesktop={isDesktop} />
-        ) : activeSection === 'downloads' ? (
+        {activeSection === 'downloads' ? (
           <DownloadSection
             musicFolderPath={configuredMusicFolderPath}
             isDesktop={isDesktop}
