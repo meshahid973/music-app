@@ -36,7 +36,7 @@ export function entriesFor(category, source = catalogue.artworks) {
     typeof entry.licence === "string" && entry.licence.trim().length > 0 &&
     ALLOWED_FORMATS.has(entry.format) &&
     typeof entry.objectKey === "string" &&
-    /^[a-zA-Z0-9/_-]+\\.(png|jpe?g|webp)$/i.test(entry.objectKey) &&
+    /^[a-zA-Z0-9/_-]+\.(png|jpe?g|webp)$/i.test(entry.objectKey) &&
     (entry.fileSize === undefined || (Number.isInteger(entry.fileSize) && entry.fileSize > 0 && entry.fileSize <= MAX_IMAGE_BYTES))
   );
 }
@@ -101,7 +101,7 @@ export default {
     if (url.pathname === "/api/artworks") {
       const rawPage = url.searchParams.get("page") || "1";
       const rawLimit = url.searchParams.get("limit") || "12";
-      if (!/^\\d+$/.test(rawPage) || !/^\\d+$/.test(rawLimit)) return responseJson({ error: "invalid_pagination" }, 400, origin);
+      if (!/^\d+$/.test(rawPage) || !/^\d+$/.test(rawLimit)) return responseJson({ error: "invalid_pagination" }, 400, origin);
       const page = Number(rawPage);
       const limit = Number(rawLimit);
       if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > PAGE_SIZE_MAX) {
