@@ -131,19 +131,39 @@ export async function nativeCoversFromPaths(coverPaths: string[]): Promise<{
   return { lookup, paths, urls }
 }
 
+async function forEachWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  task: (item: T, index: number) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0
+  const workerCount = Math.min(Math.max(1, concurrency), items.length)
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const index = nextIndex++
+        if (index >= items.length) return
+        await task(items[index], index)
+      }
+    }),
+  )
+}
+
 export async function nativeTracksFromPaths(
   filePaths: string[],
   covers: CoverLookup,
   existingIds: ReadonlySet<string> = new Set(),
   coverPathsMap?: Map<string, string>,
 ): Promise<Track[]> {
-  const tracks: Track[] = []
+  const tracks: Array<Track | undefined> = new Array(filePaths.length)
   const seen = new Set(existingIds)
 
-  for (const filePath of filePaths) {
+  // Keep native file I/O bounded: a few files can be inspected at once without
+  // spawning unbounded metadata reads or allocating a task for every song.
+  await forEachWithConcurrency(filePaths, 4, async (filePath, fileIndex) => {
     const fileName = getFileName(filePath)
     const id = `native:${filePath}`
-    if (seen.has(id)) continue
+    if (seen.has(id)) return
     seen.add(id)
 
     const audioUrl = toNativeAssetUrl(filePath)
@@ -265,7 +285,7 @@ export async function nativeTracksFromPaths(
         ? detectedAlbum
         : parentName || 'Local files'
 
-    tracks.push({
+    tracks[fileIndex] = {
       id,
       title: detectedTitle || cleanDisplayTitle(fileName),
       artist: detectedArtist || 'Unknown artist',
@@ -278,8 +298,8 @@ export async function nativeTracksFromPaths(
       coverPath,
       coverSource,
       accent: colorFromString(fileName),
-    })
-  }
+    }
+  })
 
-  return tracks
+  return tracks.filter((track): track is Track => track !== undefined)
 }
