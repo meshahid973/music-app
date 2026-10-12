@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { CheckFilled, CloseFilled, DiscFilled } from './icons'
 import { useToastStore, type Toast } from '../store/useToastStore'
 
-function ToastItem({ toast }: { toast: Toast }) {
+export function ToastItem({ toast }: { toast: Toast }) {
   const removeToast = useToastStore((state) => state.removeToast)
   const [isPaused, setIsPaused] = useState(false)
 
