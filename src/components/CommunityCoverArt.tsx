@@ -50,7 +50,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
       setPage(nextPage)
       setHasMore(Boolean(data.hasMore))
     } catch (cause) {
-      setError(cause instanceof TypeError ? 'Could not reach the artwork service. Check your connection and try again.' : cause instanceof Error ? cause.message : 'Could not load artwork.')
+      setError(artworkLoadErrorMessage(cause))
       if (replace) setItems([])
     } finally {
       setLoading(false)
@@ -76,7 +76,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
       }
       setArtwork(next)
     } catch (cause) {
-      setError(cause instanceof TypeError ? 'Could not reach the artwork service. Check your connection and try again.' : cause instanceof Error ? cause.message : 'Could not load a random cover.')
+      setError(artworkLoadErrorMessage(cause))
     } finally {
       setLoading(false)
     }
