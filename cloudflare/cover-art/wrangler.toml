@@ -1,0 +1,13 @@
+name = "resonance-cover-art"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[[r2_buckets]]
+binding = "ARTWORK_BUCKET"
+bucket_name = "resonance-cover-art"
+
+[vars]
+# Set to the exact frontend origin when you know it; "*" is intended only for
+# this read-only public gallery API. Do not store secrets in vars.
+ALLOWED_ORIGIN = "*"
