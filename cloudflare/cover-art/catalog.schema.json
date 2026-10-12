@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Resonance Community Cover Art catalogue",
+  "type": "object",
+  "required": ["schemaVersion", "artworks"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "artworks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "category", "objectKey", "format", "licence", "source", "redistributionAllowed"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,79}$" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "creator": { "type": "string", "maxLength": 160 },
+          "artist": { "type": "string", "maxLength": 160 },
+          "category": { "enum": ["community", "album"] },
+          "objectKey": { "type": "string", "pattern": "^[a-zA-Z0-9/_-]+\\.(png|jpe?g|webp)$" },
+          "format": { "enum": ["png", "jpeg", "webp"] },
+          "width": { "type": "integer", "minimum": 1 },
+          "height": { "type": "integer", "minimum": 1 },
+          "fileSize": { "type": "integer", "minimum": 1, "maximum": 15728640 },
+          "source": { "type": "string", "maxLength": 500 },
+          "licence": { "type": "string", "maxLength": 200 },
+          "attributionRequired": { "type": "boolean" },
+          "attribution": { "type": "string", "maxLength": 500 },
+          "redistributionAllowed": { "const": true }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
