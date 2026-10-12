@@ -108,10 +108,11 @@ export default {
     if (counts.size > 5000) counts.clear();
     if (count > 120) return responseJson({ error: "rate_limited", message: "Please wait before trying again." }, 429, origin, { "retry-after": "60" });
 
-    if (url.pathname === "/api/health") return responseJson({ ok: true, count: catalogue.artworks.length }, 200, origin);
+    const catalogueEntries = Array.isArray(env.CATALOGUE_FOR_TESTS) ? env.CATALOGUE_FOR_TESTS : catalogue.artworks;
+    if (url.pathname === "/api/health") return responseJson({ ok: true, count: catalogueEntries.length }, 200, origin);
     const category = categoryFrom(url);
     if (category === "invalid") return responseJson({ error: "invalid_category" }, 400, origin);
-    const entries = entriesFor(category);
+    const entries = entriesFor(category, catalogueEntries);
 
     if (url.pathname === "/api/random") {
       if (!entries.length) return responseJson({ error: "catalogue_empty", message: "No artwork is available in this category yet." }, 404, origin);
@@ -135,7 +136,7 @@ export default {
 
     const match = url.pathname.match(/^\/api\/images\/([a-z0-9][a-z0-9_-]{0,79})$/);
     if (match) {
-      const entry = entriesFor(null).find((item) => item.id === match[1]);
+      const entry = entriesFor(null, catalogueEntries).find((item) => item.id === match[1]);
       if (!entry) return responseJson({ error: "image_not_found" }, 404, origin);
       const object = await env.ARTWORK_BUCKET.get(entry.objectKey);
       if (!object) return responseJson({ error: "image_not_found" }, 404, origin);
