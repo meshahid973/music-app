@@ -28,8 +28,22 @@ function validImageSignature(bytes, format) {
 }
 
 function publicEntry(entry, apiBase) {
-  const { objectKey, ...metadata } = entry;
-  return { ...metadata, imageUrl: apiBase + "/api/images/" + entry.id };
+  return {
+    id: entry.id,
+    title: entry.title,
+    ...(entry.creator === undefined ? {} : { creator: entry.creator }),
+    ...(entry.artist === undefined ? {} : { artist: entry.artist }),
+    category: entry.category,
+    format: entry.format,
+    ...(entry.width === undefined ? {} : { width: entry.width }),
+    ...(entry.height === undefined ? {} : { height: entry.height }),
+    ...(entry.fileSize === undefined ? {} : { fileSize: entry.fileSize }),
+    source: entry.source,
+    licence: entry.licence,
+    ...(entry.attributionRequired === undefined ? {} : { attributionRequired: entry.attributionRequired }),
+    ...(entry.attribution === undefined ? {} : { attribution: entry.attribution }),
+    imageUrl: apiBase + "/api/images/" + entry.id,
+  };
 }
 
 export function entriesFor(category, source = catalogue.artworks) {
