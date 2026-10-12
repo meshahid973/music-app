@@ -3405,6 +3405,9 @@ h3 {
 .download-url-row { display: flex; gap: 10px; margin-bottom: 26px; }
 .download-url-input { flex: 1; min-width: 0; height: 48px; padding: 0 14px; color: var(--text); border: 1px solid var(--line-strong); border-radius: 12px; outline: none; background: var(--bg); font: inherit; }
 .download-url-input:focus { border-color: var(--lime); }
+.download-url-textarea { display: block; width: 100%; height: auto; min-height: 112px; padding: 12px 14px; resize: vertical; line-height: 1.55; }
+.download-url-hint { margin: -16px 0 16px; color: var(--muted); font-size: 12px; }
+.download-submit-full { width: 100%; min-height: 46px; margin-bottom: 26px; }
 .download-submit { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 132px; padding: 0 17px; border: 0; border-radius: 12px; color: #101110; background: var(--lime); font: inherit; font-weight: 700; cursor: pointer; }
 .download-submit:disabled { opacity: .5; cursor: not-allowed; }
 .download-spinner { animation: download-spin 1s linear infinite; }
