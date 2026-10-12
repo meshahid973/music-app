@@ -125,7 +125,8 @@ export async function saveDesktopLibrary(data: DesktopLibraryPayload): Promise<v
     tracks: sanitizeTracksForPersistence(Array.isArray(data.tracks) ? data.tracks : []),
   }
 
-  const json = JSON.stringify(payload, null, 2)
+  // Compact JSON reduces CPU spent formatting large libraries and disk size.
+  const json = JSON.stringify(payload)
 
   // Browser builds need a localStorage fallback. In the Windows desktop app,
   // keep the full library in AppData only: synchronous localStorage writes of a
