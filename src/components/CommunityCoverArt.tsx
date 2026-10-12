@@ -4,6 +4,7 @@ import { save } from '@tauri-apps/plugin-dialog'
 import { Download, ExternalLink, ImageOff, LoaderCircle, RefreshCw, Shuffle } from 'lucide-react'
 import {
   isArtworkId,
+  isCommunityArtwork,
   isAllowedArtworkApiUrl,
   artworkLoadErrorMessage,
   isSaveDialogCancelled,
@@ -41,13 +42,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
       if (!response.ok) throw new Error(response.status === 404 ? 'No artwork is available in this category yet.' : `Artwork service returned HTTP ${response.status}.`)
       const data = await response.json() as GalleryResponse
       if (!Array.isArray(data.items)) throw new Error('The artwork service returned an invalid catalogue.')
-      const safeItems = data.items.filter((item) =>
-        item && typeof item.id === 'string' && isArtworkId(item.id) &&
-        typeof item.title === 'string' &&
-        (item.category === 'community' || item.category === 'album') &&
-        (item.format === 'png' || item.format === 'jpeg' || item.format === 'webp') &&
-        typeof item.imageUrl === 'string' && item.imageUrl.startsWith(endpoint + '/api/images/')
-      )
+      const safeItems = data.items.filter((item) => isCommunityArtwork(item, endpoint))
       setItems((current) => replace ? safeItems : [...current, ...safeItems.filter((item) => !current.some((old) => old.id === item.id))])
       setPage(nextPage)
       setHasMore(Boolean(data.hasMore))
@@ -71,10 +66,7 @@ export function CommunityCoverArt({ isDesktop }: { isDesktop: boolean }) {
       if (!response.ok) throw new Error(`Artwork service returned HTTP ${response.status}.`)
       const data = await response.json() as { artwork?: CommunityArtwork }
       const next = data.artwork
-      if (!next || !isArtworkId(next.id) || typeof next.title !== 'string' ||
-          !['community', 'album'].includes(next.category) ||
-          !['png', 'jpeg', 'webp'].includes(next.format) ||
-          typeof next.imageUrl !== 'string' || !next.imageUrl.startsWith(endpoint + '/api/images/')) {
+      if (!isCommunityArtwork(next, endpoint)) {
         throw new Error('The artwork service returned invalid artwork metadata.')
       }
       setArtwork(next)
