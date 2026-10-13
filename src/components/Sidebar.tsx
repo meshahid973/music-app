@@ -15,7 +15,6 @@ import {
   RefreshFilled,
   SettingsFilled,
   TrashFilled,
-  UploadFilled,
 } from './icons'
 import { favoritesId, libraryId } from '../store/useMusicStore'
 import type { Playlist, Track } from '../types'
@@ -31,11 +30,9 @@ export type SidebarProps = {
   onRenamePlaylist: (playlist: Playlist) => void
   onDeletePlaylist: (playlist: Playlist) => void
   onOpenAddToPlaylist?: (playlist: Playlist) => void
-  onAddSongs: (e: ChangeEvent<HTMLInputElement>) => void
   onAddMusicFolder: (e: ChangeEvent<HTMLInputElement>) => void
   onAddCoverFolder: (e: ChangeEvent<HTMLInputElement>) => void
   isDesktop?: boolean
-  onNativeAddSongs?: () => void
   onNativeMusicFolder?: () => void
   onNativeCoverFolder?: () => void
   onRescanMusicFolder?: () => void
@@ -61,11 +58,9 @@ export function Sidebar({
   onRenamePlaylist,
   onDeletePlaylist,
   onOpenAddToPlaylist,
-  onAddSongs,
   onAddMusicFolder,
   onAddCoverFolder,
   isDesktop = false,
-  onNativeAddSongs,
   onNativeMusicFolder,
   onNativeCoverFolder,
   onRescanMusicFolder,
@@ -224,23 +219,6 @@ export function Sidebar({
           </button>
         </form>
 
-        {isDesktop && onNativeAddSongs ? (
-          <button
-            type="button"
-            className="nav-item import-nav-item"
-            title="Select audio files from your computer"
-            onClick={onNativeAddSongs}
-          >
-            <UploadFilled size={18} />
-            <span>Add songs</span>
-          </button>
-        ) : (
-          <label className="nav-item import-nav-item" title="Manually select audio files">
-            <UploadFilled size={18} />
-            <span>Add songs</span>
-            <input type="file" accept="audio/*" multiple onChange={onAddSongs} />
-          </label>
-        )}
 
         {/* Music Folder row with dedicated Rescan button */}
         <div className="nav-item nav-folder-row">
