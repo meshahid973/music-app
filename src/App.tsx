@@ -64,6 +64,7 @@ function App() {
   const cycleRepeat = useMusicStore((state) => state.cycleRepeat)
   const setVolume = useMusicStore((state) => state.setVolume)
   const updateTrack = useMusicStore((state) => state.updateTrack)
+  const deleteTrackFromLibrary = useMusicStore((state) => state.deleteTrackFromLibrary)
 
   // Initialize desktop local database storage on launch
   useEffect(() => {
@@ -382,6 +383,13 @@ function App() {
             )
           }}
           onEditTrack={setEditingTrack}
+          onDeleteTrack={(track) => {
+            deleteTrackFromLibrary(track.id)
+            showToast(`Removed "${cleanDisplayTitle(track.title)}" from your library`, {
+              title: 'Song Deleted',
+              type: 'info',
+            })
+          }}
           onAddSongs={handleMusicFiles}
           onAddMusicFolder={handleMusicFolder}
           onAddCoverFolder={handleCoverFolder}
