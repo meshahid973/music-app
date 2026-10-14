@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties } from 'react'
 import {
   CloseFilled,
@@ -21,6 +21,7 @@ import { getVirtualListRange } from '../utils/virtualList.ts'
 
 export type TrackListProps = {
   tracks: Track[]
+  filterQuery?: string
   playlists: Playlist[]
   activePlaylistId: string
   activePlaylist?: Playlist
@@ -44,6 +45,7 @@ export type TrackListProps = {
 const TRACK_ROW_HEIGHT = 86
 export function TrackList({
   tracks,
+  filterQuery = '',
   playlists,
   activePlaylistId,
   activePlaylist,
@@ -64,6 +66,12 @@ export function TrackList({
 }: TrackListProps) {
   const listRef = useRef<HTMLDivElement | null>(null)
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 32 })
+
+  // Search changes can shrink a large virtual list to just a few rows. Reset the
+  // virtual window before paint so stale scroll offsets never leave blank space.
+  useLayoutEffect(() => {
+    setVisibleRange({ start: 0, end: 32 })
+  }, [filterQuery, activePlaylistId])
 
   const updateVisibleRange = useCallback(() => {
     const list = listRef.current
@@ -234,6 +242,7 @@ export function TrackList({
         exit={{ opacity: 0, y: -6 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       >
+        <AnimatePresence initial={false} mode="popLayout">
         {tracks.slice(visibleRange.start, visibleRange.end).map((track, offset) => {
           const index = visibleRange.start + offset
           const isFavorited = favoriteTrackIds.has(track.id)
@@ -241,6 +250,16 @@ export function TrackList({
             <motion.article
               className={currentTrackId === track.id ? 'track-row active' : 'track-row'}
               key={track.id}
+              layout="position"
+              initial={{ opacity: 0, y: 9, scale: 0.985 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -7, scale: 0.985 }}
+              transition={{
+                opacity: { duration: 0.16, delay: Math.min(offset * 0.008, 0.1) },
+                y: { duration: 0.2, delay: Math.min(offset * 0.008, 0.1), ease: [0.22, 1, 0.36, 1] },
+                scale: { duration: 0.2, delay: Math.min(offset * 0.008, 0.1) },
+                layout: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
+              }}
               style={{
                 position: 'absolute',
                 top: index * TRACK_ROW_HEIGHT,
@@ -352,6 +371,7 @@ export function TrackList({
             </motion.article>
           )
         })}
+        </AnimatePresence>
       </motion.div>
     </AnimatePresence>
   )
