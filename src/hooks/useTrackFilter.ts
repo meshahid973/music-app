@@ -2,6 +2,17 @@ import { useMemo, useState } from 'react'
 import { libraryId } from '../store/useMusicStore.ts'
 import type { Playlist, Track } from '../types'
 
+export function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+    .replace(/[\p{M}\p{Cf}]/gu, '')
+    .replace(/[‘’‛]/g, "'")
+    .replace(/[‐‑‒–—―]/g, '-')
+    .toLowerCase()
+    .trim()
+}
+
 export function getVisibleTracks(
   tracks: Track[],
   activePlaylistId: string,
@@ -15,13 +26,13 @@ export function getVisibleTracks(
     activePlaylistId === libraryId
       ? tracks
       : tracks.filter((track) => playlistTrackIds.has(track.id))
-  const normalizedQuery = query.trim().toLowerCase()
+  const normalizedQuery = normalizeSearchText(query)
 
   if (!normalizedQuery) return playlistTracks
 
   return playlistTracks.filter((track) =>
     [track.title, track.artist, track.album, track.fileName].some((value) =>
-      value.toLowerCase().includes(normalizedQuery),
+      normalizeSearchText(value).includes(normalizedQuery),
     ),
   )
 }
