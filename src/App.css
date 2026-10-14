@@ -2821,9 +2821,28 @@ h3 {
 
 .settings-modal-footer {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
-  padding-top: 4px;
+  gap: 10px;
+  padding-top: 14px;
   border-top: 1px solid var(--line);
+}
+
+.settings-done-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 92px;
+  min-height: 40px;
+  padding: 9px 20px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  font-size: 13px;
+}
+
+.settings-done-btn:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
 }
 
 
@@ -3113,11 +3132,6 @@ h3 {
 .download-message-info { color: var(--text); background: rgba(255,255,255,.035); }
 .download-completed-file { display: grid; gap: 6px; margin-top: 12px; color: var(--muted); font-size: 12px; }
 .download-completed-file code { overflow-wrap: anywhere; color: var(--text); }
-.download-note { margin-top: 20px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.025); }
-.download-note strong { font-size: 13px; }
-.download-note p { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.65; }
-.download-note a { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; color: var(--text); font-size: 12px; text-decoration: none; }
-.download-note a:hover { text-decoration: underline; }
 @media (max-width: 620px) { .download-url-row { flex-direction: column; } .download-submit { min-height: 46px; } .download-page-header { gap: 12px; } .download-heading-icon { width: 44px; height: 44px; flex-basis: 44px; } }
 
 
@@ -3500,42 +3514,6 @@ h3 {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.045);
   font-size: 11px;
-}
-
-.download-note {
-  margin-top: 16px;
-  padding: 18px 21px;
-  border-color: rgba(255, 255, 255, 0.08);
-  border-radius: 17px;
-  background: rgba(255, 255, 255, 0.018);
-}
-
-.download-note strong {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  letter-spacing: 0.01em;
-}
-
-.download-note strong::before {
-  content: '';
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #a7f3d0;
-  box-shadow: 0 0 0 4px rgba(167, 243, 208, 0.08);
-}
-
-.download-note p {
-  max-width: 820px;
-}
-
-.download-note a {
-  transition: color 160ms ease;
-}
-
-.download-note a:hover {
-  color: #ffffff;
 }
 
 @media (max-width: 900px) {

@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Download, ExternalLink, FolderOpen, LoaderCircle, Music2 } from 'lucide-react'
+import { Download, FolderOpen, LoaderCircle, Music2 } from 'lucide-react'
 
 type AudioFormat = 'best' | 'mp3' | 'm4a' | 'opus' | 'flac' | 'wav'
 
@@ -193,13 +193,7 @@ export function DownloadSection({
         )}
       </form>
 
-      <div className="download-note">
-        <strong>Powered by yt-dlp</strong>
-        <p>Resonance sets up yt-dlp automatically the first time you download. The best-audio option keeps the source audio stream; MP3 and other converted formats require FFmpeg to be installed separately.</p>
-        <a href="https://github.com/yt-dlp/yt-dlp#installation" target="_blank" rel="noreferrer">
-          yt-dlp project and setup instructions <ExternalLink size={13} />
-        </a>
-      </div>
+
     </section>
   )
 }
