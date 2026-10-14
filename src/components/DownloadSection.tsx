@@ -117,47 +117,71 @@ export function DownloadSection({
       </header>
 
       <form className="download-card" onSubmit={handleDownload}>
-        <label className="download-field-label" htmlFor="download-url">Media URLs</label>
-        <textarea
-          id="download-url"
-          className="download-url-input download-url-textarea"
-          value={url}
-          onChange={(event) => setUrl(event.target.value)}
-          placeholder={'Paste one or more links, one per line…\nhttps://…\nhttps://…'}
-          autoComplete="off"
-          rows={4}
-          disabled={busy}
-        />
-        <div className="download-url-hint">Multiple links are downloaded one by one, in order.</div>
-        <button className="download-submit download-submit-full" type="submit" disabled={busy || !url.trim()}>
-          {busy ? <LoaderCircle size={17} className="download-spinner" /> : <Download size={17} />}
-          <span>{busy ? 'Downloading queue…' : `Download ${linkCount} link${linkCount === 1 ? '' : 's'}`}</span>
-        </button>
-
-        <label className="download-field-label" htmlFor="download-format">Audio format</label>
-        <div className="download-format-wrap">
-          <Music2 size={18} />
-          <select id="download-format" value={format} onChange={(event) => setFormat(event.target.value as AudioFormat)} disabled={busy}>
-            {formats.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-        </div>
-        <p className="download-format-description">{formats.find((option) => option.value === format)?.description}</p>
-
-        <div className="download-destination">
-          <FolderOpen size={19} />
-          <div className="download-destination-copy">
-            <strong>Save location</strong>
-            <span title={musicFolderPath || 'No music folder selected'}>
-              {musicFolderPath ? musicFolderPath : 'No Music folder selected'}
-            </span>
+        <div className="download-card-heading">
+          <div className="download-card-heading-copy">
+            <p className="download-card-eyebrow">DOWNLOAD SETUP</p>
+            <h2>Queue up your audio</h2>
+            <p>Add one source link or paste a whole batch. Files are saved straight into your Resonance library.</p>
           </div>
-          <button type="button" className="download-change-folder" onClick={onChooseMusicFolder} disabled={busy}>
-            Change
-          </button>
+          <div className="download-queue-count" aria-live="polite">
+            <strong>{linkCount}</strong>
+            <span>{linkCount === 1 ? 'link queued' : 'links queued'}</span>
+          </div>
+        </div>
+
+        <div className="download-workspace">
+          <div className="download-links-panel">
+            <div className="download-field-topline">
+              <label className="download-field-label" htmlFor="download-url">Media URLs</label>
+              <span>ONE PER LINE</span>
+            </div>
+            <textarea
+              id="download-url"
+              className="download-url-input download-url-textarea"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder={'Paste one or more links here…\nhttps://…\nhttps://…'}
+              autoComplete="off"
+              rows={6}
+              disabled={busy}
+            />
+            <div className="download-url-hint">Links are processed one at a time, in the order you add them.</div>
+          </div>
+
+          <div className="download-options-panel">
+            <div className="download-option-group">
+              <label className="download-field-label" htmlFor="download-format">Audio format</label>
+              <div className="download-format-wrap">
+                <Music2 size={18} />
+                <select id="download-format" value={format} onChange={(event) => setFormat(event.target.value as AudioFormat)} disabled={busy}>
+                  {formats.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </div>
+              <p className="download-format-description">{formats.find((option) => option.value === format)?.description}</p>
+            </div>
+
+            <div className="download-destination">
+              <FolderOpen size={19} />
+              <div className="download-destination-copy">
+                <strong>Save location</strong>
+                <span title={musicFolderPath || 'No music folder selected'}>
+                  {musicFolderPath ? musicFolderPath : 'No Music folder selected'}
+                </span>
+              </div>
+              <button type="button" className="download-change-folder" onClick={onChooseMusicFolder} disabled={busy}>
+                Change
+              </button>
+            </div>
+
+            <button className="download-submit download-submit-full" type="submit" disabled={busy || !url.trim()}>
+              {busy ? <LoaderCircle size={17} className="download-spinner" /> : <Download size={17} />}
+              <span>{busy ? 'Downloading queue…' : `Download ${linkCount} link${linkCount === 1 ? '' : 's'}`}</span>
+            </button>
+          </div>
         </div>
 
         {message && (
-          <div className={`download-message download-message-${message.type}`} role="status">
+          <div className={`download-message download-message-${message.type}`} role="status" aria-live="polite">
             {message.text}
           </div>
         )}
