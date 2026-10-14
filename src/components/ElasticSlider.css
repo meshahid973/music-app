@@ -77,7 +77,7 @@
 
 .volume-track-container.active .volume-track-rail,
 .volume-track-container:focus-visible .volume-track-rail {
-  height: 6px;
+  height: 4px;
   background: rgba(255, 255, 255, 0.22);
 }
 
@@ -86,7 +86,7 @@
   border-radius: inherit;
   background: var(--neutral-accent, #ffffff);
   pointer-events: none;
-  transition: width 40ms linear;
+  transition: width 65ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .volume-track-thumb {
@@ -102,15 +102,13 @@
   transform: translate(-50%, -50%);
   opacity: 0.85;
   pointer-events: none;
-  transition: opacity 150ms ease, background 150ms ease;
+  transition: left 65ms cubic-bezier(0.22, 1, 0.36, 1), opacity 150ms ease, background 150ms ease;
 }
 
 .volume-track-container.active .volume-track-thumb,
 .volume-track-container:focus-visible .volume-track-thumb {
   opacity: 1;
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.6),
-    0 0 10px rgba(255, 255, 255, 0.4);
+  /* Keep the thumb's visual size/shadow stable while hovering or dragging. */
 }
 
 .volume-percentage {
@@ -127,4 +125,12 @@
 
 .volume-percentage:hover {
   color: var(--text);
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .volume-track-fill,
+  .volume-track-thumb {
+    transition-duration: 0.01ms !important;
+  }
 }

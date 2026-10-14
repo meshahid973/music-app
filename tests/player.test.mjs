@@ -6,7 +6,7 @@ import { objectUrlForFile, revokeOwnedObjectUrls } from '../src/utils/objectUrls
 import { readID3Metadata, detectSongAndArtist, autoDetectTrackMetadata } from '../src/utils/metadata.ts'
 import { uniqueTracks, tracksFromFiles } from '../src/utils/library.ts'
 import { syncTracksWithCovers } from '../src/utils/covers.ts'
-import { getVisibleTracks } from '../src/hooks/useTrackFilter.ts'
+import { getVisibleTracks, normalizeSearchText } from '../src/hooks/useTrackFilter.ts'
 import {
   parseId3Header,
   readBoundedMetadataFromReader,
@@ -929,6 +929,72 @@ test('hover interactions avoid transform scaling that softens text and controls'
   }
 })
 
+test('search matches Unicode styled alphabets, accents, and invisible formatting marks', () => {
+  const zeroWidth = String.fromCharCode(0x200b)
+  const combiningAccent = String.fromCharCode(0x0301)
+  const tracks = [
+    { id: 'styled', title: '𝓢𝓾𝓷𝓼𝓱𝓲𝓷𝓮', artist: 'Beyoncé', album: '𝖭𝗂𝗀𝗁𝗍', fileName: 'sunshine.mp3', duration: 100 },
+    { id: 'hidden', title: 'Late' + zeroWidth + 'Night', artist: 'Aster', album: 'Cafe' + combiningAccent, fileName: 'late-night.mp3', duration: 120 },
+  ]
+
+  assert.deepEqual(getVisibleTracks(tracks, 'library', undefined, 'sunshine').map((track) => track.id), ['styled'])
+  assert.deepEqual(getVisibleTracks(tracks, 'library', undefined, 'beyonce').map((track) => track.id), ['styled'])
+  assert.deepEqual(getVisibleTracks(tracks, 'library', undefined, 'night').map((track) => track.id), ['styled', 'hidden'])
+  assert.deepEqual(getVisibleTracks(tracks, 'library', undefined, 'cafe').map((track) => track.id), ['hidden'])
+})
+
+test('deleting a song removes playlist references and stops it if currently playing', () => {
+  const original = useMusicStore.getState()
+  const retainedTrack = { id: 'keep', title: 'Keep', artist: 'Artist', album: '', duration: 1, fileName: 'keep.mp3', filePath: 'C:/Music/keep.mp3' }
+  const deletedTrack = { id: 'delete-me', title: 'Delete me', artist: 'Artist', album: '', duration: 1, fileName: 'delete-me.mp3', filePath: 'C:/Music/delete-me.mp3' }
+
+  useMusicStore.setState({
+    tracks: [retainedTrack, deletedTrack],
+    playlists: [
+      { id: 'favorites', name: 'Favorites', trackIds: ['delete-me', 'keep'], createdAt: 1 },
+      { id: 'mix', name: 'Mix', trackIds: ['delete-me'], createdAt: 2 },
+    ],
+    currentTrackId: 'delete-me',
+    isPlaying: true,
+  })
+
+  try {
+    useMusicStore.getState().deleteTrackFromLibrary('delete-me')
+    const state = useMusicStore.getState()
+    assert.deepEqual(state.tracks.map((track) => track.id), ['keep'])
+    assert.deepEqual(state.playlists.map((playlist) => playlist.trackIds), [['keep'], []])
+    assert.equal(state.currentTrackId, undefined)
+    assert.equal(state.isPlaying, false)
+    assert.equal(deletedTrack.filePath, 'C:/Music/delete-me.mp3')
+  } finally {
+    useMusicStore.setState(original, true)
+  }
+})
+
+test('song rows stay crisp, volume stays static, and progress easing only runs while seeking', () => {
+  const appCss = fs.readFileSync(new URL('../src/App.css', import.meta.url), 'utf8')
+  const volumeCss = fs.readFileSync(new URL('../src/components/ElasticSlider.css', import.meta.url), 'utf8')
+  const trackList = fs.readFileSync(new URL('../src/components/TrackList.tsx', import.meta.url), 'utf8')
+  const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
+  const playerBar = fs.readFileSync(new URL('../src/components/PlayerBar.tsx', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(trackList, /layout="position"|scale:\s*\{/)
+  assert.match(trackList, /initial=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: 10 \}\}/)
+  assert.match(trackList, /exit=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: -8 \}\}/)
+  assert.match(appCss, /\.track-more-btn \{[\s\S]*?background: transparent;[\s\S]*?border: 0;/)
+  assert.match(app, /key="downloads-section"[\s\S]*?initial=\{\{ opacity: 0, y: 12 \}\}[\s\S]*?exit=\{\{ opacity: 0, y: -8 \}\}/)
+  assert.match(app, /key="library-section"[\s\S]*?initial=\{\{ opacity: 0, y: 8 \}\}/)
+  const activeRail = volumeCss.match(/\.volume-track-container\.active \.volume-track-rail,[\s\S]*?\{([\s\S]*?)\}/)
+  assert.ok(activeRail)
+  assert.match(activeRail[1], /height: 4px/)
+  assert.match(volumeCss, /transition: width 65ms cubic-bezier/)
+  assert.match(volumeCss, /transition: left 65ms cubic-bezier/)
+  assert.match(playerBar, /isDragging \? 'scrubbing'/)
+  assert.match(appCss, /\.scrubber-fill \{[\s\S]*?transition: none/)
+  assert.match(appCss, /\.scrubber-hitbox\.scrubbing \.scrubber-fill[\s\S]*?transition: width 55ms cubic-bezier/)
+  assert.match(appCss, /\.scrubber-hitbox\.scrubbing \.scrubber-thumb[\s\S]*?transition: left 55ms cubic-bezier/)
+  assert.doesNotMatch(appCss, /\.scrubber-fill \{[\s\S]*?transition: width 65ms cubic-bezier/)
+})
 test('native folder scan reports inaccessible subfolders without discarding accessible files', async () => {
   const originalWarn = console.warn
   const warnings = []

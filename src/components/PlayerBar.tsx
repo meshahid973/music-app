@@ -261,7 +261,7 @@ export function PlayerBar({
 
             <div
               ref={trackRef}
-              className={`scrubber-hitbox ${isHovered || isDragging ? 'active' : ''}`}
+              className={`scrubber-hitbox ${isHovered || isDragging ? 'active' : ''} ${isDragging ? 'scrubbing' : ''}`}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}

@@ -29,6 +29,7 @@ type MusicState = {
   setCoverFolder: (path?: string, name?: string) => void
   initDesktopStorage: () => Promise<void>
   addTracks: (tracks: Track[]) => void
+  deleteTrackFromLibrary: (trackId: string) => void
   addCovers: (covers: Map<string, string>, extraUrls?: string[], coverPaths?: Map<string, string>) => void
   createPlaylist: (name: string) => void
   deletePlaylist: (playlistId: string) => void
@@ -274,6 +275,28 @@ export const useMusicStore = create<MusicState>()(
           }
           queueSave({ ...state, ...next })
           return next
+        }),
+
+      deleteTrackFromLibrary: (trackId) =>
+        set((state) => {
+          if (!state.tracks.some((track) => track.id === trackId)) return {}
+
+          const tracks = state.tracks.filter((track) => track.id !== trackId)
+          const playlists = state.playlists.map((playlist) => ({
+            ...playlist,
+            trackIds: playlist.trackIds.filter((id) => id !== trackId),
+          }))
+          const deletingCurrentTrack = state.currentTrackId === trackId
+          const nextState: Partial<MusicState> = {
+            tracks,
+            playlists,
+            currentTrackId: deletingCurrentTrack ? undefined : state.currentTrackId,
+            isPlaying: deletingCurrentTrack ? false : state.isPlaying,
+          }
+
+          // Remove the library entry only; the user's audio file stays on disk.
+          queueSave({ ...state, ...nextState })
+          return nextState
         }),
 
       addCovers: (covers, extraUrls = [], coverPaths = new Map()) =>
