@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { EllipsisVertical } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties } from 'react'
 import {
@@ -12,6 +13,7 @@ import {
   PencilFilled,
   PlayFilled,
   PlusFilled,
+  TrashFilled,
   UploadFilled,
 } from './icons'
 import { favoritesId, libraryId } from '../store/useMusicStore'
@@ -33,6 +35,7 @@ export type TrackListProps = {
   onToggleFavorite: (trackId: string) => void
   onOpenAddToPlaylist?: (playlist: Playlist) => void
   onEditTrack: (track: Track) => void
+  onDeleteTrack: (track: Track) => void
   onAddSongs?: (e: ChangeEvent<HTMLInputElement>) => void
   onAddMusicFolder?: (e: ChangeEvent<HTMLInputElement>) => void
   onAddCoverFolder?: (e: ChangeEvent<HTMLInputElement>) => void
@@ -56,6 +59,7 @@ export function TrackList({
   onToggleFavorite,
   onOpenAddToPlaylist,
   onEditTrack,
+  onDeleteTrack,
   onAddSongs,
   onAddMusicFolder,
   onAddCoverFolder,
@@ -66,6 +70,27 @@ export function TrackList({
 }: TrackListProps) {
   const listRef = useRef<HTMLDivElement | null>(null)
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 32 })
+  const [openMenuTrackId, setOpenMenuTrackId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!openMenuTrackId) return
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (event.target instanceof Element && !event.target.closest('.track-action-menu')) {
+        setOpenMenuTrackId(null)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenMenuTrackId(null)
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer)
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [openMenuTrackId])
 
   // Search changes can shrink a large virtual list to just a few rows. Reset the
   // virtual window before paint so stale scroll offsets never leave blank space.
@@ -248,18 +273,12 @@ export function TrackList({
           const isFavorited = favoriteTrackIds.has(track.id)
           return (
             <motion.article
-              className={currentTrackId === track.id ? 'track-row active' : 'track-row'}
+              className={`track-row ${currentTrackId === track.id ? 'active ' : ''}${openMenuTrackId === track.id ? 'menu-open' : ''}`}
               key={track.id}
-              layout="position"
-              initial={{ opacity: 0, y: 9, scale: 0.985 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -7, scale: 0.985 }}
-              transition={{
-                opacity: { duration: 0.16, delay: Math.min(offset * 0.008, 0.1) },
-                y: { duration: 0.2, delay: Math.min(offset * 0.008, 0.1), ease: [0.22, 1, 0.36, 1] },
-                scale: { duration: 0.2, delay: Math.min(offset * 0.008, 0.1) },
-                layout: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
-              }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ opacity: { duration: 0.18, delay: Math.min(offset * 0.006, 0.08) } }}
               style={{
                 position: 'absolute',
                 top: index * TRACK_ROW_HEIGHT,
@@ -341,18 +360,53 @@ export function TrackList({
               </motion.button>
 
               <div className="track-row-btns" onClick={(e) => e.stopPropagation()}>
-                <motion.button
-                  type="button"
-                  className="track-edit-btn"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onEditTrack(track)
-                  }}
-                  title={`Rename or edit details for ${cleanDisplayTitle(track.title)}`}
-                  aria-label={`Edit ${cleanDisplayTitle(track.title)}`}
-                >
-                  <PencilFilled size={15} />
-                </motion.button>
+                <div className="track-action-menu">
+                  <button
+                    type="button"
+                    className="track-more-btn"
+                    aria-label={`More actions for ${cleanDisplayTitle(track.title)}`}
+                    aria-haspopup="menu"
+                    aria-expanded={openMenuTrackId === track.id}
+                    title="Song actions"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpenMenuTrackId((current) => current === track.id ? null : track.id)
+                    }}
+                  >
+                    <EllipsisVertical size={18} />
+                  </button>
+                  {openMenuTrackId === track.id && (
+                    <div className="track-action-menu-popover" role="menu" aria-label={`Actions for ${cleanDisplayTitle(track.title)}`}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="track-menu-item"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setOpenMenuTrackId(null)
+                          onEditTrack(track)
+                        }}
+                      >
+                        <PencilFilled size={14} />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="track-menu-item danger"
+                        title="Remove from Resonance; keeps the original audio file"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setOpenMenuTrackId(null)
+                          onDeleteTrack(track)
+                        }}
+                      >
+                        <TrashFilled size={14} />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
                 {activePlaylistId !== libraryId && (
                   <motion.button
                     type="button"
