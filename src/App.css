@@ -3642,6 +3642,8 @@ h3 {
   }
 
   .track-row,
+  .scrubber-fill,
+  .scrubber-thumb,
   .download-url-input,
   .download-format-wrap,
   .download-submit,
