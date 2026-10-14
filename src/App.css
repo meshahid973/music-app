@@ -1335,18 +1335,17 @@ h3 {
   display: grid;
   place-items: center;
   border-radius: 10px;
-  background: var(--panel-soft);
+  background: transparent;
   color: var(--muted);
-  border: 1px solid var(--line);
+  border: 0;
   cursor: pointer;
-  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+  transition: color 160ms ease;
 }
 
 .track-more-btn:hover,
 .track-more-btn[aria-expanded="true"] {
   color: var(--text);
-  background: var(--line);
-  border-color: var(--line-strong);
+  background: transparent;
 }
 
 .track-action-menu-popover {
