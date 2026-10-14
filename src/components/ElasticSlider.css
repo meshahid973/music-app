@@ -108,9 +108,7 @@
 .volume-track-container.active .volume-track-thumb,
 .volume-track-container:focus-visible .volume-track-thumb {
   opacity: 1;
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.6),
-    0 0 10px rgba(255, 255, 255, 0.4);
+  /* Keep the thumb's visual size/shadow stable while hovering or dragging. */
 }
 
 .volume-percentage {
