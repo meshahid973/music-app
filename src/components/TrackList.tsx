@@ -270,15 +270,19 @@ export function TrackList({
         <AnimatePresence initial={false} mode="popLayout">
         {tracks.slice(visibleRange.start, visibleRange.end).map((track, offset) => {
           const index = visibleRange.start + offset
+          const isCurrentTrack = currentTrackId === track.id
           const isFavorited = favoriteTrackIds.has(track.id)
           return (
             <motion.article
-              className={`track-row ${currentTrackId === track.id ? 'active ' : ''}${openMenuTrackId === track.id ? 'menu-open' : ''}`}
+              className={`track-row ${isCurrentTrack ? 'active ' : ''}${openMenuTrackId === track.id ? 'menu-open' : ''}`}
               key={track.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ opacity: { duration: 0.18, delay: Math.min(offset * 0.006, 0.08) } }}
+              initial={isCurrentTrack ? { opacity: 0 } : { opacity: 0, y: 10 }}
+              animate={isCurrentTrack ? { opacity: 1 } : { opacity: 1, y: 0 }}
+              exit={isCurrentTrack ? { opacity: 0 } : { opacity: 0, y: -8 }}
+              transition={{
+                opacity: { duration: 0.2, delay: Math.min(offset * 0.008, 0.08) },
+                y: { duration: 0.24, ease: [0.22, 1, 0.36, 1], delay: Math.min(offset * 0.006, 0.06) },
+              }}
               style={{
                 position: 'absolute',
                 top: index * TRACK_ROW_HEIGHT,
