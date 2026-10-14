@@ -261,14 +261,32 @@ function App() {
       />
 
       <section className="content">
-        {activeSection === 'downloads' ? (
-          <DownloadSection
-            musicFolderPath={configuredMusicFolderPath}
-            isDesktop={isDesktop}
-            onChooseMusicFolder={handleNativeMusicFolder}
-            onRefreshLibrary={handleRescanMusicFolder}
-          />
-        ) : <>
+        <AnimatePresence mode="wait" initial={false}>
+          {activeSection === 'downloads' ? (
+            <motion.div
+              key="downloads-section"
+              className="content-section-transition"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <DownloadSection
+                musicFolderPath={configuredMusicFolderPath}
+                isDesktop={isDesktop}
+                onChooseMusicFolder={handleNativeMusicFolder}
+                onRefreshLibrary={handleRescanMusicFolder}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="library-section"
+              className="content-section-transition"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            >
         <header className="topbar">
           <div>
             <AnimatePresence mode="wait" initial={false}>
@@ -400,7 +418,9 @@ function App() {
             />
           </motion.div>
         </AnimatePresence>
-        </>}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
 
       <PlayerBar
