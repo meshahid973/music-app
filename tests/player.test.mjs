@@ -6,7 +6,7 @@ import { objectUrlForFile, revokeOwnedObjectUrls } from '../src/utils/objectUrls
 import { readID3Metadata, detectSongAndArtist, autoDetectTrackMetadata } from '../src/utils/metadata.ts'
 import { uniqueTracks, tracksFromFiles } from '../src/utils/library.ts'
 import { syncTracksWithCovers } from '../src/utils/covers.ts'
-import { getVisibleTracks } from '../src/hooks/useTrackFilter.ts'
+import { getVisibleTracks, normalizeSearchText } from '../src/hooks/useTrackFilter.ts'
 import {
   parseId3Header,
   readBoundedMetadataFromReader,
@@ -977,18 +977,18 @@ test('song rows stay crisp, volume stays static, and progress easing only runs w
   const trackList = fs.readFileSync(new URL('../src/components/TrackList.tsx', import.meta.url), 'utf8')
   const playerBar = fs.readFileSync(new URL('../src/components/PlayerBar.tsx', import.meta.url), 'utf8')
 
-  assert.doesNotMatch(trackList, /layout="position"|scale:\\s*\\{/)
-  assert.match(trackList, /initial=\\{\\{ opacity: 0 \\}\\}/)
-  const activeRail = volumeCss.match(/\\.volume-track-container\\.active \\.volume-track-rail,[\\s\\S]*?\\{([\\s\\S]*?)\\}/)
+  assert.doesNotMatch(trackList, /layout="position"|scale:\s*\{/)
+  assert.match(trackList, /initial=\{\{ opacity: 0 \}\}/)
+  const activeRail = volumeCss.match(/\.volume-track-container\.active \.volume-track-rail,[\s\S]*?\{([\s\S]*?)\}/)
   assert.ok(activeRail)
   assert.match(activeRail[1], /height: 4px/)
   assert.match(volumeCss, /transition: width 65ms cubic-bezier/)
   assert.match(volumeCss, /transition: left 65ms cubic-bezier/)
-  assert.match(playerBar, /isDragging \\? 'scrubbing'/)
-  assert.match(appCss, /\\.scrubber-fill \\{[\\s\\S]*?transition: none/)
-  assert.match(appCss, /\\.scrubber-hitbox\\.scrubbing \\.scrubber-fill[\\s\\S]*?transition: width 55ms cubic-bezier/)
-  assert.match(appCss, /\\.scrubber-hitbox\\.scrubbing \\.scrubber-thumb[\\s\\S]*?transition: left 55ms cubic-bezier/)
-  assert.doesNotMatch(appCss, /\\.scrubber-fill \\{[\\s\\S]*?transition: width 65ms cubic-bezier/)
+  assert.match(playerBar, /isDragging \? 'scrubbing'/)
+  assert.match(appCss, /\.scrubber-fill \{[\s\S]*?transition: none/)
+  assert.match(appCss, /\.scrubber-hitbox\.scrubbing \.scrubber-fill[\s\S]*?transition: width 55ms cubic-bezier/)
+  assert.match(appCss, /\.scrubber-hitbox\.scrubbing \.scrubber-thumb[\s\S]*?transition: left 55ms cubic-bezier/)
+  assert.doesNotMatch(appCss, /\.scrubber-fill \{[\s\S]*?transition: width 65ms cubic-bezier/)
 })
 test('native folder scan reports inaccessible subfolders without discarding accessible files', async () => {
   const originalWarn = console.warn
