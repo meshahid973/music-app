@@ -350,8 +350,18 @@ function App() {
           </div>
         </section>
 
-        <TrackList
+        <AnimatePresence mode="sync" initial={false}>
+          <motion.div
+            key={trackCount === 0 ? 'track-list-empty' : 'track-list-results'}
+            className="track-list-transition"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <TrackList
           tracks={visibleTracks}
+          filterQuery={query}
           playlists={playlists}
           activePlaylistId={activePlaylistId}
           activePlaylist={activePlaylist}
@@ -379,7 +389,9 @@ function App() {
           onNativeAddSongs={handleNativeAddSongs}
           onNativeMusicFolder={handleNativeMusicFolder}
           onNativeCoverFolder={handleNativeCoverFolder}
-        />
+            />
+          </motion.div>
+        </AnimatePresence>
         </>}
       </section>
 
