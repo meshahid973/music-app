@@ -1058,9 +1058,6 @@ h3 {
 }
 
 .track-row {
-  /* Let Chromium/WebView2 skip layout and paint work for off-screen song rows. */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 76px;
   min-height: 76px;
   display: grid;
   grid-template-columns: 42px 52px minmax(140px, 1.2fr) minmax(100px, 0.8fr) 56px 40px auto;
@@ -1151,21 +1148,21 @@ h3 {
 
 .track-heart-btn:hover {
   color: #ff4d6d;
-  background: rgba(255, 77, 109, 0.12);
+  background: transparent;
 }
 
 .track-heart-btn.is-favorited {
   color: #ff3b69;
-  background: rgba(255, 59, 105, 0.14);
+  background: transparent;
 }
 
 .track-heart-btn.is-favorited:hover {
   color: #ff1f54;
-  background: rgba(255, 31, 84, 0.22);
+  background: transparent;
 }
 
 .heart-icon-filled {
-  filter: drop-shadow(0 2px 8px rgba(255, 59, 105, 0.45));
+  filter: none;
 }
 
 /* Custom Playlist Dropdown */
@@ -1321,7 +1318,18 @@ h3 {
   color: var(--text);
 }
 
-.track-edit-btn {
+
+.track-action-menu {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.track-row.menu-open {
+  z-index: 40;
+}
+
+.track-more-btn {
   width: 38px;
   height: 38px;
   display: grid;
@@ -1331,13 +1339,61 @@ h3 {
   color: var(--muted);
   border: 1px solid var(--line);
   cursor: pointer;
-  transition: all 180ms ease;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
-.track-edit-btn:hover {
+.track-more-btn:hover,
+.track-more-btn[aria-expanded="true"] {
   color: var(--text);
   background: var(--line);
   border-color: var(--line-strong);
+}
+
+.track-action-menu-popover {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 156px;
+  display: grid;
+  gap: 3px;
+  padding: 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: #17191a;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+}
+
+.track-menu-item {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.track-menu-item:hover,
+.track-menu-item:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.track-menu-item.danger {
+  color: #fca5a5;
+}
+
+.track-menu-item.danger:hover,
+.track-menu-item.danger:focus-visible {
+  color: #fecaca;
+  background: rgba(248, 113, 113, 0.11);
 }
 
 /* ==================== EDIT TRACK MODAL ==================== */
@@ -1808,7 +1864,7 @@ h3 {
   border-radius: inherit;
   background: var(--neutral-accent, #ffffff);
   pointer-events: none;
-  transition: width 35ms linear;
+  transition: width 65ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .scrubber-thumb {
@@ -1824,7 +1880,7 @@ h3 {
   transform: translate(-50%, -50%);
   opacity: 0.85;
   pointer-events: none;
-  transition: opacity 150ms ease, background 150ms ease;
+  transition: left 65ms cubic-bezier(0.22, 1, 0.36, 1), opacity 150ms ease, background 150ms ease;
 }
 
 .scrubber-hitbox.active .scrubber-thumb,
@@ -3192,10 +3248,7 @@ h3 {
   min-width: 0;
 }
 
-.track-row {
-  transform-origin: center;
-  will-change: opacity, transform;
-}
+
 
 /* Downloads: a calmer, more deliberate workspace */
 .download-page {
