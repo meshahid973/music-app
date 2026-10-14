@@ -111,7 +111,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
         </div>
 
         <footer className="settings-modal-footer">
-          <button type="button" className="action-btn primary" onClick={onClose}>
+          <button type="button" className="btn-primary settings-done-btn" onClick={onClose}>
             Done
           </button>
         </footer>
