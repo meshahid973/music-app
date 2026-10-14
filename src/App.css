@@ -3469,16 +3469,15 @@ h3 {
   border-radius: 13px;
   background: linear-gradient(135deg, #f5f7f9, #d8dde2);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.17), inset 0 1px rgba(255, 255, 255, 0.6);
-  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+  transition: box-shadow 180ms ease, opacity 180ms ease, background 180ms ease;
 }
 
 .download-submit:hover:not(:disabled) {
-  transform: translateY(-1px);
   box-shadow: 0 11px 25px rgba(0, 0, 0, 0.24), inset 0 1px rgba(255, 255, 255, 0.65);
 }
 
 .download-submit:active:not(:disabled) {
-  transform: translateY(0);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.2), inset 0 1px rgba(255, 255, 255, 0.45);
 }
 
 .download-message {
