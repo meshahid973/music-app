@@ -105,10 +105,11 @@ test('deleting a song removes playlist references and stops it if currently play
   }
 })
 
-test('song rows use opacity-only transitions and volume rail does not expand on hover', () => {
+test('song rows stay crisp and progress easing runs only during manual seeking', () => {
   const appCss = fs.readFileSync(new URL('../src/App.css', import.meta.url), 'utf8')
   const volumeCss = fs.readFileSync(new URL('../src/components/ElasticSlider.css', import.meta.url), 'utf8')
   const trackList = fs.readFileSync(new URL('../src/components/TrackList.tsx', import.meta.url), 'utf8')
+  const playerBar = fs.readFileSync(new URL('../src/components/PlayerBar.tsx', import.meta.url), 'utf8')
 
   assert.doesNotMatch(trackList, /layout="position"|scale:\s*\{/)
   assert.match(trackList, /initial=\{\{ opacity: 0 \}\}/)
@@ -116,7 +117,12 @@ test('song rows use opacity-only transitions and volume rail does not expand on 
   assert.ok(activeRail)
   assert.match(activeRail[1], /height: 4px/)
   assert.match(volumeCss, /transition: width 65ms cubic-bezier/)
-  assert.match(appCss, /transition: width 65ms cubic-bezier/)
+  assert.match(volumeCss, /transition: left 65ms cubic-bezier/)
+  assert.match(playerBar, /isDragging \? 'scrubbing'/)
+  assert.match(appCss, /\.scrubber-fill[\s\S]*?transition: none/)
+  assert.match(appCss, /\.scrubber-hitbox\.scrubbing \.scrubber-fill[\s\S]*?transition: width 55ms cubic-bezier/)
+  assert.match(appCss, /\.scrubber-hitbox\.scrubbing \.scrubber-thumb[\s\S]*?transition: left 55ms cubic-bezier/)
+  assert.doesNotMatch(appCss, /\.scrubber-fill \{[\s\S]*?transition: width 65ms cubic-bezier/)
 })
 test('native folder scan reports inaccessible subfolders without discarding accessible files', async () => {
   const originalWarn = console.warn
