@@ -982,7 +982,7 @@ test('song rows use opacity-only transitions and volume rail does not expand on 
   assert.ok(activeRail)
   assert.match(activeRail[1], /height: 4px/)
   assert.match(volumeCss, /transition: width 65ms cubic-bezier/)
-  assert.match(appCss, /transition: width 65ms cubic-bezier/)
+  assert.match(appCss, /transition: width 55ms cubic-bezier/)
 })
 
 test('native folder scan reports inaccessible subfolders without discarding accessible files', async () => {
