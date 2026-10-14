@@ -1864,7 +1864,12 @@ h3 {
   border-radius: inherit;
   background: var(--neutral-accent, #ffffff);
   pointer-events: none;
-  transition: width 65ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* Playback position is updated every animation frame; don't tween each frame. */
+  transition: none;
+}
+
+.scrubber-hitbox.scrubbing .scrubber-fill {
+  transition: width 55ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .scrubber-thumb {
@@ -1880,7 +1885,11 @@ h3 {
   transform: translate(-50%, -50%);
   opacity: 0.85;
   pointer-events: none;
-  transition: left 65ms cubic-bezier(0.22, 1, 0.36, 1), opacity 150ms ease, background 150ms ease;
+  transition: opacity 150ms ease, background 150ms ease;
+}
+
+.scrubber-hitbox.scrubbing .scrubber-thumb {
+  transition: left 55ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .scrubber-hitbox.active .scrubber-thumb,
