@@ -1376,3 +1376,26 @@ test('first-run setup completion is normalized and persisted in desktop payloads
   const incomplete = migrateDesktopLibraryPayload({ ...base, firstRunSetupCompleted: false })
   assert.equal(incomplete?.firstRunSetupCompleted, false)
 })
+
+
+test('search results animate individual rows out even when no tracks match', () => {
+  const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
+  const trackList = fs.readFileSync(new URL('../src/components/TrackList.tsx', import.meta.url), 'utf8')
+
+  // Keep TrackList mounted between search updates so its AnimatePresence can retain exiting rows.
+  assert.match(app, /key="track-list-results"/)
+  assert.doesNotMatch(app, /key=\{trackCount === 0 \? 'track-list-empty'/)
+  assert.match(trackList, /<AnimatePresence mode="wait" initial=\{false\}>[\s\S]*?tracks\.length === 0 \? \([\s\S]*?renderEmptyState\(\)[\s\S]*?<AnimatePresence initial=\{false\} mode="popLayout" propagate>/)
+  assert.match(trackList, /exit=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: -8 \}\}/)
+})
+
+test('skipping first-run music folder setup dismisses onboarding without a configured folder', () => {
+  const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
+
+  assert.match(
+    app,
+    /!firstRunSetupCompleted &&\s*\(!configuredMusicFolderPath \|\| tracks\.length === 0 \|\| isFirstRunSetupInProgress\)/,
+  )
+  assert.match(app, /onSetUpLater=\{finishFirstRunSetup\}/)
+  assert.match(app, /onSkipCoverArt=\{finishFirstRunSetup\}/)
+})
