@@ -7,8 +7,8 @@ A local-first music player for the browser and Windows desktop, built with React
 Install Node.js 22.12 or later (Node.js 24 LTS recommended) and npm.
 
 ```bash
-git clone https://github.com/todouro/music-app.git
-cd music-app
+git clone https://github.com/todouro/resonance.git
+cd resonance
 npm install
 npm run dev
 ```
