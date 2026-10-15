@@ -467,7 +467,6 @@ export const useMusicStore = create<MusicState>()(
     }),
     {
       name: 'resonance-playlists-v1',
-      version: 1,
       // Desktop libraries are persisted by desktopDatabase.ts. Keeping the full
       // library out of Zustand's synchronous localStorage write avoids serializing
       // thousands of tracks and artwork metadata on every store update.
@@ -475,17 +474,39 @@ export const useMusicStore = create<MusicState>()(
       version: 2,
       migrate: (persistedState) => {
         const persisted = persistedState as Partial<MusicState>
-        const playlists = ensureFavoritesPlaylist(
-          Array.isArray(persisted.playlists) ? persisted.playlists : [],
-        )
-        const requestedActivePlaylistId = persisted.activePlaylistId ?? libraryId
-        const activePlaylistId =
-          requestedActivePlaylistId === 'night-drive' ||
-          (requestedActivePlaylistId !== libraryId &&
-            !playlists.some((playlist) => playlist.id === requestedActivePlaylistId))
-            ? libraryId
-            : requestedActivePlaylistId
-        return { ...persisted, playlists, activePlaylistId }
+        const preferences = {
+          volume: typeof persisted.volume === 'number' ? persisted.volume : 0.82,
+          shuffle: typeof persisted.shuffle === 'boolean' ? persisted.shuffle : false,
+          repeat: persisted.repeat ?? 'off',
+          themeMode: persisted.themeMode ?? 'normal',
+          musicFolderPath: persisted.musicFolderPath,
+          coverFolderPath: persisted.coverFolderPath,
+          musicFolderName: persisted.musicFolderName,
+          coverFolderName: persisted.coverFolderName,
+          firstRunSetupCompleted: persisted.firstRunSetupCompleted ?? false,
+        }
+
+        if (Array.isArray(persisted.tracks)) {
+          const playlists = ensureFavoritesPlaylist(
+            Array.isArray(persisted.playlists) ? persisted.playlists : [],
+          )
+          const requestedActivePlaylistId =
+            typeof persisted.activePlaylistId === 'string' ? persisted.activePlaylistId : libraryId
+          const activePlaylistId =
+            requestedActivePlaylistId === 'night-drive' ||
+            (requestedActivePlaylistId !== libraryId &&
+              !playlists.some((playlist) => playlist.id === requestedActivePlaylistId))
+              ? libraryId
+              : requestedActivePlaylistId
+          return {
+            ...preferences,
+            tracks: persisted.tracks,
+            playlists,
+            activePlaylistId,
+          }
+        }
+
+        return preferences
       },
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<MusicState>
