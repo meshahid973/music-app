@@ -287,12 +287,14 @@ export function TrackList({
             <motion.article
               className={`track-row ${isCurrentTrack ? 'active ' : ''}${openMenuTrackId === track.id ? 'menu-open' : ''}`}
               key={track.id}
-              initial={isCurrentTrack ? { opacity: 0 } : { opacity: 0, y: 10 }}
+              layout="position"
+              initial={isCurrentTrack ? { opacity: 0 } : { opacity: 0, y: 24 }}
               animate={isCurrentTrack ? { opacity: 1 } : { opacity: 1, y: 0 }}
-              exit={isCurrentTrack ? { opacity: 0 } : { opacity: 0, y: -8 }}
+              exit={isCurrentTrack ? { opacity: 0 } : { opacity: 0, y: -22 }}
               transition={{
-                opacity: { duration: 0.2, delay: Math.min(offset * 0.008, 0.08) },
-                y: { duration: 0.24, ease: [0.22, 1, 0.36, 1], delay: Math.min(offset * 0.006, 0.06) },
+                layout: { duration: 0.38, ease: [0.22, 1, 0.36, 1] },
+                opacity: { duration: 0.22, delay: Math.min(offset * 0.008, 0.08) },
+                y: { duration: 0.3, ease: [0.22, 1, 0.36, 1], delay: Math.min(offset * 0.006, 0.06) },
               }}
               style={{
                 position: 'absolute',
