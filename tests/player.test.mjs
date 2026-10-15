@@ -978,9 +978,15 @@ test('song rows stay crisp, volume stays static, and progress easing only runs w
   const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
   const playerBar = fs.readFileSync(new URL('../src/components/PlayerBar.tsx', import.meta.url), 'utf8')
 
-  assert.doesNotMatch(trackList, /layout="position"|scale:\s*\{/)
+  // Position-only layout animation slides surviving rows into their new filtered slots
+  // without scaling text or controls (which can make the UI look soft).
+  assert.match(trackList, /layout="position"/)
+  assert.match(trackList, /layout: \{ duration: 0\.38, ease:/)
+  assert.doesNotMatch(trackList, /scale:\s*\{/)
   assert.match(trackList, /initial=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: 10 \}\}/)
-  assert.match(trackList, /exit=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: -8 \}\}/)
+  assert.match(trackList, /initial=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: 24 \}\}/)
+  assert.match(trackList, /exit=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: -22 \}\}/)
+  assert.match(trackList, /layout="position"/)
   assert.match(appCss, /\.track-more-btn \{[\s\S]*?background: transparent;[\s\S]*?border: 0;/)
   assert.match(app, /key="downloads-section"[\s\S]*?initial=\{\{ opacity: 0, y: 12 \}\}[\s\S]*?exit=\{\{ opacity: 0, y: -8 \}\}/)
   assert.match(app, /key="library-section"[\s\S]*?initial=\{\{ opacity: 0, y: 8 \}\}/)
