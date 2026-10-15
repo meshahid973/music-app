@@ -5,7 +5,7 @@ import { colorFromString, normalizeName } from './covers.ts'
 import { autoDetectTrackMetadata } from './metadata.ts'
 import { cleanDisplayTitle } from './tracks.ts'
 import { readBoundedNativeFile } from './boundedMetadata.ts'
-import { saveEmbeddedArtwork, saveFolderArtwork } from './artworkStorage.ts'
+import { flushArtworkIndex, saveEmbeddedArtwork, saveFolderArtwork } from './artworkStorage.ts'
 import { objectUrlForBlob } from './objectUrls.ts'
 import type { CoverLookup, Track } from '../types.ts'
 
@@ -128,6 +128,7 @@ export async function nativeCoversFromPaths(coverPaths: string[]): Promise<{
     }
   }
 
+  await flushArtworkIndex()
   return { lookup, paths, urls }
 }
 

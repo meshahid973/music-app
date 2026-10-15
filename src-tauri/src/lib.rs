@@ -1,3 +1,5 @@
+mod storage;
+
 use serde_json::Value;
 use tauri::Manager;
 use std::fs;
@@ -152,7 +154,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
-        .invoke_handler(tauri::generate_handler![download_audio, inspect_media_url])
+        .invoke_handler(tauri::generate_handler![download_audio, inspect_media_url, storage::save_appdata_snapshot, storage::load_appdata_snapshot])
         .run(tauri::generate_context!())
         .expect("error while running Resonance native music player");
 }

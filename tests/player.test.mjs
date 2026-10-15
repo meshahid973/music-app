@@ -20,6 +20,8 @@ import {
   sanitizeArtworkFilename,
 } from '../src/utils/artworkStorage.ts'
 import { migrateDesktopLibraryPayload } from '../src/utils/desktopDatabase.ts'
+import { artworkIndexMatches, parseArtworkIndex, serializeArtworkIndex } from '../src/utils/artworkIndex.ts'
+import { createSerializedWriter } from '../src/utils/serializedWrites.ts'
 import { nativeTracksFromPaths, scanNativeDroppedPaths, scanNativeFolder } from '../src/utils/nativeFileSystem.ts'
 import { getVirtualListRange } from '../src/utils/virtualList.ts'
 import { processTrackEdit } from '../src/utils/trackEdit.ts'
@@ -1445,4 +1447,59 @@ test('playlist actions are accessible from the playlist-name menu, not duplicate
   assert.match(app, /<PlaylistActionMenu[\s\S]*?onAddToPlaylist=\{setPlaylistToAddSongs\}/)
   assert.match(sidebar, /<PlaylistActionMenu[\s\S]*?onAddToPlaylist=\{onOpenAddToPlaylist\}/)
   assert.doesNotMatch(app, /className="library-tool-add-btn"/)
+})
+
+
+test('artwork index reuses unchanged source metadata and rejects unsafe or stale entries', () => {
+  const entries = new Map([['C:\\Music\\Album\\cover.jpg', {
+    size: 12345,
+    modifiedMs: 1000,
+    relativePath: 'artwork/folder_cover_1234_abcd.jpg',
+  }]])
+  const saved = serializeArtworkIndex(entries)
+  const parsed = parseArtworkIndex(saved)
+  assert.deepEqual(parsed, entries)
+  assert.equal(artworkIndexMatches(parsed.values().next().value, 12345, 1000), true)
+  assert.equal(artworkIndexMatches(parsed.values().next().value, 12345, 1001), false)
+  assert.equal(artworkIndexMatches(parsed.values().next().value, 12346, 1000), false)
+  assert.equal(artworkIndexMatches(parsed.values().next().value, 12345, undefined), false)
+  const malicious = JSON.stringify({
+    version: 1,
+    entries: {
+      outside: { size: 1, modifiedMs: 1, relativePath: '../../other/image.jpg' },
+      missing: { size: 1, modifiedMs: 1, relativePath: 'artwork/folder_cover_1234_abcd.jpg' },
+    },
+  })
+  assert.equal(parseArtworkIndex(malicious).has('outside'), false)
+  assert.equal(parseArtworkIndex('{bad json').size, 0)
+  assert.equal(parseArtworkIndex('{"version":7,"entries":{}}').size, 0)
+})
+
+test('serialized writes retain order even when the first write is slow', async () => {
+  const calls = []
+  let releaseFirst
+  const firstGate = new Promise((resolve) => { releaseFirst = resolve })
+  const save = createSerializedWriter(async (value) => {
+    calls.push('start ' + value)
+    if (value === 1) await firstGate
+    calls.push('end ' + value)
+  })
+  const first = save(1)
+  const second = save(2)
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(calls, ['start 1'])
+  releaseFirst()
+  await Promise.all([first, second])
+  assert.deepEqual(calls, ['start 1', 'end 1', 'start 2', 'end 2'])
+})
+
+test('a failed save does not poison subsequent serialized writes', async () => {
+  const calls = []
+  const save = createSerializedWriter(async (value) => {
+    calls.push(value)
+    if (value === 'broken') throw new Error('disk error')
+  })
+  await assert.rejects(save('broken'), /disk error/)
+  await save('recovered')
+  assert.deepEqual(calls, ['broken', 'recovered'])
 })

@@ -5,6 +5,7 @@ import { assignCoversToTracks, syncTracksWithCovers, uniqueTracks } from '../uti
 import { loadDesktopLibrary, saveDesktopLibrary } from '../utils/desktopDatabase.ts'
 import { hydrateTracksArtwork, sanitizeTracksForPersistence } from '../utils/artworkStorage.ts'
 import { isDesktopApp } from '../utils/platform.ts'
+import { showToast } from './useToastStore.ts'
 
 type MusicState = {
   tracks: Track[]
@@ -80,9 +81,16 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 let initPromise: Promise<void> | null = null
 
 function queueSave(state: MusicState) {
+  if (!state.isInitialized) {
+    // Startup recovery must finish before any imported preferences or tracks
+    // can overwrite the user's older AppData snapshot.
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => queueSave(useMusicStore.getState()), 400)
+    return
+  }
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
-    saveDesktopLibrary({
+    void saveDesktopLibrary({
       tracks: state.tracks.filter((t) => Boolean(t.filePath)),
       playlists: state.playlists,
       activePlaylistId: state.activePlaylistId,
@@ -96,7 +104,7 @@ function queueSave(state: MusicState) {
       musicFolderName: state.musicFolderName,
       coverFolderName: state.coverFolderName,
       firstRunSetupCompleted: state.firstRunSetupCompleted,
-    })
+    }).catch((error) => console.warn('Could not save music library:', error))
   }, 400)
 }
 
@@ -241,6 +249,12 @@ export const useMusicStore = create<MusicState>()(
             }
           } catch (err) {
             console.warn('Could not initialize desktop storage:', err)
+            if (isDesktopApp()) {
+              showToast('Saved library could not be loaded. Original AppData files are preserved.', {
+                title: 'Library Recovery Needed',
+                type: 'error',
+              })
+            }
           } finally {
             initPromise = null
           }
@@ -304,11 +318,32 @@ export const useMusicStore = create<MusicState>()(
       addCovers: (covers, extraUrls = [], coverPaths = new Map()) =>
         set((state) => {
           const mergedLookup = new Map(state.coverLookup)
+          let lookupChanged = false
           for (const [key, value] of covers.entries()) {
+            if (mergedLookup.get(key) !== value) lookupChanged = true
             mergedLookup.set(key, value)
           }
-          const incomingCovers = Array.from(new Set([...Array.from(covers.values()), ...extraUrls]))
+          const incomingCovers = Array.from(new Set([...covers.values(), ...extraUrls]))
           const updatedPool = Array.from(new Set([...state.coverPool, ...incomingCovers]))
+          const poolChanged = updatedPool.length !== state.coverPool.length
+
+          // Repeated folder scans should not rematch thousands of saved tracks
+          // when the artwork lookup and the copied file paths are unchanged.
+          let pathChanged = false
+          if (!lookupChanged && !poolChanged && coverPaths.size > 0) {
+            const directPathsByUrl = new Map(
+              state.tracks
+                .filter((track) => track.coverSource === 'direct' && track.coverUrl)
+                .map((track) => [track.coverUrl, track.coverPath]),
+            )
+            pathChanged = Array.from(coverPaths.entries()).some(([key, path]) => {
+              const url = covers.get(key)
+              return url !== undefined && directPathsByUrl.has(url) &&
+                directPathsByUrl.get(url) !== path
+            })
+          }
+          if (!lookupChanged && !poolChanged && !pathChanged) return {}
+
           const tracksWithCovers = syncTracksWithCovers(state.tracks, mergedLookup, updatedPool)
 
           // Keep the original file path beside the asset URL. Asset URLs alone are not

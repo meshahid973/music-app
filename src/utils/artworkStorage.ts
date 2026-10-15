@@ -1,7 +1,71 @@
-import { BaseDirectory, exists, mkdir, readFile, writeFile } from '@tauri-apps/plugin-fs'
+import { BaseDirectory, exists, mkdir, readFile, stat, writeFile } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
 import { appDataDir, join } from '@tauri-apps/api/path'
 import { isDesktopApp, toNativeAssetUrl } from './platform.ts'
 import type { Track } from '../types.ts'
+import {
+  artworkIndexMatches,
+  parseArtworkIndex,
+  serializeArtworkIndex,
+  type ArtworkIndexEntry,
+} from './artworkIndex.ts'
+
+// A cache miss never prevents artwork from importing. The on-disk index is optional
+// and may be discarded/rebuilt without touching existing user-selected artwork.
+let artworkIndexPromise: Promise<Map<string, ArtworkIndexEntry>> | null = null
+let artworkIndexTimer: ReturnType<typeof setTimeout> | null = null
+let artworkIndexDirty = false
+let artworkIndexWriteTail: Promise<void> = Promise.resolve()
+const artworkInFlight = new Map<string, Promise<string | null>>()
+
+async function loadArtworkIndex(): Promise<Map<string, ArtworkIndexEntry>> {
+  if (!artworkIndexPromise) {
+    artworkIndexPromise = (async () => {
+      try {
+        const result = await invoke<{ json: string | null }>('load_appdata_snapshot', { kind: 'artwork' })
+        return parseArtworkIndex(result.json)
+      } catch (error) {
+        console.warn('Rebuilding optional artwork cache:', error)
+        return new Map<string, ArtworkIndexEntry>()
+      }
+    })()
+  }
+  return artworkIndexPromise
+}
+
+function scheduleArtworkIndexSave(): void {
+  artworkIndexDirty = true
+  if (artworkIndexTimer !== null) clearTimeout(artworkIndexTimer)
+  artworkIndexTimer = setTimeout(() => {
+    artworkIndexTimer = null
+    void flushArtworkIndex()
+  }, 300)
+}
+
+/** Flushes a batch once, rather than serializing a manifest for every cover. */
+export async function flushArtworkIndex(): Promise<void> {
+  if (!isDesktopApp()) return
+  if (artworkIndexTimer !== null) {
+    clearTimeout(artworkIndexTimer)
+    artworkIndexTimer = null
+  }
+  if (!artworkIndexDirty) {
+    await artworkIndexWriteTail.catch(() => {})
+    return
+  }
+  artworkIndexDirty = false
+  const json = serializeArtworkIndex(await loadArtworkIndex())
+  const write = artworkIndexWriteTail.catch(() => {}).then(() =>
+    invoke<void>('save_appdata_snapshot', { kind: 'artwork', json }),
+  )
+  artworkIndexWriteTail = write
+  try {
+    await write
+  } catch (error) {
+    artworkIndexDirty = true
+    console.warn('Could not save optional artwork index; future scans will rebuild it:', error)
+  }
+}
 
 export function sanitizeArtworkFilename(name: string): string {
   const base = name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 32)
@@ -58,10 +122,25 @@ export async function saveEmbeddedArtwork(
  * cannot be used directly as <img src> URLs. A content fingerprint also gives changed
  * artwork a new URL, avoiding stale WebView image-cache entries after a rescan.
  */
-export async function saveFolderArtwork(sourcePath: string): Promise<string | null> {
-  if (!isDesktopApp()) return null
-
+async function saveFolderArtworkOnce(sourcePath: string): Promise<string | null> {
   try {
+    const index = await loadArtworkIndex()
+    // Only trust the index when both the file size and modification time match.
+    // If stat permission is unavailable, fall back to fingerprinting the bytes.
+    const info = await stat(sourcePath).catch(() => null)
+    const modifiedMs = info?.mtime instanceof Date ? info.mtime.getTime() : undefined
+    const previous = index.get(sourcePath)
+    if (info && artworkIndexMatches(previous, info.size, modifiedMs) && previous) {
+      const cached = await stat(previous.relativePath, { baseDir: BaseDirectory.AppData }).catch(() => null)
+      if (cached?.isFile && cached.size === info.size) {
+        return join(await appDataDir(), ...previous.relativePath.split('/'))
+      }
+    }
+
+    if (info && (info.size === 0 || info.size > 25 * 1024 * 1024)) {
+      console.warn('Skipping empty or oversized cover:', sourcePath)
+      return null
+    }
     const bytes = await readFile(sourcePath)
     if (bytes.length === 0 || bytes.length > 25 * 1024 * 1024) {
       console.warn('Skipping artwork that is empty or larger than 25 MiB:', sourcePath)
@@ -69,9 +148,7 @@ export async function saveFolderArtwork(sourcePath: string): Promise<string | nu
     }
 
     let hash = 2166136261
-    for (const byte of bytes) {
-      hash = Math.imul(hash ^ byte, 16777619)
-    }
+    for (const byte of bytes) hash = Math.imul(hash ^ byte, 16777619)
     const fingerprint = (hash >>> 0).toString(16)
     const extension = sourcePath.match(/\.([a-z0-9]{2,5})$/i)?.[1]?.toLowerCase()
     const allowedExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'avif', 'bmp', 'gif', 'svg'])
@@ -79,17 +156,38 @@ export async function saveFolderArtwork(sourcePath: string): Promise<string | nu
     const fileName = `folder_${sanitizeArtworkFilename(sourcePath)}_${fingerprint}.${ext}`
     const relativePath = `artwork/${fileName}`
 
-    const artworkDirExists = await exists('artwork', { baseDir: BaseDirectory.AppData })
-    if (!artworkDirExists) {
+    // A previous interrupted copy may exist but be incomplete. Size-check it
+    // before reusing its deterministic, content-fingerprinted destination.
+    const copied = await stat(relativePath, { baseDir: BaseDirectory.AppData }).catch(() => null)
+    if (!copied?.isFile || copied.size !== bytes.length) {
       await mkdir('artwork', { baseDir: BaseDirectory.AppData, recursive: true })
+      await writeFile(relativePath, bytes, { baseDir: BaseDirectory.AppData })
     }
 
-    await writeFile(relativePath, bytes, { baseDir: BaseDirectory.AppData })
-    const appData = await appDataDir()
-    return await join(appData, 'artwork', fileName)
-  } catch (err) {
-    console.warn('Failed to copy cover-folder artwork into AppData:', sourcePath, err)
+    // Only persist reliable filesystem metadata. Without an mtime, a subsequent
+    // scan safely re-hashes the file rather than returning stale cover artwork.
+    if (info && Number.isFinite(modifiedMs)) {
+      index.set(sourcePath, { size: info.size, modifiedMs: modifiedMs!, relativePath })
+      scheduleArtworkIndexSave()
+    }
+    return join(await appDataDir(), 'artwork', fileName)
+  } catch (error) {
+    console.warn('Failed to cache cover-folder artwork:', sourcePath, error)
     return null
+  }
+}
+
+export async function saveFolderArtwork(sourcePath: string): Promise<string | null> {
+  if (!isDesktopApp()) return null
+  // Rescans and manual imports can overlap. Deduplicate identical in-flight copies.
+  const existing = artworkInFlight.get(sourcePath)
+  if (existing) return existing
+  const task = saveFolderArtworkOnce(sourcePath)
+  artworkInFlight.set(sourcePath, task)
+  try {
+    return await task
+  } finally {
+    artworkInFlight.delete(sourcePath)
   }
 }
 

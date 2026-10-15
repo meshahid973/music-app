@@ -34,6 +34,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build Tauri Windows desktop installer
         run: npx tauri build
+      - name: Test native snapshot recovery
+        run: cargo test --manifest-path src-tauri/Cargo.toml --release --lib storage::tests
       - name: Smoke-test per-user installation and app startup
         shell: pwsh
         run: |

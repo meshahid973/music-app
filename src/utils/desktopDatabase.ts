@@ -1,5 +1,6 @@
-import { BaseDirectory, exists, mkdir, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
 import { isDesktopApp } from './platform.ts'
+import { createSerializedWriter } from './serializedWrites.ts'
 import { hydrateTracksArtwork, sanitizeTracksForPersistence } from './artworkStorage.ts'
 import type { Playlist, RepeatMode, ThemeMode, Track } from '../types.ts'
 
@@ -20,7 +21,6 @@ export interface DesktopLibraryPayload {
   firstRunSetupCompleted?: boolean
 }
 
-const STORAGE_FILE = 'resonance_library.json'
 const WEB_STORAGE_KEY = 'resonance_desktop_library_backup'
 const STORAGE_VERSION = 2
 
@@ -102,59 +102,60 @@ function safeReadJson(raw: string): unknown {
   }
 }
 
-export async function saveDesktopLibrary(data: DesktopLibraryPayload): Promise<void> {
+type SnapshotResult = { json: string | null; recovered: boolean }
+
+// A failed native load must never be followed by an automatic empty-library save.
+// Leave the user's original files in AppData for manual recovery.
+let nativeWritesBlocked = false
+
+/** Serialize disk writes, preserving call order and never running two at once. */
+export const saveDesktopLibrary = createSerializedWriter(async (data: DesktopLibraryPayload): Promise<void> => {
   const payload: DesktopLibraryPayload = {
     ...data,
     version: STORAGE_VERSION,
     tracks: sanitizeTracksForPersistence(Array.isArray(data.tracks) ? data.tracks : []),
   }
-
-  // Compact JSON reduces CPU spent formatting large libraries and disk size.
   const json = JSON.stringify(payload)
 
-  // Browser builds need a localStorage fallback. In the Windows desktop app,
-  // keep the full library in AppData only: synchronous localStorage writes of a
-  // large JSON library can block the WebView2 UI thread during frequent edits.
-  if (!isDesktopApp()) {
+  const persist = async () => {
+    if (isDesktopApp()) {
+      if (nativeWritesBlocked) {
+        throw new Error('Library writes are disabled because the saved library needs recovery.')
+      }
+      await invoke<void>('save_appdata_snapshot', { kind: 'library', json })
+      return
+    }
+    // Keep browser-only persistence behavior unchanged.
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(WEB_STORAGE_KEY, json)
       }
     } catch {
-      // ignore
+      // Browser private mode/storage quotas can disable localStorage.
     }
   }
 
-  if (isDesktopApp()) {
-    try {
-      try {
-        const appDataExists = await exists('.', { baseDir: BaseDirectory.AppData })
-        if (!appDataExists) {
-          await mkdir('.', { baseDir: BaseDirectory.AppData, recursive: true })
-        }
-      } catch {
-        // Directory may already exist or root check may not be needed before writeTextFile
-      }
-      await writeTextFile(STORAGE_FILE, json, { baseDir: BaseDirectory.AppData })
-    } catch (err) {
-      console.warn('Failed to save native library to AppData:', err)
-    }
-  }
-}
+  await persist()
+})
 
 export async function loadDesktopLibrary(): Promise<DesktopLibraryPayload | null> {
   if (isDesktopApp()) {
     try {
-      const fileExists = await exists(STORAGE_FILE, { baseDir: BaseDirectory.AppData })
-      if (fileExists) {
-        const content = await readTextFile(STORAGE_FILE, { baseDir: BaseDirectory.AppData })
-        if (content) {
-          const parsed = migrateDesktopLibraryPayload(safeReadJson(content))
-          if (parsed) return parsed
-        }
+      const snapshot = await invoke<SnapshotResult>('load_appdata_snapshot', { kind: 'library' })
+      if (snapshot.recovered) {
+        console.warn('Resonance restored the library from its last good AppData backup.')
       }
-    } catch (err) {
-      console.warn('Failed to load native library from AppData:', err)
+      if (snapshot.json !== null) {
+        const parsed = migrateDesktopLibraryPayload(safeReadJson(snapshot.json))
+        if (!parsed) throw new Error('Stored library has an unsupported format')
+        nativeWritesBlocked = false
+        return parsed
+      }
+      nativeWritesBlocked = false
+    } catch (error) {
+      nativeWritesBlocked = true
+      console.error('Library recovery required; refusing to overwrite existing AppData:', error)
+      throw error
     }
   }
 
