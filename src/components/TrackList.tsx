@@ -148,13 +148,15 @@ export function TrackList({
   const favoritesPlaylist = playlists.find((p) => p.id === favoritesId)
   const favoriteTrackIds = new Set(favoritesPlaylist?.trackIds ?? [])
 
-  if (tracks.length === 0) {
+  const renderEmptyState = () => {
     if (activePlaylistId !== libraryId && activePlaylist) {
       return (
         <motion.div
+          key="empty-playlist-state"
           className="empty-state empty-playlist-state"
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
         >
           <DiscFilled size={42} />
           <h3>"{activePlaylist.name}" is empty</h3>
@@ -176,7 +178,13 @@ export function TrackList({
     }
 
     return (
-      <motion.div className="empty-state" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+      <motion.div
+        key="empty-library-state"
+        className="empty-state"
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+      >
         <DiscFilled size={42} />
         <h3>Your library is waiting</h3>
         <p>Add songs manually or import an entire music folder. Covers will automatically be applied to songs in your library.</p>
@@ -257,6 +265,9 @@ export function TrackList({
 
   return (
     <AnimatePresence mode="wait" initial={false}>
+      {tracks.length === 0 ? (
+        renderEmptyState()
+      ) : (
       <motion.div
         key={activePlaylistId}
         ref={listRef}
@@ -267,7 +278,7 @@ export function TrackList({
         exit={{ opacity: 0, y: -6 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       >
-        <AnimatePresence initial={false} mode="popLayout">
+        <AnimatePresence initial={false} mode="popLayout" propagate>
         {tracks.slice(visibleRange.start, visibleRange.end).map((track, offset) => {
           const index = visibleRange.start + offset
           const isCurrentTrack = currentTrackId === track.id
@@ -431,6 +442,7 @@ export function TrackList({
         })}
         </AnimatePresence>
       </motion.div>
+      )}
     </AnimatePresence>
   )
 }
