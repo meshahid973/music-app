@@ -128,9 +128,8 @@ function App() {
   const shouldShowFirstRunSetup =
     isDesktop &&
     isInitialized &&
-    (!configuredMusicFolderPath ||
-      (!firstRunSetupCompleted && tracks.length === 0) ||
-      isFirstRunSetupInProgress)
+    !firstRunSetupCompleted &&
+    (!configuredMusicFolderPath || tracks.length === 0 || isFirstRunSetupInProgress)
   const visibleFirstRunStep =
     configuredMusicFolderPath && !isFirstRunSetupInProgress && firstRunSetupStep === 'music'
       ? 'covers'
@@ -371,7 +370,7 @@ function App() {
 
         <AnimatePresence mode="sync" initial={false}>
           <motion.div
-            key={trackCount === 0 ? 'track-list-empty' : 'track-list-results'}
+            key="track-list-results"
             className="track-list-transition"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
