@@ -983,7 +983,7 @@ test('song rows stay crisp, volume stays static, and progress easing only runs w
   assert.match(trackList, /layout="position"/)
   assert.match(trackList, /layout: \{ duration: 0\.38, ease:/)
   assert.doesNotMatch(trackList, /scale:\s*\{/)
-  assert.match(trackList, /initial=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: 10 \}\}/)
+  assert.match(trackList, /initial=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: 24 \}\}/)
   assert.match(trackList, /initial=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: 24 \}\}/)
   assert.match(trackList, /exit=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: -22 \}\}/)
   assert.match(trackList, /layout="position"/)
@@ -1392,7 +1392,7 @@ test('search results animate individual rows out even when no tracks match', () 
   assert.match(app, /key="track-list-results"/)
   assert.doesNotMatch(app, /key=\{trackCount === 0 \? 'track-list-empty'/)
   assert.match(trackList, /<AnimatePresence mode="wait" initial=\{false\}>[\s\S]*?tracks\.length === 0 \? \([\s\S]*?renderEmptyState\(\)[\s\S]*?<AnimatePresence initial=\{false\} mode="popLayout" propagate>/)
-  assert.match(trackList, /exit=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: -8 \}\}/)
+  assert.match(trackList, /exit=\{isCurrentTrack \? \{ opacity: 0 \} : \{ opacity: 0, y: -22 \}\}/)
 })
 
 test('skipping first-run music folder setup dismisses onboarding without a configured folder', () => {
