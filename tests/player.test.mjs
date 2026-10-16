@@ -921,12 +921,15 @@ test('hover interactions avoid transform scaling that softens text and controls'
 
   for (const path of [
     '../src/components/TrackList.tsx',
-    '../src/components/PlayerBar.tsx',
     '../src/components/modals/AddToPlaylistModal.tsx',
   ]) {
     const source = fs.readFileSync(new URL(path, import.meta.url), 'utf8')
     assert.doesNotMatch(source, /\bwhileHover\s*=|\bwhileTap\s*=/, path)
   }
+  const playerBar = fs.readFileSync(new URL('../src/components/PlayerBar.tsx', import.meta.url), 'utf8')
+  assert.match(playerBar, /whileHover=\{\{ scale: 1\.06 \}\}/)
+  assert.match(playerBar, /whileTap=\{\{ scale: 0\.94 \}\}/)
+  assert.match(playerBar, /AnimatePresence mode="wait"/)
 })
 
 test('search matches Unicode styled alphabets, accents, and invisible formatting marks', () => {
@@ -971,7 +974,7 @@ test('deleting a song removes playlist references and stops it if currently play
   }
 })
 
-test('song rows stay crisp, volume stays static, and progress easing only runs while seeking', () => {
+test('song rows stay crisp while playback progress and volume use React Bits ElasticSlider', () => {
   const appCss = fs.readFileSync(new URL('../src/App.css', import.meta.url), 'utf8')
   const volumeCss = fs.readFileSync(new URL('../src/components/ElasticSlider.css', import.meta.url), 'utf8')
   const trackList = fs.readFileSync(new URL('../src/components/TrackList.tsx', import.meta.url), 'utf8')
@@ -990,12 +993,16 @@ test('song rows stay crisp, volume stays static, and progress easing only runs w
   assert.match(appCss, /\.track-more-btn \{[\s\S]*?background: transparent;[\s\S]*?border: 0;/)
   assert.match(app, /key="downloads-section"[\s\S]*?initial=\{\{ opacity: 0, y: 12 \}\}[\s\S]*?exit=\{\{ opacity: 0, y: -8 \}\}/)
   assert.match(app, /key="library-section"[\s\S]*?initial=\{\{ opacity: 0, y: 8 \}\}/)
-  const activeRail = volumeCss.match(/\.volume-track-container\.active \.volume-track-rail,[\s\S]*?\{([\s\S]*?)\}/)
-  assert.ok(activeRail)
-  assert.match(activeRail[1], /height: 4px/)
-  assert.match(volumeCss, /transition: width 65ms cubic-bezier/)
-  assert.match(volumeCss, /transition: left 65ms cubic-bezier/)
-  assert.match(playerBar, /isDragging \? 'scrubbing'/)
+  const elasticSlider = fs.readFileSync(new URL('../src/components/ElasticSlider.tsx', import.meta.url), 'utf8')
+  assert.match(volumeCss, /\.elastic-slider__track\s*\{[\s\S]*?will-change: transform;/)
+  assert.match(elasticSlider, /rubber\(over, s\.maxStretch\)/)
+  assert.match(elasticSlider, /valueSourceRef/)
+  assert.match(playerBar, /valueSourceRef=\{progressValueRef\}/)
+  assert.match(playerBar, /ariaLabel="Playback progress"/)
+  assert.match(playerBar, /ariaLabel="Volume"/)
+  assert.match(playerBar, /leftIcon=\{<HugeiconsIcon icon=\{VolumeLowIcon\}/)
+  assert.match(playerBar, /rightIcon=\{<HugeiconsIcon icon=\{VolumeHighIcon\}/)
+  assert.match(playerBar, /whileTap=\{\{ scale: 0\.92 \}\}/)
   assert.match(appCss, /\.scrubber-fill \{[\s\S]*?transition: none/)
   assert.match(appCss, /\.scrubber-hitbox\.scrubbing \.scrubber-fill[\s\S]*?transition: width 55ms cubic-bezier/)
   assert.match(appCss, /\.scrubber-hitbox\.scrubbing \.scrubber-thumb[\s\S]*?transition: left 55ms cubic-bezier/)
