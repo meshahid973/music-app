@@ -1423,6 +1423,10 @@ test('track and playlist action menus use subtle enter and exit animations', () 
   assert.match(trackList, /<AnimatePresence initial=\{false\}>[\s\S]*?className="track-action-menu-popover"[\s\S]*?initial=\{\{ opacity: 0, y: -5, scale: 0\.98 \}\}/)
   assert.match(playlistMenu, /className="playlist-action-menu-popover"[\s\S]*?initial=\{\{ opacity: 0, y: -5, scale: 0\.98 \}\}[\s\S]*?exit=\{\{ opacity: 0, y: -3, scale: 0\.98 \}\}/)
   assert.match(playlistMenu, /Add to playlist[\s\S]*?Rename[\s\S]*?Delete/)
+  assert.match(trackList, /layoutId=\{`track-action-glide-\$\{track\.id\}`\}/)
+  assert.match(playlistMenu, /layoutId=\{`playlist-action-glide-\$\{playlist\.id\}`\}/)
+  const css = fs.readFileSync(new URL('../src/App.css', import.meta.url), 'utf8')
+  assert.match(css, /\.glide-menu-highlight\s*\{[\s\S]*?pointer-events: none;/)
 })
 
 test('add-to-playlist search reserves a single aligned row for text and clear button', () => {
