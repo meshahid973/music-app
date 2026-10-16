@@ -71,6 +71,7 @@ export function TrackList({
   const listRef = useRef<HTMLDivElement | null>(null)
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 32 })
   const [openMenuTrackId, setOpenMenuTrackId] = useState<string | null>(null)
+  const [hoveredTrackMenuItem, setHoveredTrackMenuItem] = useState<'edit' | 'delete' | null>(null)
 
   useEffect(() => {
     if (!openMenuTrackId) return
@@ -387,6 +388,7 @@ export function TrackList({
                     title="Song actions"
                     onClick={(e) => {
                       e.stopPropagation()
+                      setHoveredTrackMenuItem(null)
                       setOpenMenuTrackId((current) => current === track.id ? null : track.id)
                     }}
                   >
@@ -407,12 +409,28 @@ export function TrackList({
                         type="button"
                         role="menuitem"
                         className="track-menu-item"
+                        onMouseEnter={() => setHoveredTrackMenuItem('edit')}
+                        onFocus={() => setHoveredTrackMenuItem('edit')}
+                        onBlur={(event) => {
+                          if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) {
+                            setHoveredTrackMenuItem(null)
+                          }
+                        }}
                         onClick={(e) => {
                           e.stopPropagation()
                           setOpenMenuTrackId(null)
+                          setHoveredTrackMenuItem(null)
                           onEditTrack(track)
                         }}
                       >
+                        {hoveredTrackMenuItem === 'edit' && (
+                          <motion.span
+                            layoutId={`track-action-glide-${track.id}`}
+                            className="glide-menu-highlight"
+                            aria-hidden="true"
+                            transition={{ layout: { duration: 0.22, ease: [0.22, 1, 0.36, 1] } }}
+                          />
+                        )}
                         <PencilFilled size={14} />
                         <span>Edit</span>
                       </button>
@@ -421,12 +439,28 @@ export function TrackList({
                         role="menuitem"
                         className="track-menu-item danger"
                         title="Remove from Resonance; keeps the original audio file"
+                        onMouseEnter={() => setHoveredTrackMenuItem('delete')}
+                        onFocus={() => setHoveredTrackMenuItem('delete')}
+                        onBlur={(event) => {
+                          if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) {
+                            setHoveredTrackMenuItem(null)
+                          }
+                        }}
                         onClick={(e) => {
                           e.stopPropagation()
                           setOpenMenuTrackId(null)
+                          setHoveredTrackMenuItem(null)
                           onDeleteTrack(track)
                         }}
                       >
+                        {hoveredTrackMenuItem === 'delete' && (
+                          <motion.span
+                            layoutId={`track-action-glide-${track.id}`}
+                            className="glide-menu-highlight"
+                            aria-hidden="true"
+                            transition={{ layout: { duration: 0.22, ease: [0.22, 1, 0.36, 1] } }}
+                          />
+                        )}
                         <TrashFilled size={14} />
                         <span>Delete</span>
                       </button>
