@@ -127,36 +127,27 @@ export function PlayerBar({
       {/* 2. Center Transport Controls & Modern Scrubber */}
       <div className="transport">
         <div className="transport-buttons">
-          <motion.button
+          <button
             className={shuffle ? 'control active' : 'control'}
             type="button"
             onClick={onShuffle}
             aria-label="Toggle shuffle"
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
-            transition={{ type: 'spring', stiffness: 460, damping: 24 }}
           >
             <ShuffleFilled size={18} />
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             className="control"
             type="button"
             onClick={onPrevious}
             aria-label="Previous track"
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
-            transition={{ type: 'spring', stiffness: 460, damping: 24 }}
           >
             <SkipBackFilled size={20} />
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             className="play-button"
             type="button"
             onClick={onTogglePlay}
             aria-label={isPlaying ? 'Pause' : 'Play'}
-            whileHover={{ scale: 1.045 }}
-            whileTap={{ scale: 0.92 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 22 }}
           >
             <AnimatePresence mode="wait" initial={false}>
               <motion.span
@@ -170,29 +161,23 @@ export function PlayerBar({
                 {isPlaying ? <PauseFilled size={24} /> : <PlayFilled size={24} />}
               </motion.span>
             </AnimatePresence>
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             className="control"
             type="button"
             onClick={onNext}
             aria-label="Next track"
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
-            transition={{ type: 'spring', stiffness: 460, damping: 24 }}
           >
             <SkipForwardFilled size={20} />
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             className={repeat !== 'off' ? 'control active' : 'control'}
             type="button"
             onClick={onRepeat}
             aria-label="Cycle repeat mode"
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
-            transition={{ type: 'spring', stiffness: 460, damping: 24 }}
           >
             {repeat === 'one' ? <RepeatOneFilled size={18} /> : <RepeatFilled size={18} />}
-          </motion.button>
+          </button>
         </div>
 
         {/* React Bits ElasticSlider playback timeline */}
