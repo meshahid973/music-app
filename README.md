@@ -40,12 +40,12 @@ npm run tauri:build:win
 ```
 
 The NSIS installer will be output to:
-`src-tauri/target/release/bundle/nsis/Resonance_1.0.0_x64-setup.exe`
+`src-tauri/target/release/bundle/nsis/Resonance_1.1.0_x64-setup.exe`
 
 ### Option 2: Build via GitHub Actions
 
-1. Push to `main` or manually trigger the **Verify music player** or **Release Resonance** workflow via `workflow_dispatch` in the **Actions** tab to download the `Resonance-Windows-Setup` artifact containing `Resonance_1.0.0_x64-setup.exe`.
-2. Push a version tag (`git tag v1.0.0 && git push origin v1.0.0`) to automatically publish a GitHub Release with `Resonance_1.0.0_x64-setup.exe` and `.msi` installers attached.
+1. Push to `main` or manually trigger the **Verify music player** or **Release Resonance** workflow via `workflow_dispatch` in the **Actions** tab to download the `Resonance-Windows-Setup` artifact containing `Resonance_1.1.0_x64-setup.exe`.
+2. Push a version tag (`git tag v1.1.0 && git push origin v1.1.0`) to automatically publish a GitHub Release with `Resonance_1.1.0_x64-setup.exe` and `.msi` installers attached.
 
 ## Using Resonance
 
