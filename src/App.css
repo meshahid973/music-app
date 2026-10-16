@@ -3777,9 +3777,9 @@ h3 {
 }
 
 .track-menu-item > svg,
-.track-menu-item > span,
+.track-menu-item > span:not(.glide-menu-highlight),
 .playlist-action-menu-item > svg,
-.playlist-action-menu-item > span {
+.playlist-action-menu-item > span:not(.glide-menu-highlight) {
   position: relative;
   z-index: 1;
 }
