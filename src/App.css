@@ -3755,3 +3755,42 @@ h3 {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* React Bits-inspired glide highlight for three-dot action menus. */
+.glide-menu-highlight {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.085);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  pointer-events: none;
+}
+
+.track-menu-item,
+.playlist-action-menu-item {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.track-menu-item > svg,
+.track-menu-item > span,
+.playlist-action-menu-item > svg,
+.playlist-action-menu-item > span {
+  position: relative;
+  z-index: 1;
+}
+
+.track-menu-item:hover,
+.track-menu-item:focus-visible,
+.track-menu-item.danger:hover,
+.track-menu-item.danger:focus-visible,
+.playlist-action-menu-item:hover:not(:disabled),
+.playlist-action-menu-item:focus-visible:not(:disabled),
+.playlist-action-menu-item.danger:hover:not(:disabled),
+.playlist-action-menu-item.danger:focus-visible:not(:disabled) {
+  background: transparent;
+}
