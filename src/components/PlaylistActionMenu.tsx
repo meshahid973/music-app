@@ -20,6 +20,7 @@ export function PlaylistActionMenu({
   onDeletePlaylist,
 }: PlaylistActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [hoveredItem, setHoveredItem] = useState<'add' | 'rename' | 'delete' | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const isProtectedPlaylist = playlist.id === favoritesId
 
@@ -43,6 +44,7 @@ export function PlaylistActionMenu({
     event.preventDefault()
     event.stopPropagation()
     setIsOpen(false)
+    setHoveredItem(null)
     action()
   }
 
@@ -57,6 +59,7 @@ export function PlaylistActionMenu({
         title={`Playlist actions for "${playlist.name}"`}
         onClick={(event) => {
           event.stopPropagation()
+          setHoveredItem(null)
           setIsOpen((open) => !open)
         }}
       >
@@ -79,8 +82,18 @@ export function PlaylistActionMenu({
               role="menuitem"
               className="playlist-action-menu-item"
               disabled={!onAddToPlaylist}
+              onMouseEnter={() => { if (onAddToPlaylist) setHoveredItem('add') }}
+              onFocus={() => { if (onAddToPlaylist) setHoveredItem('add') }}
+              onBlur={(event) => {
+                if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) {
+                  setHoveredItem(null)
+                }
+              }}
               onClick={(event) => runAction(event, () => onAddToPlaylist?.(playlist))}
             >
+              {hoveredItem === 'add' && (
+                <motion.span layoutId={`playlist-action-glide-${playlist.id}`} className="glide-menu-highlight" aria-hidden="true" transition={{ layout: { duration: 0.22, ease: [0.22, 1, 0.36, 1] } }} />
+              )}
               <PlusFilled size={14} />
               <span>Add to playlist</span>
             </button>
@@ -90,8 +103,18 @@ export function PlaylistActionMenu({
               className="playlist-action-menu-item"
               disabled={isProtectedPlaylist}
               title={isProtectedPlaylist ? 'Favorites cannot be renamed' : undefined}
+              onMouseEnter={() => { if (!isProtectedPlaylist) setHoveredItem('rename') }}
+              onFocus={() => { if (!isProtectedPlaylist) setHoveredItem('rename') }}
+              onBlur={(event) => {
+                if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) {
+                  setHoveredItem(null)
+                }
+              }}
               onClick={(event) => runAction(event, () => onRenamePlaylist(playlist))}
             >
+              {hoveredItem === 'rename' && (
+                <motion.span layoutId={`playlist-action-glide-${playlist.id}`} className="glide-menu-highlight" aria-hidden="true" transition={{ layout: { duration: 0.22, ease: [0.22, 1, 0.36, 1] } }} />
+              )}
               <PencilFilled size={14} />
               <span>Rename</span>
             </button>
@@ -101,8 +124,18 @@ export function PlaylistActionMenu({
               className="playlist-action-menu-item danger"
               disabled={isProtectedPlaylist}
               title={isProtectedPlaylist ? 'Favorites cannot be deleted' : undefined}
+              onMouseEnter={() => { if (!isProtectedPlaylist) setHoveredItem('delete') }}
+              onFocus={() => { if (!isProtectedPlaylist) setHoveredItem('delete') }}
+              onBlur={(event) => {
+                if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) {
+                  setHoveredItem(null)
+                }
+              }}
               onClick={(event) => runAction(event, () => onDeletePlaylist(playlist))}
             >
+              {hoveredItem === 'delete' && (
+                <motion.span layoutId={`playlist-action-glide-${playlist.id}`} className="glide-menu-highlight" aria-hidden="true" transition={{ layout: { duration: 0.22, ease: [0.22, 1, 0.36, 1] } }} />
+              )}
               <TrashFilled size={14} />
               <span>Delete</span>
             </button>
