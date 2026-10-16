@@ -922,14 +922,14 @@ test('hover interactions avoid transform scaling that softens text and controls'
   for (const path of [
     '../src/components/TrackList.tsx',
     '../src/components/modals/AddToPlaylistModal.tsx',
+    '../src/components/PlayerBar.tsx',
   ]) {
     const source = fs.readFileSync(new URL(path, import.meta.url), 'utf8')
     assert.doesNotMatch(source, /\bwhileHover\s*=|\bwhileTap\s*=/, path)
   }
   const playerBar = fs.readFileSync(new URL('../src/components/PlayerBar.tsx', import.meta.url), 'utf8')
-  assert.match(playerBar, /whileHover=\{\{ scale: 1\.06 \}\}/)
-  assert.match(playerBar, /whileTap=\{\{ scale: 0\.94 \}\}/)
   assert.match(playerBar, /AnimatePresence mode="wait"/)
+  assert.match(playerBar, /<motion\.span/)
 })
 
 test('search matches Unicode styled alphabets, accents, and invisible formatting marks', () => {
@@ -1002,7 +1002,7 @@ test('song rows stay crisp while playback progress and volume use React Bits Ela
   assert.match(playerBar, /ariaLabel="Volume"/)
   assert.match(playerBar, /leftIcon=\{<HugeiconsIcon icon=\{VolumeLowIcon\}/)
   assert.match(playerBar, /rightIcon=\{<HugeiconsIcon icon=\{VolumeHighIcon\}/)
-  assert.match(playerBar, /whileTap=\{\{ scale: 0\.92 \}\}/)
+  assert.doesNotMatch(playerBar, /\bwhileHover\s*=|\bwhileTap\s*=/)
   assert.match(appCss, /\.scrubber-fill \{[\s\S]*?transition: none/)
   assert.match(appCss, /\.scrubber-hitbox\.scrubbing \.scrubber-fill[\s\S]*?transition: width 55ms cubic-bezier/)
   assert.match(appCss, /\.scrubber-hitbox\.scrubbing \.scrubber-thumb[\s\S]*?transition: left 55ms cubic-bezier/)
