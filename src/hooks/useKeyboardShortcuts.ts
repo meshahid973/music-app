@@ -36,6 +36,12 @@ export function useKeyboardShortcuts({
           target.isContentEditable)
 
       if (isInput) return
+      // Never hijack browser/OS shortcuts (Ctrl+R, Ctrl+S, Alt+Left, ...) or keys another
+      // control already handled.
+      if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return
+      // Keep native keyboard behaviour inside dialogs/menus, and Space on focused buttons/links.
+      if (target?.closest('dialog, [role="dialog"], [role="menu"], [role="listbox"]')) return
+      if (event.code === 'Space' && target?.closest('button, a[href], [role="button"], [role="menuitem"]')) return
 
       if (event.code === 'Space') {
         event.preventDefault()

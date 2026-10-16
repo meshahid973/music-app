@@ -52,7 +52,7 @@ jobs:
           workspaces: src-tauri -> target
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Run unit tests and lint
         run: |
