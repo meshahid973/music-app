@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CSSProperties, PointerEvent, RefObject } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useRef } from 'react'
+import type { CSSProperties, RefObject } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { VolumeHighIcon, VolumeLowIcon } from '@hugeicons/core-free-icons'
 import type { Howl } from 'howler'
 import ElasticSlider from './ElasticSlider'
 import {
@@ -51,22 +53,34 @@ export function PlayerBar({
 }: PlayerBarProps) {
   const duration = currentTrack?.duration ?? 0
 
-  // Scrubber refs & state
-  const trackRef = useRef<HTMLDivElement>(null)
-  const fillRef = useRef<HTMLDivElement>(null)
-  const thumbRef = useRef<HTMLDivElement>(null)
+  // Keep playback position out of React state while audio is advancing.
+  // ElasticSlider reads this ref directly and animates its own DOM at frame rate.
+  const progressValueRef = useRef(seek)
   const timeLabelRef = useRef<HTMLSpanElement>(null)
-  const isDraggingRef = useRef(false)
   const rafRef = useRef<number | null>(null)
 
-  const [isDragging, setIsDragging] = useState(false)
-  const [isHovered, setIsHovered] = useState(false)
-  const [hoverPct, setHoverPct] = useState(0)
-  const [hoverTime, setHoverTime] = useState(0)
-
-  // 60fps continuous animation frame for seamless, smooth progression
   useEffect(() => {
+    progressValueRef.current = Math.max(0, Math.min(duration || 0, seek))
+    if (timeLabelRef.current) timeLabelRef.current.textContent = formatTime(seek)
+  }, [seek, duration, currentTrack?.id])
+
+  useEffect(() => {
+    const readPosition = () => {
+      const howl = audioRef.current
+      if (!howl) return
+      const position = howl.seek()
+      if (typeof position !== 'number' || Number.isNaN(position)) return
+      const clampedPosition = duration > 0 ? Math.min(Math.max(0, position), duration) : 0
+      progressValueRef.current = clampedPosition
+      const second = Math.floor(clampedPosition)
+      if (timeLabelRef.current && timeLabelRef.current.dataset.second !== String(second)) {
+        timeLabelRef.current.dataset.second = String(second)
+        timeLabelRef.current.textContent = formatTime(clampedPosition)
+      }
+    }
+
     if (!isPlaying) {
+      readPosition()
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current)
         rafRef.current = null
@@ -74,37 +88,11 @@ export function PlayerBar({
       return
     }
 
-    let lastSec = -1
-
     const loop = () => {
-      const howl = audioRef.current
-      if (howl && isPlaying && !isDraggingRef.current) {
-        const pos = howl.seek()
-        if (typeof pos === 'number' && !Number.isNaN(pos)) {
-          const clampedPos = duration > 0 ? Math.min(pos, duration) : pos
-          const pct = duration > 0 ? (clampedPos / duration) * 100 : 0
-
-          if (fillRef.current) {
-            fillRef.current.style.width = `${pct}%`
-          }
-          if (thumbRef.current) {
-            thumbRef.current.style.left = `${pct}%`
-          }
-
-          const currentSec = Math.floor(clampedPos)
-          if (currentSec !== lastSec) {
-            lastSec = currentSec
-            if (timeLabelRef.current) {
-              timeLabelRef.current.textContent = formatTime(clampedPos)
-            }
-          }
-        }
-      }
+      readPosition()
       rafRef.current = requestAnimationFrame(loop)
     }
-
     rafRef.current = requestAnimationFrame(loop)
-
     return () => {
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current)
@@ -113,77 +101,6 @@ export function PlayerBar({
     }
   }, [isPlaying, audioRef, duration])
 
-  // Sync on track switch, pause, or external seek
-  useEffect(() => {
-    if (!isDraggingRef.current) {
-      const pct = duration > 0 ? (Math.min(seek, duration) / duration) * 100 : 0
-      if (fillRef.current) {
-        fillRef.current.style.width = `${pct}%`
-      }
-      if (thumbRef.current) {
-        thumbRef.current.style.left = `${pct}%`
-      }
-      if (timeLabelRef.current) {
-        timeLabelRef.current.textContent = formatTime(seek)
-      }
-    }
-  }, [seek, duration, currentTrack?.id])
-
-  const getTimeFromPointer = useCallback(
-    (clientX: number) => {
-      if (!trackRef.current || duration <= 0) return 0
-      const rect = trackRef.current.getBoundingClientRect()
-      if (rect.width <= 0) return 0
-      const relative = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-      return relative * duration
-    },
-    [duration],
-  )
-
-  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (duration <= 0) return
-    e.currentTarget.setPointerCapture(e.pointerId)
-    isDraggingRef.current = true
-    setIsDragging(true)
-
-    const targetTime = getTimeFromPointer(e.clientX)
-    const pct = (targetTime / duration) * 100
-
-    if (fillRef.current) fillRef.current.style.width = `${pct}%`
-    if (thumbRef.current) thumbRef.current.style.left = `${pct}%`
-    if (timeLabelRef.current) timeLabelRef.current.textContent = formatTime(targetTime)
-  }
-
-  const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (duration <= 0 || !trackRef.current) return
-    const rect = trackRef.current.getBoundingClientRect()
-    const relative = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    const calculatedTime = relative * duration
-
-    setHoverPct(relative * 100)
-    setHoverTime(calculatedTime)
-
-    if (isDraggingRef.current) {
-      const pct = relative * 100
-      if (fillRef.current) fillRef.current.style.width = `${pct}%`
-      if (thumbRef.current) thumbRef.current.style.left = `${pct}%`
-      if (timeLabelRef.current) timeLabelRef.current.textContent = formatTime(calculatedTime)
-    }
-  }
-
-  const handlePointerUp = (e: PointerEvent<HTMLDivElement>) => {
-    if (isDraggingRef.current) {
-      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-        e.currentTarget.releasePointerCapture(e.pointerId)
-      }
-      isDraggingRef.current = false
-      setIsDragging(false)
-      const finalTime = getTimeFromPointer(e.clientX)
-      onSeek(finalTime)
-    }
-  }
-
-  const initialPct = duration > 0 ? (Math.min(seek, duration) / duration) * 100 : 0
 
   return (
     <footer className="player-bar">
@@ -215,6 +132,9 @@ export function PlayerBar({
             type="button"
             onClick={onShuffle}
             aria-label="Toggle shuffle"
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+            transition={{ type: 'spring', stiffness: 460, damping: 24 }}
           >
             <ShuffleFilled size={18} />
           </motion.button>
@@ -223,6 +143,9 @@ export function PlayerBar({
             type="button"
             onClick={onPrevious}
             aria-label="Previous track"
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+            transition={{ type: 'spring', stiffness: 460, damping: 24 }}
           >
             <SkipBackFilled size={20} />
           </motion.button>
@@ -231,14 +154,31 @@ export function PlayerBar({
             type="button"
             onClick={onTogglePlay}
             aria-label={isPlaying ? 'Pause' : 'Play'}
+            whileHover={{ scale: 1.045 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 22 }}
           >
-            {isPlaying ? <PauseFilled size={24} /> : <PlayFilled size={24} />}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={isPlaying ? 'pause' : 'play'}
+                initial={{ opacity: 0, rotate: -18, scale: 0.78 }}
+                animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                exit={{ opacity: 0, rotate: 18, scale: 0.78 }}
+                transition={{ type: 'spring', stiffness: 480, damping: 26 }}
+                style={{ display: 'grid', placeItems: 'center' }}
+              >
+                {isPlaying ? <PauseFilled size={24} /> : <PlayFilled size={24} />}
+              </motion.span>
+            </AnimatePresence>
           </motion.button>
           <motion.button
             className="control"
             type="button"
             onClick={onNext}
             aria-label="Next track"
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+            transition={{ type: 'spring', stiffness: 460, damping: 24 }}
           >
             <SkipForwardFilled size={20} />
           </motion.button>
@@ -247,85 +187,41 @@ export function PlayerBar({
             type="button"
             onClick={onRepeat}
             aria-label="Cycle repeat mode"
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+            transition={{ type: 'spring', stiffness: 460, damping: 24 }}
           >
             {repeat === 'one' ? <RepeatOneFilled size={18} /> : <RepeatFilled size={18} />}
           </motion.button>
         </div>
 
-        {/* Brand-new Modern Audio Progress Scrubber */}
+        {/* React Bits ElasticSlider playback timeline */}
         <div className="progress-line">
           <div className="modern-scrubber-row">
             <span ref={timeLabelRef} className="scrubber-timestamp current">
               {formatTime(seek)}
             </span>
-
-            <div
-              ref={trackRef}
-              className={`scrubber-hitbox ${isHovered || isDragging ? 'active' : ''} ${isDragging ? 'scrubbing' : ''}`}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
-              onPointerEnter={() => setIsHovered(true)}
-              onPointerLeave={() => {
-                if (!isDragging) setIsHovered(false)
-              }}
-              role="slider"
-              tabIndex={0}
-              aria-label="Playback progress"
-              aria-valuemin={0}
-              aria-valuemax={duration}
-              aria-valuenow={seek}
-              aria-valuetext={`${formatTime(seek)} of ${formatTime(duration)}`}
-              onKeyDown={(e) => {
-                if (duration <= 0) return
-                if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-                  e.preventDefault()
-                  onSeek(Math.min(duration, seek + 5))
-                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-                  e.preventDefault()
-                  onSeek(Math.max(0, seek - 5))
-                } else if (e.key === 'Home') {
-                  e.preventDefault()
-                  onSeek(0)
-                } else if (e.key === 'End') {
-                  e.preventDefault()
-                  onSeek(duration)
-                }
-              }}
-            >
-              <div className="scrubber-rail">
-                {/* Hover preview ghost bar */}
-                {isHovered && duration > 0 && (
-                  <div
-                    className="scrubber-hover-ghost"
-                    style={{ width: `${hoverPct}%` }}
-                  />
-                )}
-
-                {/* Active playback fill */}
-                <div
-                  ref={fillRef}
-                  className="scrubber-fill"
-                  style={{ width: `${initialPct}%` }}
-                />
-
-                {/* Draggable thumb handle */}
-                <div
-                  ref={thumbRef}
-                  className="scrubber-thumb"
-                  style={{ left: `${initialPct}%` }}
-                />
-              </div>
-
-              {/* Hover timestamp tooltip */}
-              {isHovered && duration > 0 && (
-                <div className="scrubber-tooltip" style={{ left: `${hoverPct}%` }}>
-                  {formatTime(hoverTime)}
-                </div>
-              )}
-            </div>
-
+            <ElasticSlider
+              value={Math.max(0, Math.min(duration || 0, seek))}
+              valueSourceRef={progressValueRef}
+              animateValueSource={isPlaying}
+              onChange={onSeek}
+              onChangeEnd={onSeek}
+              startingValue={0}
+              maxValue={Math.max(1, duration)}
+              isStepped
+              stepSize={1}
+              formatValue={formatTime}
+              valuePosition="bubble"
+              ariaLabel="Playback progress"
+              disabled={duration <= 0}
+              leftIcon={null}
+              rightIcon={null}
+              trackColor="rgba(255, 255, 255, 0.14)"
+              rangeColor="var(--neutral-accent, #f2f4f7)"
+              contentColor="var(--muted)"
+              style={{ flex: 1, minWidth: 0, width: '100%' }}
+            />
             <span className="scrubber-timestamp total">{formatTime(duration)}</span>
           </div>
         </div>
@@ -333,7 +229,20 @@ export function PlayerBar({
 
       {/* 3. Brand-new Modern Volume Controller on Right */}
       <div className="volume">
-        <ElasticSlider value={volume} onChange={onVolume} />
+        <ElasticSlider
+          value={Math.round(volume * 100)}
+          onChange={(value) => onVolume(value / 100)}
+          leftIcon={<HugeiconsIcon icon={VolumeLowIcon} size={20} strokeWidth={1.75} />}
+          rightIcon={<HugeiconsIcon icon={VolumeHighIcon} size={20} strokeWidth={1.75} />}
+          valuePosition="none"
+          isStepped
+          stepSize={1}
+          ariaLabel="Volume"
+          trackColor="rgba(255, 255, 255, 0.14)"
+          rangeColor="var(--neutral-accent, #f2f4f7)"
+          iconColor="var(--muted)"
+          style={{ width: '100%' }}
+        />
       </div>
     </footer>
   )
