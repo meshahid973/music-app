@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{Emitter, Manager};
 use tauri_plugin_fs::FsExt;
-use util::{last_line, validate_url, Progress, PROGRESS_PREFIX};
+use util::{installer_error, last_line, validate_url, Progress, PROGRESS_PREFIX};
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -29,17 +29,20 @@ static INSTALL_LOCK: Mutex<()> = Mutex::new(());
 const INSTALL_SCRIPT: &str = r#"$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
 $base='https://github.com/yt-dlp/yt-dlp/releases/latest/download/'
-$out=$env:RESONANCE_YTDLP_OUT; $tmp=$out+'.download'
+$out=$env:RESONANCE_YTDLP_OUT; $tmp=$out+'.download'; $sumsFile=$out+'.sums'
 try {
   Invoke-WebRequest -UseBasicParsing -Uri ($base+'yt-dlp.exe') -OutFile $tmp
-  $sums=(Invoke-WebRequest -UseBasicParsing -Uri ($base+'SHA2-256SUMS')).Content
-  $line=($sums -split "`n" | Where-Object { $_ -match '^[0-9a-fA-F]{64}\s+\*?yt-dlp\.exe\s*$' } | Select-Object -First 1)
+  # GitHub serves the checksum list as application/octet-stream, which PowerShell returns as
+  # raw bytes rather than text, so save it to disk and read it back as lines.
+  Invoke-WebRequest -UseBasicParsing -Uri ($base+'SHA2-256SUMS') -OutFile $sumsFile
+  $line=(Get-Content -LiteralPath $sumsFile | Where-Object { $_ -match '^[0-9a-fA-F]{64}\s+\*?yt-dlp\.exe\s*$' } | Select-Object -First 1)
   if (-not $line) { throw 'Could not find the published yt-dlp checksum.' }
   $expected=($line.Trim() -split '\s+')[0].ToLower()
   $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $tmp).Hash.ToLower()
   if ($expected -ne $actual) { throw 'Checksum mismatch: the download was rejected.' }
   Move-Item -Force -LiteralPath $tmp -Destination $out
-} finally { if (Test-Path -LiteralPath $tmp) { Remove-Item -Force -LiteralPath $tmp } }"#;
+} catch { [Console]::Error.WriteLine('RESONANCE_ERROR: ' + $_.Exception.Message); throw
+} finally { foreach ($f in @($tmp, $sumsFile)) { if (Test-Path -LiteralPath $f) { Remove-Item -Force -LiteralPath $f } } }"#;
 
 // Same idea for ffmpeg (needed by yt-dlp for MP3/M4A/Opus/FLAC/WAV conversion): the zip is
 // verified against the checksum list published with the release before anything is unpacked.
@@ -54,8 +57,9 @@ New-Item -ItemType Directory -Force -Path $work | Out-Null
 try {
   $zip=Join-Path $work $name
   Invoke-WebRequest -UseBasicParsing -Uri ($base+$name) -OutFile $zip
-  $sums=(Invoke-WebRequest -UseBasicParsing -Uri ($base+'checksums.sha256')).Content
-  $line=($sums -split "`n" | Where-Object { $_ -match ('^[0-9a-fA-F]{64}\s+\*?'+[regex]::Escape($name)+'\s*$') } | Select-Object -First 1)
+  $sumsFile=Join-Path $work 'checksums.sha256'
+  Invoke-WebRequest -UseBasicParsing -Uri ($base+'checksums.sha256') -OutFile $sumsFile
+  $line=(Get-Content -LiteralPath $sumsFile | Where-Object { $_ -match ('^[0-9a-fA-F]{64}\s+\*?'+[regex]::Escape($name)+'\s*$') } | Select-Object -First 1)
   if (-not $line) { throw 'Could not find the published ffmpeg checksum.' }
   $expected=($line.Trim() -split '\s+')[0].ToLower()
   $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLower()
@@ -69,6 +73,7 @@ try {
   New-Item -ItemType Directory -Force -Path $dest | Out-Null
   Copy-Item -Force -LiteralPath $ffmpeg.FullName -Destination (Join-Path $dest 'ffmpeg.exe')
   Copy-Item -Force -LiteralPath $ffprobe -Destination (Join-Path $dest 'ffprobe.exe')
+} catch { [Console]::Error.WriteLine('RESONANCE_ERROR: ' + $_.Exception.Message); throw
 } finally { if (Test-Path -LiteralPath $work) { Remove-Item -Recurse -Force -LiteralPath $work } }"#;
 
 #[derive(Serialize, Clone)]
@@ -171,7 +176,7 @@ fn yt_dlp_executable(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
     if !result.status.success() || !executable.is_file() {
         let _ = fs::remove_file(&executable);
-        let detail = last_line(&result.stderr, "The download did not complete.");
+        let detail = installer_error(&result.stderr, "The download did not complete.");
         return Err(format!("Resonance could not install yt-dlp automatically: {detail} Check your internet connection and try again."));
     }
 
@@ -200,7 +205,7 @@ fn ffmpeg_location(app: &tauri::AppHandle) -> Result<Option<PathBuf>, String> {
     emit_progress(
         app,
         "preparing",
-        "Setting up audio conversion (one-time download, about 100 MB)…",
+        "Setting up audio conversion (one-time download, about 200 MB)…",
         None,
     );
     let result = new_command("powershell.exe")
@@ -211,7 +216,7 @@ fn ffmpeg_location(app: &tauri::AppHandle) -> Result<Option<PathBuf>, String> {
 
     if !result.status.success() || !ready(&dir) {
         let _ = fs::remove_dir_all(&dir);
-        let detail = last_line(&result.stderr, "The download did not complete.");
+        let detail = installer_error(&result.stderr, "The download did not complete.");
         return Err(format!(
             "Resonance could not set up audio conversion: {detail} Check your connection, or choose \"Best available audio\", which needs no conversion."
         ));
