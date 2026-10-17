@@ -3794,3 +3794,15 @@ h3 {
 .playlist-action-menu-item.danger:focus-visible:not(:disabled) {
   background: transparent;
 }
+
+/* Download progress + cancel */
+.download-progress { margin-top: 14px; }
+.download-progress-track { height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+.download-progress-fill { height: 100%; border-radius: inherit; background: var(--accent, #1db954); transition: width .25s ease; }
+.download-progress-fill.is-indeterminate { width: 35%; animation: download-indeterminate 1.2s ease-in-out infinite; }
+@keyframes download-indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+.download-progress-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 13px; color: var(--muted, rgba(255,255,255,.7)); }
+.download-cancel { padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.download-cancel:hover:not(:disabled) { background: rgba(255,255,255,.07); }
+.download-cancel:disabled { opacity: .55; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .download-progress-fill.is-indeterminate { animation: none; width: 100%; opacity: .45; } }

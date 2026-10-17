@@ -249,7 +249,6 @@ function ElasticSlider({
     onChangeEnd
   };
   const settingsRef = useRef(settings);
-  settingsRef.current = settings;
 
   const snap = (raw: number) => {
     const s = settingsRef.current;
@@ -435,13 +434,22 @@ function ElasticSlider({
   };
 
   const snapRef = useRef(snap);
-  snapRef.current = snap;
   const bumpRef = useRef(bump);
-  bumpRef.current = bump;
   const commitRef = useRef(commit);
-  commitRef.current = commit;
   const goalRef = useRef(refreshGoal);
-  goalRef.current = refreshGoal;
+  const kickRef = useRef(kick);
+
+  // Keep the "latest value" refs current after every commit. They are only read from
+  // effects and event handlers (never during render), and this effect is declared before
+  // all the others, so those always see the newest closures.
+  useIsoLayoutEffect(() => {
+    settingsRef.current = settings;
+    snapRef.current = snap;
+    bumpRef.current = bump;
+    commitRef.current = commit;
+    goalRef.current = refreshGoal;
+    kickRef.current = kick;
+  });
 
   useIsoLayoutEffect(() => {
     const m = motion.current;
@@ -485,7 +493,7 @@ function ElasticSlider({
     const sourceValue = clamp(valueSourceRef.current, lo, hi);
     currentRef.current = sourceValue;
     motion.current.target = (sourceValue - lo) / span;
-    kick();
+    kickRef.current();
   }, [animateValueSource, valueSourceRef, lo, hi, span]);
 
   useEffect(() => {

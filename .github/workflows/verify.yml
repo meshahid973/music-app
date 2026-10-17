@@ -18,6 +18,12 @@ jobs:
       - run: npm test
       - run: npm run lint
       - run: npm run build
+      - name: Rust unit tests (std-only download logic)
+        run: |
+          mkdir -p "$RUNNER_TEMP/rt"
+          printf '#[path = "%s/src-tauri/src/util.rs"] mod util;\n#[path = "%s/src-tauri/src/runner.rs"] mod runner;\nfn main() {}\n' "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE" > "$RUNNER_TEMP/rt/main.rs"
+          rustc --edition 2021 --test "$RUNNER_TEMP/rt/main.rs" -o "$RUNNER_TEMP/rt/tests"
+          "$RUNNER_TEMP/rt/tests" --test-threads=1
 
   build-windows:
     runs-on: windows-latest

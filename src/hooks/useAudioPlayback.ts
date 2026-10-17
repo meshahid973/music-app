@@ -26,12 +26,8 @@ export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
   const currentAudioUrl = currentTrack?.audioUrl
   const currentId = currentTrack?.id
 
-  // PlayerBar reads the Howler position with requestAnimationFrame and updates
-  // its scrubber DOM directly. Avoid a 350ms React state update here: this hook is
-  // mounted by App, so that timer previously rerendered the entire screen ~3x/sec.
-  function startProgress() {}
-
-  function stopProgress() {}
+  // PlayerBar reads the Howler position with requestAnimationFrame and updates its
+  // scrubber DOM directly, so no progress timer (and no re-render of App) is needed here.
 
   useEffect(() => {
     volumeRef.current = volume
@@ -62,20 +58,10 @@ export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
         if (useMusicStore.getState().isPlaying && !howl.playing()) {
           try {
             howl.play()
-            startProgress()
           } catch {
             // ignore
           }
         }
-      },
-      onplay: () => {
-        startProgress()
-      },
-      onpause: () => {
-        stopProgress()
-      },
-      onstop: () => {
-        stopProgress()
       },
       onloaderror: (_id, err) => {
         console.warn('Audio load error:', err)
@@ -104,7 +90,6 @@ export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
       howl.stop()
       howl.unload()
       if (audioRef.current === howl) audioRef.current = null
-      stopProgress()
     }
   }, [currentAudioUrl, currentId])
 
@@ -115,7 +100,6 @@ export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
       if (!howl.playing()) {
         try {
           howl.play()
-          startProgress()
         } catch {
           // ignore
         }
@@ -126,9 +110,7 @@ export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
       } catch {
         // ignore
       }
-      stopProgress()
     }
-    return () => stopProgress()
   }, [isPlaying, currentAudioUrl])
 
   useEffect(() => {
@@ -157,7 +139,6 @@ export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
     if (automatic && repeat === 'one') {
       audioRef.current?.seek(0)
       audioRef.current?.play()
-      startProgress()
       return
     }
     moveTrack(1, automatic)

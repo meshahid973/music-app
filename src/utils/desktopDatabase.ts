@@ -102,38 +102,56 @@ function safeReadJson(raw: string): unknown {
   }
 }
 
-// Serialises native writes; writeLibraryAtomically never rejects, so the chain never breaks.
-let saveChain: Promise<void> = Promise.resolve()
+export interface LibraryFileSystem {
+  ensureAppDataDir(): Promise<void>
+  writeText(fileName: string, text: string): Promise<void>
+  rename(from: string, to: string): Promise<void>
+}
 
 /**
- * Writes to a temp file first, then renames it over the real file. A crash or power loss
- * mid-write therefore leaves the previous library intact instead of a truncated file
- * (which would parse as "no library" and be overwritten by the next save).
+ * Creates a saver that queues writes one after another and writes atomically: the JSON goes
+ * to a temp file first and is then renamed over the real file. A crash or power loss
+ * mid-write therefore leaves the previous library intact instead of a truncated file (which
+ * would parse as "no library" and be overwritten by the next save). The returned promise
+ * never rejects, so one failed save cannot break the queue.
  */
-async function writeLibraryAtomically(json: string): Promise<void> {
-  try {
-    try {
-      const appDataExists = await exists('.', { baseDir: BaseDirectory.AppData })
-      if (!appDataExists) {
-        await mkdir('.', { baseDir: BaseDirectory.AppData, recursive: true })
+export function createLibrarySaver(
+  fileSystem: LibraryFileSystem,
+  warn: (message: string, error: unknown) => void = console.warn,
+): (json: string) => Promise<void> {
+  let chain: Promise<void> = Promise.resolve()
+  return (json) => {
+    chain = chain.then(async () => {
+      try {
+        try {
+          await fileSystem.ensureAppDataDir()
+        } catch {
+          // Directory may already exist or root check may not be needed before writing
+        }
+        const tempFile = `${STORAGE_FILE}.tmp`
+        await fileSystem.writeText(tempFile, json)
+        try {
+          await fileSystem.rename(tempFile, STORAGE_FILE)
+        } catch {
+          await fileSystem.writeText(STORAGE_FILE, json)
+        }
+      } catch (err) {
+        warn('Failed to save native library to AppData:', err)
       }
-    } catch {
-      // Directory may already exist or root check may not be needed before writeTextFile
-    }
-    const tempFile = `${STORAGE_FILE}.tmp`
-    await writeTextFile(tempFile, json, { baseDir: BaseDirectory.AppData })
-    try {
-      await rename(tempFile, STORAGE_FILE, {
-        oldPathBaseDir: BaseDirectory.AppData,
-        newPathBaseDir: BaseDirectory.AppData,
-      })
-    } catch {
-      await writeTextFile(STORAGE_FILE, json, { baseDir: BaseDirectory.AppData })
-    }
-  } catch (err) {
-    console.warn('Failed to save native library to AppData:', err)
+    })
+    return chain
   }
 }
+
+const saveNativeLibrary = createLibrarySaver({
+  async ensureAppDataDir() {
+    const appDataExists = await exists('.', { baseDir: BaseDirectory.AppData })
+    if (!appDataExists) await mkdir('.', { baseDir: BaseDirectory.AppData, recursive: true })
+  },
+  writeText: (fileName, text) => writeTextFile(fileName, text, { baseDir: BaseDirectory.AppData }),
+  rename: (from, to) =>
+    rename(from, to, { oldPathBaseDir: BaseDirectory.AppData, newPathBaseDir: BaseDirectory.AppData }),
+})
 
 export async function saveDesktopLibrary(data: DesktopLibraryPayload): Promise<void> {
   const payload: DesktopLibraryPayload = {
@@ -159,9 +177,7 @@ export async function saveDesktopLibrary(data: DesktopLibraryPayload): Promise<v
   }
 
   if (isDesktopApp()) {
-    // Saves are queued one after another so overlapping writes can never interleave.
-    saveChain = saveChain.then(() => writeLibraryAtomically(json))
-    await saveChain
+    await saveNativeLibrary(json)
   }
 }
 
