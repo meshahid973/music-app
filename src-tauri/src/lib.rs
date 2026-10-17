@@ -1,17 +1,26 @@
+mod runner;
+mod util;
+
+use serde::Serialize;
 use serde_json::Value;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Mutex;
-use tauri::Manager;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use tauri::{Emitter, Manager};
 use tauri_plugin_fs::FsExt;
+use util::{last_line, validate_url, Progress, PROGRESS_PREFIX};
 
-const MAX_URL_LEN: usize = 2048;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-// Serialises first-run installs so two simultaneous commands never race on the same file.
+/// How often the private yt-dlp copy checks for a newer release (sites change; old builds break).
+const UPDATE_CHECK_INTERVAL: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+const UPDATE_MARKER: &str = "yt-dlp.update-check";
+
+// Serialises tool installs/updates so two simultaneous commands never race on the same files.
 static INSTALL_LOCK: Mutex<()> = Mutex::new(());
 
 // Downloads yt-dlp and refuses to install it unless its SHA-256 matches the checksum file
@@ -32,6 +41,58 @@ try {
   Move-Item -Force -LiteralPath $tmp -Destination $out
 } finally { if (Test-Path -LiteralPath $tmp) { Remove-Item -Force -LiteralPath $tmp } }"#;
 
+// Same idea for ffmpeg (needed by yt-dlp for MP3/M4A/Opus/FLAC/WAV conversion): the zip is
+// verified against the checksum list published with the release before anything is unpacked.
+const FFMPEG_INSTALL_SCRIPT: &str = r#"$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$base='https://github.com/yt-dlp/FFmpeg-Builds/releases/latest/download/'
+$name='ffmpeg-master-latest-win64-gpl.zip'
+$dest=$env:RESONANCE_FFMPEG_DIR; $work=$dest+'.work'
+if (Test-Path -LiteralPath $work) { Remove-Item -Recurse -Force -LiteralPath $work }
+New-Item -ItemType Directory -Force -Path $work | Out-Null
+try {
+  $zip=Join-Path $work $name
+  Invoke-WebRequest -UseBasicParsing -Uri ($base+$name) -OutFile $zip
+  $sums=(Invoke-WebRequest -UseBasicParsing -Uri ($base+'checksums.sha256')).Content
+  $line=($sums -split "`n" | Where-Object { $_ -match ('^[0-9a-fA-F]{64}\s+\*?'+[regex]::Escape($name)+'\s*$') } | Select-Object -First 1)
+  if (-not $line) { throw 'Could not find the published ffmpeg checksum.' }
+  $expected=($line.Trim() -split '\s+')[0].ToLower()
+  $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLower()
+  if ($expected -ne $actual) { throw 'Checksum mismatch: the ffmpeg download was rejected.' }
+  $unzipped=Join-Path $work 'unzipped'
+  [IO.Compression.ZipFile]::ExtractToDirectory($zip, $unzipped)
+  $ffmpeg=Get-ChildItem -Path $unzipped -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+  if (-not $ffmpeg) { throw 'ffmpeg.exe was not found in the download.' }
+  $ffprobe=Join-Path $ffmpeg.DirectoryName 'ffprobe.exe'
+  if (-not (Test-Path -LiteralPath $ffprobe)) { throw 'ffprobe.exe was not found in the download.' }
+  New-Item -ItemType Directory -Force -Path $dest | Out-Null
+  Copy-Item -Force -LiteralPath $ffmpeg.FullName -Destination (Join-Path $dest 'ffmpeg.exe')
+  Copy-Item -Force -LiteralPath $ffprobe -Destination (Join-Path $dest 'ffprobe.exe')
+} finally { if (Test-Path -LiteralPath $work) { Remove-Item -Recurse -Force -LiteralPath $work } }"#;
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct DownloadProgress {
+    /// "preparing" while tools are installed/updated, "downloading" while yt-dlp reports progress.
+    stage: &'static str,
+    percent: Option<f64>,
+    speed: String,
+    eta: String,
+    message: String,
+}
+
+fn emit_progress(app: &tauri::AppHandle, stage: &'static str, message: &str, progress: Option<&Progress>) {
+    let payload = DownloadProgress {
+        stage,
+        percent: progress.and_then(|p| p.percent),
+        speed: progress.map(|p| p.speed.clone()).unwrap_or_default(),
+        eta: progress.map(|p| p.eta.clone()).unwrap_or_default(),
+        message: message.to_string(),
+    };
+    let _ = app.emit("download-progress", payload);
+}
+
 /// Builds a Command that never flashes a console window on Windows.
 fn new_command<S: AsRef<OsStr>>(program: S) -> Command {
     #[allow(unused_mut)]
@@ -44,28 +105,39 @@ fn new_command<S: AsRef<OsStr>>(program: S) -> Command {
     command
 }
 
-/// Accepts only a single http(s) URL (scheme check is case-insensitive, matching the UI).
-fn validate_url(raw: &str) -> Result<String, String> {
-    let url = raw.trim();
-    let lower = url.to_ascii_lowercase();
-    let has_scheme = lower.starts_with("https://") || lower.starts_with("http://");
-    if !has_scheme
-        || url.len() > MAX_URL_LEN
-        || url.chars().any(|c| c.is_control() || c.is_whitespace())
-    {
-        return Err("Enter a valid http:// or https:// URL.".into());
-    }
-    Ok(url.to_string())
+fn command_works<S: AsRef<OsStr>>(program: S) -> bool {
+    new_command(program)
+        .arg("-version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
-fn last_line(bytes: &[u8], fallback: &str) -> String {
-    let text = String::from_utf8_lossy(bytes);
-    text.lines()
-        .rev()
-        .find(|line| !line.trim().is_empty())
-        .unwrap_or(fallback)
-        .trim()
-        .to_string()
+fn tools_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let app_data = app.path().app_data_dir()
+        .map_err(|error| format!("Could not locate Resonance's app data folder: {error}"))?;
+    let tools = app_data.join("tools");
+    fs::create_dir_all(&tools)
+        .map_err(|error| format!("Could not prepare the downloader folder: {error}"))?;
+    Ok(tools)
+}
+
+/// Checks (at most weekly) for a newer yt-dlp. Only used for Resonance's private copy; a
+/// yt-dlp the user installed themselves is never modified. Best effort: failures are ignored.
+fn maybe_update_yt_dlp(executable: &Path, tools: &Path) {
+    let marker = tools.join(UPDATE_MARKER);
+    let due = fs::metadata(&marker)
+        .and_then(|meta| meta.modified())
+        .ok()
+        .and_then(|modified| modified.elapsed().ok())
+        .map(|age| age > UPDATE_CHECK_INTERVAL)
+        .unwrap_or(true);
+    if !due {
+        return;
+    }
+    // Write the marker first so being offline doesn't retry on every single download.
+    let _ = fs::write(&marker, b"");
+    let _ = new_command(executable).arg("-U").output();
 }
 
 fn yt_dlp_executable(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -76,13 +148,12 @@ fn yt_dlp_executable(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
     // Otherwise, keep a private copy in Resonance's app data directory and
     // install it automatically on first use.
-    let app_data = app.path().app_data_dir()
-        .map_err(|error| format!("Could not locate Resonance's app data folder: {error}"))?;
-    let tools_dir = app_data.join("tools");
-    fs::create_dir_all(&tools_dir)
-        .map_err(|error| format!("Could not prepare the downloader folder: {error}"))?;
-    let executable = tools_dir.join("yt-dlp.exe");
+    let tools = tools_dir(app)?;
+    let executable = tools.join("yt-dlp.exe");
     if executable.is_file() {
+        if let Ok(_guard) = INSTALL_LOCK.lock() {
+            maybe_update_yt_dlp(&executable, &tools);
+        }
         return Ok(executable);
     }
 
@@ -91,6 +162,7 @@ fn yt_dlp_executable(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         return Ok(executable); // another command finished the install while we waited
     }
 
+    emit_progress(app, "preparing", "Setting up the downloader (one-time)…", None);
     let result = new_command("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", INSTALL_SCRIPT])
         .env("RESONANCE_YTDLP_OUT", &executable)
@@ -103,23 +175,79 @@ fn yt_dlp_executable(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         return Err(format!("Resonance could not install yt-dlp automatically: {detail} Check your internet connection and try again."));
     }
 
+    let _ = fs::write(tools.join(UPDATE_MARKER), b""); // freshly installed = up to date
     Ok(executable)
 }
 
+/// Returns the folder to pass to `--ffmpeg-location`, or None when ffmpeg is already on PATH.
+/// Installs a verified private copy the first time a format conversion is requested.
+fn ffmpeg_location(app: &tauri::AppHandle) -> Result<Option<PathBuf>, String> {
+    if command_works("ffmpeg") && command_works("ffprobe") {
+        return Ok(None);
+    }
+
+    let dir = tools_dir(app)?.join("ffmpeg");
+    let ready = |path: &Path| path.join("ffmpeg.exe").is_file() && path.join("ffprobe.exe").is_file();
+    if ready(&dir) {
+        return Ok(Some(dir));
+    }
+
+    let _guard = INSTALL_LOCK.lock().map_err(|_| "The ffmpeg installer is unavailable.".to_string())?;
+    if ready(&dir) {
+        return Ok(Some(dir));
+    }
+
+    emit_progress(
+        app,
+        "preparing",
+        "Setting up audio conversion (one-time download, about 100 MB)…",
+        None,
+    );
+    let result = new_command("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", FFMPEG_INSTALL_SCRIPT])
+        .env("RESONANCE_FFMPEG_DIR", &dir)
+        .output()
+        .map_err(|error| format!("Resonance could not download ffmpeg automatically: {error}."))?;
+
+    if !result.status.success() || !ready(&dir) {
+        let _ = fs::remove_dir_all(&dir);
+        let detail = last_line(&result.stderr, "The download did not complete.");
+        return Err(format!(
+            "Resonance could not set up audio conversion: {detail} Check your connection, or choose \"Best available audio\", which needs no conversion."
+        ));
+    }
+    Ok(Some(dir))
+}
+
 fn run_download(app: tauri::AppHandle, url: String, output_path: PathBuf, format: String) -> Result<String, String> {
+    emit_progress(&app, "preparing", "Preparing…", None);
     let executable = yt_dlp_executable(&app)?;
+    let ffmpeg = if format == "best" { None } else { ffmpeg_location(&app)? };
+
+    // Partial files go to a private temp folder, never into the user's Music folder, so a
+    // cancelled or failed download leaves nothing behind there.
+    let temp_dir = tools_dir(&app)?.join("tmp");
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).map_err(|error| format!("Could not prepare a temporary folder: {error}"))?;
+
     let mut command = new_command(executable);
     command
         .arg("--no-warnings")
         .arg("--no-playlist")
         .arg("--newline")
-        .arg("--no-progress")
+        .arg("--progress")
+        .arg("--progress-template")
+        .arg(format!(
+            "download:{PROGRESS_PREFIX}%(progress.status)s|%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s"
+        ))
         .arg("--socket-timeout")
         .arg("30")
         .arg("--print")
         .arg("after_move:filepath")
         .arg("-P")
         .arg(&output_path)
+        .arg("-P")
+        .arg(format!("temp:{}", temp_dir.display()))
         .arg("-o")
         .arg("%(title)s.%(ext)s")
         .arg("-f")
@@ -133,21 +261,43 @@ fn run_download(app: tauri::AppHandle, url: String, output_path: PathBuf, format
             .arg("--audio-quality")
             .arg("0")
             .arg("--embed-metadata");
+        if let Some(dir) = &ffmpeg {
+            command.arg("--ffmpeg-location").arg(dir);
+        }
     }
 
     // `--` guarantees the URL can never be parsed as an option.
-    let result = command.arg("--").arg(&url).output()
-        .map_err(|error| format!("Could not start yt-dlp: {error}"))?;
+    command.arg("--").arg(&url);
 
-    if !result.status.success() {
-        return Err(format!("Download failed: {}", last_line(&result.stderr, "yt-dlp could not download this URL.")));
+    let handle = app.clone();
+    let on_progress: runner::ProgressCallback =
+        Arc::new(move |progress| emit_progress(&handle, "downloading", "", Some(&progress)));
+    let output = runner::run_with_progress(command, on_progress)
+        .map_err(|error| format!("Could not start yt-dlp: {error}"));
+    let _ = fs::remove_dir_all(&temp_dir);
+    let output = output?;
+
+    if output.cancelled {
+        return Err("Download cancelled.".into());
+    }
+    if !output.success {
+        let detail = output
+            .stderr
+            .iter()
+            .rev()
+            .find(|line| !line.trim().is_empty())
+            .map(|line| line.trim().to_string())
+            .unwrap_or_else(|| "yt-dlp could not download this URL.".to_string());
+        return Err(format!("Download failed: {detail}"));
     }
 
-    let stdout = String::from_utf8_lossy(&result.stdout);
-    let saved_path = stdout.lines().rev().find(|line| {
-        let line = line.trim();
-        !line.is_empty() && Path::new(line).is_absolute()
-    }).map(str::trim).unwrap_or("");
+    let saved_path = output
+        .stdout
+        .iter()
+        .rev()
+        .map(|line| line.trim())
+        .find(|line| !line.is_empty() && Path::new(line).is_absolute())
+        .unwrap_or("");
 
     if saved_path.is_empty() {
         return Err("yt-dlp finished, but Resonance could not identify the saved file path.".into());
@@ -184,6 +334,14 @@ async fn download_audio(
     tauri::async_runtime::spawn_blocking(move || run_download(app, url, output_path, format))
         .await
         .map_err(|error| format!("The download task stopped unexpectedly: {error}"))?
+}
+
+/// Stops the download that is currently running (including ffmpeg and other child processes).
+#[tauri::command]
+async fn cancel_download() -> bool {
+    tauri::async_runtime::spawn_blocking(runner::cancel_active)
+        .await
+        .unwrap_or(false)
 }
 
 fn run_inspect(app: tauri::AppHandle, url: String) -> Result<String, String> {
@@ -225,7 +383,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
-        .invoke_handler(tauri::generate_handler![download_audio, inspect_media_url])
+        .invoke_handler(tauri::generate_handler![download_audio, inspect_media_url, cancel_download])
         .run(tauri::generate_context!())
         .expect("error while running Resonance native music player");
 }

@@ -3,7 +3,8 @@ import type { ChangeEvent, DragEvent } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { appDataDir } from '@tauri-apps/api/path'
 import { useMusicStore } from '../store/useMusicStore'
-import { saveFolderArtwork } from '../utils/artworkStorage'
+import { pruneOrphanArtwork, referencedArtworkNames, saveFolderArtwork } from '../utils/artworkStorage'
+import { findMissingTrackIds } from '../utils/missingTracks'
 import { showToast, type ToastType } from '../store/useToastStore'
 import {
   extractCovers,
@@ -205,6 +206,38 @@ export function useLibraryImport() {
     }
   }, [isDesktop, importNativeScanResult, showNotice, showScanErrors])
 
+  // Once per session, shortly after startup, delete cached artwork nothing uses any more.
+  useEffect(() => {
+    if (!isDesktop || !isInitialized) return
+    const timer = setTimeout(() => {
+      const names = referencedArtworkNames(
+        useMusicStore.getState().tracks,
+        nativeCoverPathsRef.current.values(),
+      )
+      void pruneOrphanArtwork(names).catch((err) => {
+        console.warn('Cleaning up unused artwork failed:', err)
+      })
+    }, 20_000)
+    return () => clearTimeout(timer)
+  }, [isDesktop, isInitialized])
+
+  // Drops library entries whose files vanished from the music folder. Only trusts a scan
+  // that finished without errors and found files, so an unplugged drive or an unreadable
+  // subfolder can never look like "everything was deleted".
+  function pruneMissingTracks(folderPath: string, audioPaths: string[], errors: string[]) {
+    if (errors.length > 0 || audioPaths.length === 0) return
+    const missing = findMissingTrackIds(useMusicStore.getState().tracks, audioPaths, folderPath)
+    if (missing.length === 0) return
+    useMusicStore.getState().removeTracksFromLibrary(missing)
+    showNotice(
+      missing.length === 1
+        ? 'Removed 1 song whose file no longer exists'
+        : `Removed ${missing.length} songs whose files no longer exist`,
+      'info',
+      'Library Cleaned Up',
+    )
+  }
+
   // Native desktop handlers using OS dialogs
   async function handleNativeAddSongs() {
     try {
@@ -277,6 +310,7 @@ export function useLibraryImport() {
         showNotice(`Library is up to date (${audioPaths.length} songs found)`, 'info', 'Folder Scanned')
       }
       showScanErrors(errors)
+      pruneMissingTracks(folderPath, audioPaths, errors)
     } catch (err) {
       console.warn('Importing the selected music folder failed:', err)
       showNotice('Could not import the selected music folder', 'error', 'Import Failed')
@@ -309,6 +343,7 @@ export function useLibraryImport() {
           showNotice('Music folder is up to date (no new files)', 'info', 'Library Up to Date')
         }
         showScanErrors(errors)
+        pruneMissingTracks(currentPath, audioPaths, errors)
       } catch (err) {
         console.warn('Rescan music folder failed:', err)
         showNotice('Failed to scan music folder', 'error', 'Scan Error')

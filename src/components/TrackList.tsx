@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { EllipsisVertical } from 'lucide-react'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties } from 'react'
 import {
   CloseFilled,
@@ -94,10 +94,14 @@ export function TrackList({
   }, [openMenuTrackId])
 
   // Search changes can shrink a large virtual list to just a few rows. Reset the
-  // virtual window before paint so stale scroll offsets never leave blank space.
-  useLayoutEffect(() => {
+  // virtual window as part of the same render (React's "adjust state when a key changes"
+  // pattern) so stale scroll offsets never leave blank space, with no extra effect pass.
+  const rangeResetKey = `${filterQuery}\u0000${activePlaylistId}\u0000${tracks.length}`
+  const [appliedRangeResetKey, setAppliedRangeResetKey] = useState(rangeResetKey)
+  if (appliedRangeResetKey !== rangeResetKey) {
+    setAppliedRangeResetKey(rangeResetKey)
     setVisibleRange({ start: 0, end: 32 })
-  }, [filterQuery, activePlaylistId, tracks.length])
+  }
 
   const updateVisibleRange = useCallback(() => {
     const list = listRef.current

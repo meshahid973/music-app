@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
-import { useState } from 'react'
+import { listen } from '@tauri-apps/api/event'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Download, FolderOpen, LoaderCircle, Music2 } from 'lucide-react'
 
@@ -10,6 +11,24 @@ type DownloadSectionProps = {
   isDesktop: boolean
   onChooseMusicFolder: () => void
   onRefreshLibrary: () => Promise<unknown> | unknown
+}
+
+type DownloadProgress = {
+  stage: 'preparing' | 'downloading'
+  percent: number | null
+  speed: string
+  eta: string
+  message: string
+}
+
+function describeProgress(progress: DownloadProgress | null, index: number, total: number) {
+  const prefix = total > 1 ? `Link ${index} of ${total} · ` : ''
+  if (!progress) return { text: `${prefix}Starting…`, percent: null }
+  if (progress.stage === 'preparing') return { text: `${prefix}${progress.message || 'Preparing…'}`, percent: null }
+  if (progress.percent === null) return { text: `${prefix}Downloading…`, percent: null }
+  if (progress.percent >= 100) return { text: `${prefix}Finishing…`, percent: 100 }
+  const details = [`${Math.round(progress.percent)}%`, progress.speed, progress.eta && `${progress.eta} left`]
+  return { text: prefix + details.filter(Boolean).join(' · '), percent: progress.percent }
 }
 
 const formats: { value: AudioFormat; label: string; description: string }[] = [
@@ -32,6 +51,38 @@ export function DownloadSection({
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null)
   const [downloadedPaths, setDownloadedPaths] = useState<string[]>([])
+  const [progress, setProgress] = useState<DownloadProgress | null>(null)
+  const [queue, setQueue] = useState({ index: 0, total: 0 })
+  const [cancelling, setCancelling] = useState(false)
+  const cancelRequested = useRef(false)
+
+  useEffect(() => {
+    if (!isDesktop) return
+    let unlisten: (() => void) | undefined
+    let disposed = false
+    listen<DownloadProgress>('download-progress', (event) => setProgress(event.payload))
+      .then((stop) => {
+        if (disposed) stop()
+        else unlisten = stop
+      })
+      .catch(() => {
+        // Progress is a nicety; downloads still work without it.
+      })
+    return () => {
+      disposed = true
+      unlisten?.()
+    }
+  }, [isDesktop])
+
+  const handleCancel = async () => {
+    cancelRequested.current = true
+    setCancelling(true)
+    try {
+      await invoke<boolean>('cancel_download')
+    } catch {
+      // Nothing was running (it may have just finished).
+    }
+  }
 
   const handleDownload = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -55,15 +106,20 @@ export function DownloadSection({
       return
     }
 
+    cancelRequested.current = false
+    setCancelling(false)
     setBusy(true)
     setDownloadedPaths([])
     const savedPaths: string[] = []
     const failures: string[] = []
     try {
       for (let index = 0; index < links.length; index += 1) {
+        if (cancelRequested.current) break
+        setQueue({ index: index + 1, total: links.length })
+        setProgress(null)
         setMessage({
           type: 'info',
-          text: `Downloading ${index + 1} of ${links.length}… The first run may also set up yt-dlp automatically.`,
+          text: `Downloading ${index + 1} of ${links.length}…`,
         })
         try {
           const savedPath = await invoke<string>('download_audio', {
@@ -74,6 +130,7 @@ export function DownloadSection({
           savedPaths.push(savedPath)
           setDownloadedPaths([...savedPaths])
         } catch (error) {
+          if (cancelRequested.current) break
           failures.push(`Link ${index + 1}: ${typeof error === 'string' ? error : 'Download failed.'}`)
         }
       }
@@ -86,7 +143,12 @@ export function DownloadSection({
         }
       }
 
-      if (failures.length === 0) {
+      if (cancelRequested.current) {
+        setMessage({
+          type: 'info',
+          text: `Download cancelled. ${savedPaths.length} of ${links.length} downloaded.`,
+        })
+      } else if (failures.length === 0) {
         setUrl('')
         setMessage({
           type: 'success',
@@ -100,6 +162,8 @@ export function DownloadSection({
       }
     } finally {
       setBusy(false)
+      setProgress(null)
+      setCancelling(false)
     }
   }
 
@@ -179,6 +243,33 @@ export function DownloadSection({
             </button>
           </div>
         </div>
+
+        {busy && (() => {
+          const view = describeProgress(progress, queue.index, queue.total)
+          return (
+            <div className="download-progress">
+              <div
+                className="download-progress-track"
+                role="progressbar"
+                aria-label="Download progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={view.percent === null ? undefined : Math.round(view.percent)}
+              >
+                <div
+                  className={`download-progress-fill${view.percent === null ? ' is-indeterminate' : ''}`}
+                  style={view.percent === null ? undefined : { width: `${view.percent}%` }}
+                />
+              </div>
+              <div className="download-progress-meta">
+                <span aria-live="polite">{view.text}</span>
+                <button type="button" className="download-cancel" onClick={handleCancel} disabled={cancelling}>
+                  {cancelling ? 'Cancelling…' : 'Cancel'}
+                </button>
+              </div>
+            </div>
+          )
+        })()}
 
         {message && (
           <div className={`download-message download-message-${message.type}`} role="status" aria-live="polite">

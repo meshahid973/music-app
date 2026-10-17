@@ -62,3 +62,17 @@ Some audio extensions may be recognized but cannot play if the WebView/browser l
 Please work on a feature branch and submit a focused pull request to the upstream project. Run `npm test`, `npm run lint`, and `npm run build` before proposing changes. Test keyboard and pointer operation when modifying playback UI.
 
 The elastic volume control is an adaptation of the [React Bits Elastic Slider](https://reactbits.dev/components/elastic-slider), implemented with the existing Framer Motion dependency and a native accessible range input.
+
+## Downloads (desktop app)
+
+Resonance uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to save audio into your Music folder.
+
+- **Progress and cancel:** each download shows live progress and can be cancelled at any time. Cancelling stops yt-dlp and ffmpeg and leaves no partial files in your Music folder.
+- **First-run setup:** if yt-dlp is not on your `PATH`, Resonance downloads a private copy into its app-data folder and checks its SHA-256 checksum against the one published with the release before using it.
+- **Audio conversion (MP3, M4A, Opus, FLAC, WAV):** needs ffmpeg. If it is not on your `PATH`, Resonance downloads a checksum-verified private copy the first time you convert (roughly 100 MB, one time). "Best available audio" needs no conversion.
+- **Stays current:** the private yt-dlp copy checks for a newer release at most once a week. A yt-dlp you installed yourself is never modified.
+
+## Library maintenance
+
+- Rescanning your music folder removes library entries whose files were deleted or moved out of that folder (your audio files are never touched). Nothing is removed if the scan hit errors or found no files, so an unplugged drive can't empty your library.
+- Cover images are copied into app data only when they are new or changed, and cached covers nothing uses any more are cleaned up after 30 days.

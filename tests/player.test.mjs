@@ -1420,7 +1420,11 @@ test('skipping music-folder import advances first-run setup to cover-art import'
 
 test('single-song playlist updates cannot remain behind an empty-state exit', () => {
   const trackList = fs.readFileSync(new URL('../src/components/TrackList.tsx', import.meta.url), 'utf8')
-  assert.match(trackList, /setVisibleRange\(\{ start: 0, end: 32 \}\)\s*\}, \[filterQuery, activePlaylistId, tracks\.length\]\)/)
+  // The virtual window must reset whenever the search text, the active playlist or the
+  // number of tracks changes. It is derived during render (no effect pass, nothing lags a frame).
+  assert.match(trackList, /const rangeResetKey = `\$\{filterQuery\}\\u0000\$\{activePlaylistId\}\\u0000\$\{tracks\.length\}`/)
+  assert.match(trackList, /if \(appliedRangeResetKey !== rangeResetKey\) \{[\s\S]*?setVisibleRange\(\{ start: 0, end: 32 \}\)/)
+  assert.doesNotMatch(trackList, /useLayoutEffect\(\(\) => \{\s*setVisibleRange/)
   assert.match(trackList, /<AnimatePresence mode="sync" initial=\{false\}>/)
 })
 
