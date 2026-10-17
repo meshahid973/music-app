@@ -2,6 +2,7 @@ import { Howl } from 'howler'
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { useMusicStore } from '../store/useMusicStore'
+import { showToast } from '../store/useToastStore'
 import { getExtension } from '../utils/audioFiles'
 import { revokeOwnedObjectUrls } from '../utils/objectUrls'
 import type { PlaybackQueue } from '../utils/queue'
@@ -78,6 +79,14 @@ export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
       },
       onloaderror: (_id, err) => {
         console.warn('Audio load error:', err)
+        // Without this the UI kept showing "playing" for a file that is missing or unsupported.
+        if (audioRef.current !== howl) return
+        useMusicStore.getState().setIsPlaying(false)
+        const name = useMusicStore.getState().tracks.find((t) => t.id === currentId)?.title
+        showToast(
+          `${name ? `“${name}”` : 'This track'} could not be played. The file may have been moved, deleted or is not supported.`,
+          { title: 'Playback Error', type: 'error' },
+        )
       },
       onplayerror: (_id, err) => {
         console.warn('Audio play error:', err)

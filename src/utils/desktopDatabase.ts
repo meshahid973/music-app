@@ -1,4 +1,4 @@
-import { BaseDirectory, exists, mkdir, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
+import { BaseDirectory, exists, mkdir, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs'
 import { isDesktopApp } from './platform.ts'
 import { hydrateTracksArtwork, sanitizeTracksForPersistence } from './artworkStorage.ts'
 import type { Playlist, RepeatMode, ThemeMode, Track } from '../types.ts'
@@ -102,6 +102,39 @@ function safeReadJson(raw: string): unknown {
   }
 }
 
+// Serialises native writes; writeLibraryAtomically never rejects, so the chain never breaks.
+let saveChain: Promise<void> = Promise.resolve()
+
+/**
+ * Writes to a temp file first, then renames it over the real file. A crash or power loss
+ * mid-write therefore leaves the previous library intact instead of a truncated file
+ * (which would parse as "no library" and be overwritten by the next save).
+ */
+async function writeLibraryAtomically(json: string): Promise<void> {
+  try {
+    try {
+      const appDataExists = await exists('.', { baseDir: BaseDirectory.AppData })
+      if (!appDataExists) {
+        await mkdir('.', { baseDir: BaseDirectory.AppData, recursive: true })
+      }
+    } catch {
+      // Directory may already exist or root check may not be needed before writeTextFile
+    }
+    const tempFile = `${STORAGE_FILE}.tmp`
+    await writeTextFile(tempFile, json, { baseDir: BaseDirectory.AppData })
+    try {
+      await rename(tempFile, STORAGE_FILE, {
+        oldPathBaseDir: BaseDirectory.AppData,
+        newPathBaseDir: BaseDirectory.AppData,
+      })
+    } catch {
+      await writeTextFile(STORAGE_FILE, json, { baseDir: BaseDirectory.AppData })
+    }
+  } catch (err) {
+    console.warn('Failed to save native library to AppData:', err)
+  }
+}
+
 export async function saveDesktopLibrary(data: DesktopLibraryPayload): Promise<void> {
   const payload: DesktopLibraryPayload = {
     ...data,
@@ -126,19 +159,9 @@ export async function saveDesktopLibrary(data: DesktopLibraryPayload): Promise<v
   }
 
   if (isDesktopApp()) {
-    try {
-      try {
-        const appDataExists = await exists('.', { baseDir: BaseDirectory.AppData })
-        if (!appDataExists) {
-          await mkdir('.', { baseDir: BaseDirectory.AppData, recursive: true })
-        }
-      } catch {
-        // Directory may already exist or root check may not be needed before writeTextFile
-      }
-      await writeTextFile(STORAGE_FILE, json, { baseDir: BaseDirectory.AppData })
-    } catch (err) {
-      console.warn('Failed to save native library to AppData:', err)
-    }
+    // Saves are queued one after another so overlapping writes can never interleave.
+    saveChain = saveChain.then(() => writeLibraryAtomically(json))
+    await saveChain
   }
 }
 

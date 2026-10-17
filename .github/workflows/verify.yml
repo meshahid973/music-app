@@ -1,4 +1,6 @@
 name: Verify music player
+permissions:
+  contents: read
 on:
   push:
     branches: [main, 'feat/**', 'fix/**']
@@ -12,7 +14,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm test
       - run: npm run lint
       - run: npm run build
@@ -31,7 +33,7 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Build Tauri Windows desktop installer
         run: npx tauri build
       - name: Smoke-test per-user installation and app startup
