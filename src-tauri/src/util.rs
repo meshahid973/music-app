@@ -28,6 +28,21 @@ pub fn last_line(bytes: &[u8], fallback: &str) -> String {
         .to_string()
 }
 
+/// Prefix the PowerShell install scripts put on the one line that explains a failure.
+pub const ERROR_PREFIX: &str = "RESONANCE_ERROR: ";
+
+/// The human-readable reason an install script failed. Falls back to the last output line
+/// (which, for PowerShell, is often just error-formatting noise).
+pub fn installer_error(bytes: &[u8], fallback: &str) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    text.lines()
+        .rev()
+        .find_map(|line| line.trim().strip_prefix(ERROR_PREFIX))
+        .map(|reason| reason.trim().to_string())
+        .filter(|reason| !reason.is_empty())
+        .unwrap_or_else(|| last_line(bytes, fallback))
+}
+
 /// Removes ANSI escape sequences (colour codes) that some yt-dlp builds add to progress text.
 pub fn strip_ansi(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
@@ -98,6 +113,16 @@ mod tests {
     fn last_line_skips_blank_lines() {
         assert_eq!(last_line(b"first\nERROR: boom\n\n  \n", "x"), "ERROR: boom");
         assert_eq!(last_line(b"\n\n", "fallback"), "fallback");
+    }
+
+    #[test]
+    fn installer_error_prefers_the_explicit_reason() {
+        let stderr = b"At line:1 char:5\nRESONANCE_ERROR: Checksum mismatch: the download was rejected.\n    + FullyQualifiedErrorId : Checksum mismatch\n";
+        assert_eq!(installer_error(stderr, "x"), "Checksum mismatch: the download was rejected.");
+        // no marker -> last line, then fallback
+        assert_eq!(installer_error(b"plain failure\n", "x"), "plain failure");
+        assert_eq!(installer_error(b"", "fallback"), "fallback");
+        assert_eq!(installer_error(b"RESONANCE_ERROR: \n", "fallback"), "RESONANCE_ERROR:");
     }
 
     #[test]
