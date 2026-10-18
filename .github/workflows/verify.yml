@@ -42,6 +42,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Build Tauri Windows desktop installer
         run: npx tauri build
+      - name: Test SQLite migration and rollback
+        run: cargo test --manifest-path src-tauri/Cargo.toml --release --lib database::tests
       - name: Smoke-test per-user installation and app startup
         shell: pwsh
         run: |

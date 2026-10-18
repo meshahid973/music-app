@@ -5,6 +5,7 @@ import { assignCoversToTracks, syncTracksWithCovers, uniqueTracks } from '../uti
 import { loadDesktopLibrary, saveDesktopLibrary } from '../utils/desktopDatabase.ts'
 import { hydrateTracksArtwork, sanitizeTracksForPersistence } from '../utils/artworkStorage.ts'
 import { isDesktopApp } from '../utils/platform.ts'
+import { showToast } from './useToastStore.ts'
 
 type MusicState = {
   tracks: Track[]
@@ -79,11 +80,13 @@ function ensureFavoritesPlaylist(playlists: Playlist[]): Playlist[] {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let initPromise: Promise<void> | null = null
+let desktopStorageReady = !isDesktopApp()
 
 function queueSave(state: MusicState) {
+  if (!desktopStorageReady) return
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
-    saveDesktopLibrary({
+    void saveDesktopLibrary({
       tracks: state.tracks.filter((t) => Boolean(t.filePath)),
       playlists: state.playlists,
       activePlaylistId: state.activePlaylistId,
@@ -97,6 +100,9 @@ function queueSave(state: MusicState) {
       musicFolderName: state.musicFolderName,
       coverFolderName: state.coverFolderName,
       firstRunSetupCompleted: state.firstRunSetupCompleted,
+    }).catch((error) => {
+      console.error('Could not save library to SQLite:', error)
+      showToast('Library changes could not be saved. Check disk space and file permissions.', { title: 'Storage Error', type: 'error' })
     })
   }, 400)
 }
@@ -160,6 +166,7 @@ export const useMusicStore = create<MusicState>()(
         initPromise = (async () => {
           try {
             const loaded = await loadDesktopLibrary()
+            desktopStorageReady = true
             if (loaded) {
               set((state) => {
                 // 1. Safely merge tracks: loaded tracks + any tracks concurrently added to state
@@ -242,6 +249,8 @@ export const useMusicStore = create<MusicState>()(
             }
           } catch (err) {
             console.warn('Could not initialize desktop storage:', err)
+            desktopStorageReady = false
+            showToast('Saved library could not be loaded. Original data has been preserved; automatic saves are disabled.', { title: 'Library Recovery Needed', type: 'error' })
           } finally {
             initPromise = null
           }

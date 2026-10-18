@@ -1,10 +1,11 @@
 import { Howl } from 'howler'
+import { invoke } from '@tauri-apps/api/core'
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { useMusicStore } from '../store/useMusicStore'
 import { showToast } from '../store/useToastStore'
-import { getExtension } from '../utils/audioFiles'
 import { revokeOwnedObjectUrls } from '../utils/objectUrls'
+import { isDesktopApp } from '../utils/platform'
 import type { PlaybackQueue } from '../utils/queue'
 
 export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
@@ -36,62 +37,78 @@ export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
   useEffect(() => () => revokeOwnedObjectUrls(), [])
 
   useEffect(() => {
-    audioRef.current?.stop()
-    audioRef.current?.unload()
+    let cancelled = false
+    const previous = audioRef.current
+    if (previous) {
+      previous.stop()
+      previous.unload()
+    }
     audioRef.current = null
-    if (!currentAudioUrl) return
 
-    const shouldAutoplay = useMusicStore.getState().isPlaying
-    const currentFileName = useMusicStore
-      .getState()
-      .tracks.find((t) => t.id === currentId)?.fileName
-    const ext = getExtension(currentFileName ?? '') || 'mp3'
-    const howl = new Howl({
-      src: [currentAudioUrl],
-      format: [ext],
-      html5: true,
-      autoplay: shouldAutoplay,
-      volume: volumeRef.current,
-      onend: () => playNextRef.current(),
-      onload: () => {
-        setSeek(0)
-        if (useMusicStore.getState().isPlaying && !howl.playing()) {
-          try {
-            howl.play()
-          } catch {
-            // ignore
-          }
-        }
-      },
-      onloaderror: (_id, err) => {
-        console.warn('Audio load error:', err)
-        // Without this the UI kept showing "playing" for a file that is missing or unsupported.
-        if (audioRef.current !== howl) return
-        useMusicStore.getState().setIsPlaying(false)
-        const name = useMusicStore.getState().tracks.find((t) => t.id === currentId)?.title
-        showToast(
-          `${name ? `“${name}”` : 'This track'} could not be played. The file may have been moved, deleted or is not supported.`,
-          { title: 'Playback Error', type: 'error' },
-        )
-      },
-      onplayerror: (_id, err) => {
-        console.warn('Audio play error:', err)
-        howl.once('unlock', () => {
-          try {
-            howl.play()
-          } catch {
-            // ignore
-          }
-        })
-      },
+    const fail = (message: string) => {
+      if (cancelled) return
+      useMusicStore.getState().setIsPlaying(false)
+      showToast(message, { title: 'Playback Error', type: 'error' })
+    }
+
+    if (!currentAudioUrl) {
+      if (useMusicStore.getState().isPlaying) {
+        fail('This track has no local audio file. Import a matching song to play it.')
+      }
+      return () => { cancelled = true }
+    }
+
+    let howl: Howl | null = null
+    const prepare = async () => {
+      // convertFileSrc alone does not grant asset protocol permission for
+      // user-selected songs. This command checks the existing Tauri FS scope
+      // and grants access only to this audio file.
+      if (isDesktopApp() && currentTrack?.filePath) {
+        await invoke<void>('authorize_audio_path', { path: currentTrack.filePath })
+      }
+      if (cancelled) return
+
+      const audio = new Howl({
+        src: [currentAudioUrl],
+        html5: true,
+        autoplay: false,
+        volume: volumeRef.current,
+        onend: () => playNextRef.current(),
+        onload: () => {
+          if (cancelled || audioRef.current !== audio) return
+          setSeek(0)
+        },
+        onloaderror: (_id, error) => {
+          if (cancelled || audioRef.current !== audio) return
+          console.warn('Audio load error:', error)
+          fail('Could not load this audio. The file may have moved or its codec may not be supported.')
+        },
+        onplayerror: (_id, error) => {
+          if (cancelled || audioRef.current !== audio) return
+          console.warn('Audio playback error:', error)
+          // Browsers may defer playback until the next user gesture.
+          audio.once('unlock', () => {
+            if (!cancelled && audioRef.current === audio && useMusicStore.getState().isPlaying) {
+              audio.play()
+            }
+          })
+        },
+      })
+      howl = audio
+      audioRef.current = audio
+      if (useMusicStore.getState().isPlaying) audio.play()
+    }
+    void prepare().catch((error) => {
+      console.warn('Audio access denied:', error)
+      fail(typeof error === 'string' ? error : 'This audio file could not be opened. Select the Music folder again.')
     })
-    audioRef.current = howl
     return () => {
-      howl.stop()
-      howl.unload()
+      cancelled = true
+      howl?.stop()
+      howl?.unload()
       if (audioRef.current === howl) audioRef.current = null
     }
-  }, [currentAudioUrl, currentId])
+  }, [currentAudioUrl, currentId, currentTrack?.filePath])
 
   useEffect(() => {
     const howl = audioRef.current

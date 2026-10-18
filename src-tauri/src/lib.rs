@@ -1,3 +1,4 @@
+mod database;
 mod runner;
 mod util;
 
@@ -382,13 +383,53 @@ async fn inspect_media_url(app: tauri::AppHandle, url: String) -> Result<String,
         .map_err(|error| format!("The inspection task stopped unexpectedly: {error}"))?
 }
 
+
+fn is_audio_extension(path: &Path) -> bool {
+    path.extension().and_then(OsStr::to_str)
+        .is_some_and(|ext| matches!(ext.to_ascii_lowercase().as_str(),
+            "mp3" | "wav" | "ogg" | "flac" | "m4a" | "aac" |
+            "opus" | "webm" | "wma" | "alac" | "aiff"))
+}
+
+/// Asset protocol is intentionally AppData-only by default. Grant *only* audio
+/// files already authorized by Tauri's file/folder dialog + FS scope, not $HOME/**.
+#[tauri::command]
+async fn authorize_audio_paths(app: tauri::AppHandle, paths: Vec<String>) -> Result<usize, String> {
+    if paths.len() > 1024 {
+        return Err("Too many audio paths in a single request".into());
+    }
+    let file_scope = app.fs_scope();
+    let asset_scope = app.asset_protocol_scope();
+    let mut authorized = 0;
+    for raw in paths {
+        let path = Path::new(&raw);
+        if !path.is_absolute() || !is_audio_extension(path) || !file_scope.is_allowed(path) {
+            continue;
+        }
+        if !path.is_file() {
+            continue;
+        }
+        asset_scope.allow_file(path).map_err(|err| format!("Could not permit selected audio file: {err}"))?;
+        authorized += 1;
+    }
+    Ok(authorized)
+}
+
+#[tauri::command]
+async fn authorize_audio_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    if authorize_audio_paths(app, vec![path]).await? != 1 {
+        return Err("Audio file unavailable or not authorized. Select your Music folder again.".into());
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
-        .invoke_handler(tauri::generate_handler![download_audio, inspect_media_url, cancel_download])
+        .invoke_handler(tauri::generate_handler![download_audio, inspect_media_url, cancel_download, authorize_audio_paths, authorize_audio_path, database::load_library_sqlite, database::save_library_sqlite])
         .run(tauri::generate_context!())
         .expect("error while running Resonance native music player");
 }

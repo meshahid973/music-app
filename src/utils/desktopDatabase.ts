@@ -1,4 +1,4 @@
-import { BaseDirectory, exists, mkdir, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
 import { isDesktopApp } from './platform.ts'
 import { hydrateTracksArtwork, sanitizeTracksForPersistence } from './artworkStorage.ts'
 import type { Playlist, RepeatMode, ThemeMode, Track } from '../types.ts'
@@ -20,7 +20,6 @@ export interface DesktopLibraryPayload {
   firstRunSetupCompleted?: boolean
 }
 
-const STORAGE_FILE = 'resonance_library.json'
 const WEB_STORAGE_KEY = 'resonance_desktop_library_backup'
 const STORAGE_VERSION = 2
 
@@ -102,56 +101,23 @@ function safeReadJson(raw: string): unknown {
   }
 }
 
-export interface LibraryFileSystem {
-  ensureAppDataDir(): Promise<void>
-  writeText(fileName: string, text: string): Promise<void>
-  rename(from: string, to: string): Promise<void>
-}
+// Desktop snapshots go to native SQLite. Never overlap saves: an older snapshot
+// finishing late must not overwrite a newer playlist or preference edit.
+let saveChain: Promise<void> = Promise.resolve()
+let migrationFailed = false
 
-/**
- * Creates a saver that queues writes one after another and writes atomically: the JSON goes
- * to a temp file first and is then renamed over the real file. A crash or power loss
- * mid-write therefore leaves the previous library intact instead of a truncated file (which
- * would parse as "no library" and be overwritten by the next save). The returned promise
- * never rejects, so one failed save cannot break the queue.
- */
-export function createLibrarySaver(
-  fileSystem: LibraryFileSystem,
-  warn: (message: string, error: unknown) => void = console.warn,
-): (json: string) => Promise<void> {
-  let chain: Promise<void> = Promise.resolve()
-  return (json) => {
-    chain = chain.then(async () => {
-      try {
-        try {
-          await fileSystem.ensureAppDataDir()
-        } catch {
-          // Directory may already exist or root check may not be needed before writing
-        }
-        const tempFile = `${STORAGE_FILE}.tmp`
-        await fileSystem.writeText(tempFile, json)
-        try {
-          await fileSystem.rename(tempFile, STORAGE_FILE)
-        } catch {
-          await fileSystem.writeText(STORAGE_FILE, json)
-        }
-      } catch (err) {
-        warn('Failed to save native library to AppData:', err)
-      }
-    })
-    return chain
-  }
+export function queueSqliteSave(
+  json: string,
+  write: (snapshot: string) => Promise<void> = (snapshot) =>
+    invoke<void>('save_library_sqlite', { json: snapshot }),
+): Promise<void> {
+  const task = saveChain.catch(() => {}).then(() => {
+    if (migrationFailed) throw new Error('Library recovery required; writes are disabled')
+    return write(json)
+  })
+  saveChain = task
+  return task
 }
-
-const saveNativeLibrary = createLibrarySaver({
-  async ensureAppDataDir() {
-    const appDataExists = await exists('.', { baseDir: BaseDirectory.AppData })
-    if (!appDataExists) await mkdir('.', { baseDir: BaseDirectory.AppData, recursive: true })
-  },
-  writeText: (fileName, text) => writeTextFile(fileName, text, { baseDir: BaseDirectory.AppData }),
-  rename: (from, to) =>
-    rename(from, to, { oldPathBaseDir: BaseDirectory.AppData, newPathBaseDir: BaseDirectory.AppData }),
-})
 
 export async function saveDesktopLibrary(data: DesktopLibraryPayload): Promise<void> {
   const payload: DesktopLibraryPayload = {
@@ -177,26 +143,31 @@ export async function saveDesktopLibrary(data: DesktopLibraryPayload): Promise<v
   }
 
   if (isDesktopApp()) {
-    await saveNativeLibrary(json)
+    await queueSqliteSave(json)
   }
 }
 
 export async function loadDesktopLibrary(): Promise<DesktopLibraryPayload | null> {
   if (isDesktopApp()) {
     try {
-      const fileExists = await exists(STORAGE_FILE, { baseDir: BaseDirectory.AppData })
-      if (fileExists) {
-        const content = await readTextFile(STORAGE_FILE, { baseDir: BaseDirectory.AppData })
-        if (content) {
-          const parsed = migrateDesktopLibraryPayload(safeReadJson(content))
-          if (parsed) return parsed
-        }
+      // The native command migrates the old resonance_library.json once, in a
+      // transaction. It never deletes the JSON (or its backup).
+      const content = await invoke<string | null>('load_library_sqlite')
+      migrationFailed = false
+      if (content) {
+        const parsed = migrateDesktopLibraryPayload(safeReadJson(content))
+        if (!parsed) throw new Error('Stored SQLite library has an invalid payload')
+        return parsed
       }
-    } catch (err) {
-      console.warn('Failed to load native library from AppData:', err)
+    } catch (error) {
+      migrationFailed = true
+      // A corrupt database/legacy JSON must not silently become an empty one.
+      throw new Error('Could not load saved music library; original data is preserved', { cause: error })
     }
   }
 
+  // Browser-only fallback is unchanged. Do not consult this when a native load
+  // fails; that could hide a damaged on-disk library.
   try {
     if (typeof localStorage !== 'undefined') {
       const raw = localStorage.getItem(WEB_STORAGE_KEY)
@@ -206,7 +177,7 @@ export async function loadDesktopLibrary(): Promise<DesktopLibraryPayload | null
       }
     }
   } catch {
-    // ignore
+    // Browser storage may be blocked by private mode.
   }
   return null
 }

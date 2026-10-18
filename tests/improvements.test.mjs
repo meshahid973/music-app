@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { findMissingTrackIds, isPathInside, normalizePathForCompare } from '../src/utils/missingTracks.ts'
 import { shouldIgnoreShortcut } from '../src/utils/shortcutGuard.ts'
-import { createLibrarySaver } from '../src/utils/desktopDatabase.ts'
+import { queueSqliteSave } from '../src/utils/desktopDatabase.ts'
 import { pruneOrphanArtwork, referencedArtworkNames, statFingerprint } from '../src/utils/artworkStorage.ts'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -71,63 +71,33 @@ test('hardware media keys always work, even inside fields or with modifiers', ()
   assert.equal(shouldIgnoreShortcut(key({ key: 'MediaTrackNext', code: 'MediaTrackNext', target: input })), false)
 })
 
-// ---------- atomic, serialized library saves ----------
-function fakeFs({ failRename = false, failWriteOnce = false, delay = 0 } = {}) {
-  const log = []
-  let writing = 0
-  let maxConcurrent = 0
-  let failedAlready = false
-  return {
-    log,
-    get maxConcurrent() { return maxConcurrent },
-    ensureAppDataDir: async () => { log.push('ensure') },
-    writeText: async (name, text) => {
-      writing += 1
-      maxConcurrent = Math.max(maxConcurrent, writing)
-      if (delay) await new Promise((r) => setTimeout(r, delay))
-      writing -= 1
-      if (failWriteOnce && !failedAlready) { failedAlready = true; throw new Error('disk full') }
-      log.push(`write:${name}:${text}`)
-    },
-    rename: async (from, to) => {
-      if (failRename) throw new Error('locked')
-      log.push(`rename:${from}->${to}`)
-    },
+// ---------- serialized native SQLite saves ----------
+test('SQLite saves remain ordered when earlier writes are slow', async () => {
+  const events = []
+  let release
+  const gate = new Promise((resolve) => { release = resolve })
+  const writer = async (json) => {
+    events.push('start:' + json)
+    if (json === 'one') await gate
+    events.push('end:' + json)
   }
-}
-
-test('a save writes the temp file first and only then renames it over the library', async () => {
-  const fs = fakeFs()
-  await createLibrarySaver(fs)('{"v":1}')
-  const writes = fs.log.filter((l) => l.startsWith('write:')).map((l) => l.split(':')[1])
-  assert.equal(writes.length, 1)
-  assert.match(writes[0], /\.tmp$/) // the real file is never written directly
-  assert.ok(fs.log.indexOf(`write:${writes[0]}:{"v":1}`) < fs.log.findIndex((l) => l.startsWith('rename:')))
+  const first = queueSqliteSave('one', writer)
+  const second = queueSqliteSave('two', writer)
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(events, ['start:one'])
+  release()
+  await Promise.all([first, second])
+  assert.deepEqual(events, ['start:one', 'end:one', 'start:two', 'end:two'])
 })
 
-test('if the rename fails, the library is still saved directly', async () => {
-  const fs = fakeFs({ failRename: true })
-  await createLibrarySaver(fs)('{"v":2}')
-  assert.ok(fs.log.some((l) => l.startsWith('write:') && !l.includes('.tmp') && l.endsWith('{"v":2}')))
-})
-
-test('concurrent saves never overlap and are applied in order', async () => {
-  const fs = fakeFs({ delay: 15 })
-  const save = createLibrarySaver(fs)
-  await Promise.all([save('1'), save('2'), save('3')])
-  assert.equal(fs.maxConcurrent, 1)
-  const tempWrites = fs.log.filter((l) => l.startsWith('write:') && l.includes('.tmp')).map((l) => l.split(':').pop())
-  assert.deepEqual(tempWrites, ['1', '2', '3'])
-})
-
-test('one failed save is reported but does not break later saves', async () => {
-  const fs = fakeFs({ failWriteOnce: true })
-  const warnings = []
-  const save = createLibrarySaver(fs, (message) => warnings.push(message))
-  await save('first') // fails
-  await save('second') // must still work
-  assert.equal(warnings.length, 1)
-  assert.ok(fs.log.some((l) => l.endsWith(':second')))
+test('SQLite write failures are propagated without blocking later saves', async () => {
+  await assert.rejects(
+    queueSqliteSave('broken', async () => { throw new Error('disk full') }),
+    /disk full/,
+  )
+  const events = []
+  await queueSqliteSave('new', async (json) => { events.push(json) })
+  assert.deepEqual(events, ['new'])
 })
 
 // ---------- artwork cache ----------

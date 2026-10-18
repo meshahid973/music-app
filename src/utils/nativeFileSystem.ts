@@ -1,4 +1,5 @@
 import { readDir } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
 import { toNativeAssetUrl } from './platform.ts'
 import { audioExtensions, coverExtensions, getExtension, readDuration } from './audioFiles.ts'
 import { colorFromString, normalizeName } from './covers.ts'
@@ -155,6 +156,21 @@ export async function nativeTracksFromPaths(
   existingIds: ReadonlySet<string> = new Set(),
   coverPathsMap?: Map<string, string>,
 ): Promise<Track[]> {
+  // Metadata duration probes also use asset URLs. Grant previously selected
+  // audio files through the existing Tauri FS scope in bounded IPC batches.
+  for (let i = 0; i < filePaths.length; i += 512) {
+    const paths = filePaths.slice(i, i + 512)
+    try {
+      const allowed = await invoke<number>('authorize_audio_paths', { paths })
+      if (allowed !== paths.length) {
+        console.warn('Some imported audio files were not authorized for asset playback')
+      }
+    } catch (error) {
+      console.warn('Could not authorize imported audio:', error)
+      break
+    }
+  }
+
   const tracks: Array<Track | undefined> = new Array(filePaths.length)
   const seen = new Set(existingIds)
 
