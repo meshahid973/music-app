@@ -184,3 +184,17 @@ test('restart chooses a playable saved song, not a dangling current track ID', (
   assert.equal(restorePlayableTrackId(tracks, 'placeholder', 'good'), 'good')
   assert.equal(restorePlayableTrackId([tracks[0]], 'placeholder'), undefined)
 })
+
+
+test('play recreates a non-null Howl whose state became unloaded', async () => {
+  const f = createFixture()
+  try {
+    await wait()
+    assert.equal(f.instances.length, 1)
+    f.instances[0].currentState = 'unloaded'
+    f.engine.play()
+    await wait()
+    assert.equal(f.instances.length, 2)
+    assert.equal(f.instances[1].playCalls, 1)
+  } finally { f.engine.dispose() }
+})

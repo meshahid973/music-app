@@ -90,7 +90,7 @@ export class PlaybackEngine {
           this.transition('playing')
         },
         onpause: () => {
-          if (this.current(nonce, sound) && !this.desired) this.transition('paused')
+          if (this.current(nonce, sound)) this.transition(this.desired ? 'buffering' : 'paused')
         },
         onend: () => {
           if (!this.current(nonce, sound)) return
@@ -154,12 +154,17 @@ export class PlaybackEngine {
     this.playRequestedAt = Date.now()
     this.lastProgressAt = this.playRequestedAt
     this.lastProgress = this.position()
-    if (this.sound && this.sound.state() !== 'unloaded') {
+    if (this.sound?.state() === 'unloaded') {
+      // A previous failed load can leave a non-null but unusable Howl.
+      this.sound.unload()
+      this.sound = null
+    }
+    if (this.sound) {
       this.safePlay(this.sound)
-    } else if (this.phase === 'error' || !this.sound) {
-      // On a failed/unloaded instance, explicitly rebuild. When preparing,
-      // an existing authorization task will honor this desired state.
-      if (this.phase !== 'loading') void this.prepare()
+    } else if (this.phase !== 'loading') {
+      // A pending authorization will honor desired=true; otherwise create a
+      // replacement instead of discarding another user Play gesture.
+      void this.prepare()
     }
     this.watch()
   }
