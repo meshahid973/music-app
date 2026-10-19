@@ -419,6 +419,65 @@ fn saved_audio_file(app: &tauri::AppHandle, requested: &Path) -> bool {
     false
 }
 
+/// Restore the *folder* grants that the native directory picker normally adds.
+/// The picker updates both the filesystem and asset-protocol scopes. Merely
+/// restoring individual song paths when Play is pressed does not reproduce that
+/// grant on a fresh launch (and an unchanged-folder rescan cannot restore it).
+fn saved_music_folder(json: &str) -> Option<PathBuf> {
+    let state: Value = serde_json::from_str(json).ok()?;
+    let folder = PathBuf::from(state.get("musicFolderPath")?.as_str()?);
+    if !folder.is_absolute() || folder.parent().is_none() {
+        return None;
+    }
+    let tracks = state.get("tracks")?.as_array()?;
+    // This directory was actually used for imported songs, rather than being
+    // an unrelated path supplied by the renderer or a damaged preference.
+    let has_imported_song = tracks.iter().any(|track| {
+        track.get("filePath")
+            .and_then(Value::as_str)
+            .is_some_and(|saved| Path::new(saved).starts_with(&folder))
+    });
+    has_imported_song.then_some(folder)
+}
+
+fn restore_saved_music_folder(app: &tauri::AppHandle) -> Result<(), String> {
+    const MAX_LIBRARY_JSON_BYTES: u64 = 128 * 1024 * 1024;
+    let app_data = app.path().app_data_dir().map_err(|err| err.to_string())?;
+    let mut folder = None;
+
+    // The current library takes precedence; an older backup is used only if
+    // the primary is unreadable. Leave both source files untouched.
+    for name in ["resonance_library.json", "resonance_library.json.bak"] {
+        let library = app_data.join(name);
+        if !fs::metadata(&library).is_ok_and(|info| info.is_file() && info.len() <= MAX_LIBRARY_JSON_BYTES) {
+            continue;
+        }
+        if let Ok(json) = fs::read_to_string(library) {
+            if let Some(saved) = saved_music_folder(&json) {
+                folder = Some(saved);
+                break;
+            }
+        }
+    }
+    let Some(folder) = folder else {
+        return Ok(());
+    };
+    if !folder.is_dir() {
+        return Err("Previously selected Music folder is no longer available".into());
+    }
+
+    // The directory picker grants these exact two scopes recursively. Repeat
+    // those grants before the first window requests an asset URL. Do not grant
+    // a generic home directory, arbitrary renderer-supplied path, or all disks.
+    app.fs_scope()
+        .allow_directory(&folder, true)
+        .map_err(|err| format!("Cannot restore Music folder filesystem access: {err}"))?;
+    app.asset_protocol_scope()
+        .allow_directory(&folder, true)
+        .map_err(|err| format!("Cannot restore Music folder media access: {err}"))?;
+    Ok(())
+}
+
 /// Restore access to music previously imported by the user. Dialog grants
 /// handle fresh imports; saved library membership covers older installations
 /// where those dialog grants were not persisted across restarts.
@@ -466,6 +525,33 @@ mod startup_audio_tests {
     }
 
     #[test]
+    fn restores_only_a_folder_actually_used_for_imported_tracks() {
+        let folder = if cfg!(windows) { r"C:\Music\albums" } else { "/music/albums" };
+        let song = if cfg!(windows) { r"C:\Music\albums\artist\song.mp3" } else { "/music/albums/artist/song.mp3" };
+        let other = if cfg!(windows) { r"C:\Other\track.mp3" } else { "/another-location/track.mp3" };
+        let state = serde_json::json!({
+            "musicFolderPath": folder,
+            "tracks": [{"id": "one", "filePath": song}, {"id": "two", "filePath": other}]
+        });
+        assert_eq!(saved_music_folder(&state.to_string()), Some(PathBuf::from(folder)));
+        let unrelated = serde_json::json!({"musicFolderPath": folder, "tracks": [{"filePath": other}]});
+        assert_eq!(saved_music_folder(&unrelated.to_string()), None);
+        assert_eq!(saved_music_folder(r#"{"musicFolderPath":"relative/path","tracks":[{"filePath":"relative/path/song.mp3"}]}"#), None);
+        assert_eq!(saved_music_folder("{bad json"), None);
+    }
+
+    #[test]
+    fn does_not_restore_a_drive_or_filesystem_root() {
+        let root = if cfg!(windows) { r"C:\\" } else { "/" };
+        let file = if cfg!(windows) { r"C:\song.mp3" } else { "/song.mp3" };
+        let json = serde_json::json!({
+            "musicFolderPath": root,
+            "tracks": [{"filePath": file}]
+        });
+        assert_eq!(saved_music_folder(&json.to_string()), None);
+    }
+
+    #[test]
     fn ignores_invalid_or_unrelated_saved_library_data() {
         let file = Path::new("/music/song.mp3");
         assert!(!saved_library_contains_file("{broken json", file));
@@ -480,6 +566,14 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
+        .setup(|app| {
+            // Restore scopes from the user's own saved music-folder selection,
+            // before the frontend hydrates and attempts its first playback.
+            if let Err(error) = restore_saved_music_folder(app.handle()) {
+                eprintln!("Could not restore saved Music folder: {error}");
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![download_audio, inspect_media_url, cancel_download, authorize_audio_path])
         .run(tauri::generate_context!())
         .expect("error while running Resonance native music player");
