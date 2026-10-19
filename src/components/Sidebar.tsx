@@ -146,7 +146,6 @@ export function Sidebar({
           <span>Settings</span>
         </button>
 
-        </AnimatePresence>
       </nav>
     </aside>
   )
