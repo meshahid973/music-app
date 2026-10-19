@@ -2373,6 +2373,22 @@ h3 {
   scrollbar-color: var(--line) transparent;
 }
 
+/* Windowed playlist rows: keep the full scroll height without mounting every song. */
+.add-playlist-track-spacer {
+  position: relative;
+  width: 100%;
+  flex: none;
+}
+
+.add-playlist-track-spacer > .add-playlist-track-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 72px;
+  min-height: 72px;
+  box-sizing: border-box;
+}
+
 .add-playlist-track-list::-webkit-scrollbar {
   width: 6px;
 }

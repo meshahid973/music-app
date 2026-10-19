@@ -7,6 +7,7 @@ import { readID3Metadata, detectSongAndArtist, autoDetectTrackMetadata } from '.
 import { uniqueTracks, tracksFromFiles } from '../src/utils/library.ts'
 import { syncTracksWithCovers } from '../src/utils/covers.ts'
 import { getVisibleTracks, normalizeSearchText } from '../src/hooks/useTrackFilter.ts'
+import { restoreAudioAssetAccess } from '../src/utils/audioAccess.ts'
 import {
   parseId3Header,
   readBoundedMetadataFromReader,
@@ -1528,4 +1529,88 @@ test('docked player bar stays square and above the auto-hide panel with an acryl
   // The existing activation/reveal transition remains in place.
   assert.match(css, /\.app-shell\.auto-hide-sidebar\.sidebar-revealed > \.sidebar\s*\{\s*transform:\s*translateX\(0\);\s*\}/)
   assert.match(css, /transition: transform \.22s cubic-bezier\(\.22,1,\.36,1\), box-shadow \.22s ease;/)
+})
+
+
+test('restored audio access is granted before playing a saved desktop track', async () => {
+  const events = []
+  let release
+  const gate = new Promise((resolve) => { release = resolve })
+  const authorize = async (path) => {
+    events.push('authorize:' + path)
+    await gate
+    events.push('ready')
+  }
+  const pending = restoreAudioAssetAccess('C:\\Music\\song.mp3', true, authorize)
+    .then(() => events.push('play'))
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(events, ['authorize:C:\\Music\\song.mp3'])
+  release()
+  await pending
+  assert.deepEqual(events, ['authorize:C:\\Music\\song.mp3', 'ready', 'play'])
+})
+
+test('browser tracks never require native asset permission', async () => {
+  let count = 0
+  const authorize = async () => { count += 1 }
+  await restoreAudioAssetAccess('C:\\Music\\track.mp3', false, authorize)
+  await restoreAudioAssetAccess(undefined, true, authorize)
+  assert.equal(count, 0)
+})
+
+test('denied saved audio access fails rather than reporting that playback started', async () => {
+  await assert.rejects(
+    restoreAudioAssetAccess('C:\\private.mp3', true, async () => { throw new Error('permission denied') }),
+    /permission denied/,
+  )
+})
+
+test('startup audio restore is enabled without opening the Music folder picker', () => {
+  const manifest = fs.readFileSync(new URL('../src-tauri/Cargo.toml', import.meta.url), 'utf8')
+  const rust = fs.readFileSync(new URL('../src-tauri/src/lib.rs', import.meta.url), 'utf8')
+  const player = fs.readFileSync(new URL('../src/hooks/useAudioPlayback.ts', import.meta.url), 'utf8')
+  assert.match(manifest, /tauri-plugin-persisted-scope\s*=\s*\{[^\n]*"protocol-asset"/)
+  assert.match(rust, /app\.fs_scope\(\)\.is_allowed\(file\)/)
+  assert.match(rust, /app\.asset_protocol_scope\(\)[\s\S]*?\.allow_file\(file\)/)
+  assert.match(rust, /authorize_audio_path\]/)
+  assert.match(player, /restoreAudioAssetAccess\(selectedFilePath, isDesktopApp\(\)/)
+  assert.match(player, /if \(useMusicStore\.getState\(\)\.isPlaying\) next\.play\(\)/)
+})
+
+test('native scanner caps concurrent reads and returns stable sorted results', async () => {
+  let active = 0
+  let peak = 0
+  const result = await scanNativeFolder('root', async (path) => {
+    active += 1
+    peak = Math.max(peak, active)
+    await new Promise((resolve) => setTimeout(resolve, 3))
+    active -= 1
+    if (path === 'root') {
+      return Array.from({ length: 12 }, (_, i) => ({
+        name: 'album' + i, isDirectory: true, isFile: false,
+      }))
+    }
+    return [{ name: 'track.mp3', isDirectory: false, isFile: true }]
+  })
+  assert.ok(peak > 1, 'nested folders should be scanned concurrently')
+  assert.ok(peak <= 4, 'the folder scanner must not use unbounded concurrency')
+  assert.equal(result.audioPaths.length, 12)
+  assert.deepEqual(result.audioPaths, [...result.audioPaths].sort((a, b) => a.localeCompare(b)))
+})
+
+test('search index refreshes when track metadata is edited', () => {
+  const track = { id: 'one', title: 'Old title', artist: 'Musician', album: '', fileName: 'audio.mp3', duration: 1 }
+  assert.deepEqual(getVisibleTracks([track], 'library', undefined, 'old').map((t) => t.id), ['one'])
+  const edited = { ...track, title: 'New title' }
+  assert.deepEqual(getVisibleTracks([edited], 'library', undefined, 'old'), [])
+  assert.deepEqual(getVisibleTracks([edited], 'library', undefined, 'new').map((t) => t.id), ['one'])
+})
+
+test('Add to Playlist keeps a bounded DOM window for large libraries', () => {
+  const modal = fs.readFileSync(new URL('../src/components/modals/AddToPlaylistModal.tsx', import.meta.url), 'utf8')
+  const css = fs.readFileSync(new URL('../src/App.css', import.meta.url), 'utf8')
+  assert.match(modal, /getVirtualListRange\(filteredTracks\.length/)
+  assert.match(modal, /filteredTracks\.slice\(visibleRange\.start, visibleRange\.end\)/)
+  assert.match(modal, /className="add-playlist-track-spacer"/)
+  assert.match(css, /\.add-playlist-track-spacer\s*\{[\s\S]*?position: relative/)
 })

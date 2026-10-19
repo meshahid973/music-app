@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { motion } from 'framer-motion'
 import { CheckFilled, CloseFilled, DiscFilled, PlusFilled, SearchFilled } from '../icons'
 import { cleanDisplayTitle, formatTime } from '../../utils/library'
 import type { Playlist, Track } from '../../types'
+import { getVirtualListRange } from '../../utils/virtualList.ts'
 
 export type AddToPlaylistModalProps = {
   playlist: Playlist
@@ -12,6 +13,9 @@ export type AddToPlaylistModalProps = {
   onAddTrack: (playlistId: string, trackId: string) => void
   onRemoveTrack?: (playlistId: string, trackId: string) => void
 }
+
+const ROW_HEIGHT = 72
+const ROW_STEP = 80 // 72px rows with 8px gap
 
 export function AddToPlaylistModal({
   playlist,
@@ -22,6 +26,8 @@ export function AddToPlaylistModal({
 }: AddToPlaylistModalProps) {
   const [query, setQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 24 })
 
   useEffect(() => {
     searchInputRef.current?.focus()
@@ -52,6 +58,26 @@ export function AddToPlaylistModal({
       )
     })
   }, [allTracks, normalizedQuery])
+
+  // Search can shrink the list while it is scrolled near the end; reset before
+  // paint to prevent a blank result window.
+  useLayoutEffect(() => {
+    const list = listRef.current
+    if (list) list.scrollTop = 0
+    setVisibleRange((previous) => {
+      const next = getVirtualListRange(filteredTracks.length, 0, list?.clientHeight ?? 900, ROW_STEP, 6)
+      return previous.start === next.start && previous.end === next.end ? previous : next
+    })
+  }, [normalizedQuery, playlist.id, filteredTracks.length])
+
+  const handleScroll = () => {
+    const list = listRef.current
+    if (!list) return
+    const next = getVirtualListRange(filteredTracks.length, list.scrollTop, list.clientHeight, ROW_STEP, 6)
+    setVisibleRange((previous) =>
+      previous.start === next.start && previous.end === next.end ? previous : next,
+    )
+  }
 
   const inPlaylistSet = useMemo(() => new Set(playlist.trackIds), [playlist.trackIds])
 
@@ -121,7 +147,7 @@ export function AddToPlaylistModal({
           </div>
         </div>
 
-        <div className="add-playlist-track-list" role="list">
+        <div className="add-playlist-track-list" ref={listRef} onScroll={handleScroll} role="list">
           {allTracks.length === 0 ? (
             <div className="add-playlist-empty">
               <DiscFilled size={36} />
@@ -133,12 +159,14 @@ export function AddToPlaylistModal({
               <p>No songs found matching "{query}"</p>
             </div>
           ) : (
-            filteredTracks.map((track) => {
+            <div className="add-playlist-track-spacer" style={{ height: Math.max(0, filteredTracks.length * ROW_STEP - (ROW_STEP - ROW_HEIGHT)) }}>
+              {filteredTracks.slice(visibleRange.start, visibleRange.end).map((track, index) => {
               const isAdded = inPlaylistSet.has(track.id)
               return (
                 <div
                   key={track.id}
                   className={`add-playlist-track-row ${isAdded ? 'is-added' : ''}`}
+                  style={{ top: `${(visibleRange.start + index) * ROW_STEP}px` }}
                   role="listitem"
                 >
                   <div
@@ -146,7 +174,7 @@ export function AddToPlaylistModal({
                     style={{ '--cover-accent': track.accent } as CSSProperties}
                   >
                     {track.coverUrl ? (
-                      <img src={track.coverUrl} alt="" />
+                      <img src={track.coverUrl} alt="" loading="lazy" decoding="async" />
                     ) : (
                       <DiscFilled size={18} />
                     )}
@@ -195,7 +223,8 @@ export function AddToPlaylistModal({
                   </div>
                 </div>
               )
-            })
+              })}
+            </div>
           )}
         </div>
 

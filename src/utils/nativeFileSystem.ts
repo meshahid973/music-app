@@ -42,18 +42,24 @@ export async function scanNativeFolder(
   const coverPaths: string[] = []
   const errors: string[] = []
 
-  async function traverse(currentPath: string, depth = 0) {
+  // Folder scans used to await every nested directory sequentially. A bounded
+  // queue keeps the UI responsive on large collections without flooding disk I/O.
+  const pending: Array<{ path: string; depth: number }> = [{ path: folderPath, depth: 0 }]
+  const active = new Set<Promise<void>>()
+  const concurrency = 4
+
+  const scan = async ({ path, depth }: { path: string; depth: number }) => {
     if (depth > 8) {
-      errors.push(currentPath)
-      console.warn(`Skipping deeply nested directory (depth limit reached): ${currentPath}`)
+      errors.push(path)
+      console.warn(`Skipping deeply nested directory (depth limit reached): ${path}`)
       return
     }
     try {
-      const entries = await readDirectory(currentPath)
+      const entries = await readDirectory(path)
       for (const entry of entries) {
-        const fullPath = joinPath(currentPath, entry.name)
+        const fullPath = joinPath(path, entry.name)
         if (entry.isDirectory) {
-          await traverse(fullPath, depth + 1)
+          pending.push({ path: fullPath, depth: depth + 1 })
         } else if (entry.isFile) {
           const ext = getExtension(entry.name)
           if (audioExtensions.has(ext)) {
@@ -63,13 +69,26 @@ export async function scanNativeFolder(
           }
         }
       }
-    } catch (err) {
-      errors.push(currentPath)
-      console.warn(`Could not read directory ${currentPath}:`, err)
+    } catch (error) {
+      errors.push(path)
+      console.warn(`Could not read directory ${path}:`, error)
     }
   }
 
-  await traverse(folderPath)
+  while (pending.length > 0 || active.size > 0) {
+    while (pending.length > 0 && active.size < concurrency) {
+      const job = pending.shift()!
+      const task = scan(job)
+      active.add(task)
+      void task.finally(() => active.delete(task))
+    }
+    if (active.size > 0) await Promise.race(active)
+  }
+
+  // Completion order depends on the filesystem. Use stable presentation order.
+  audioPaths.sort((a, b) => a.localeCompare(b))
+  coverPaths.sort((a, b) => a.localeCompare(b))
+  errors.sort((a, b) => a.localeCompare(b))
   return { audioPaths, coverPaths, errors }
 }
 

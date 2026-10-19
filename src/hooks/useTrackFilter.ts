@@ -13,6 +13,20 @@ export function normalizeSearchText(value: string): string {
     .trim()
 }
 
+// Cached per immutable track object. Searches no longer repeatedly normalize the
+// same title/artist/album/file name on every keystroke.
+const searchTextByTrack = new WeakMap<Track, string>()
+
+function indexedSearchText(track: Track): string {
+  const cached = searchTextByTrack.get(track)
+  if (cached !== undefined) return cached
+  const indexed = [track.title, track.artist, track.album, track.fileName]
+    .map(normalizeSearchText)
+    .join('\u0000')
+  searchTextByTrack.set(track, indexed)
+  return indexed
+}
+
 export function getVisibleTracks(
   tracks: Track[],
   activePlaylistId: string,
@@ -21,20 +35,13 @@ export function getVisibleTracks(
 ): Track[] {
   // Build membership once per filter calculation rather than scanning the
   // playlist array for every track. This matters for large libraries/playlists.
-  const playlistTrackIds = new Set(activePlaylist?.trackIds ?? [])
-  const playlistTracks =
-    activePlaylistId === libraryId
-      ? tracks
-      : tracks.filter((track) => playlistTrackIds.has(track.id))
+  const membership = activePlaylistId === libraryId ? null : new Set(activePlaylist?.trackIds ?? [])
+  const playlistTracks = membership ? tracks.filter((track) => membership.has(track.id)) : tracks
   const normalizedQuery = normalizeSearchText(query)
 
   if (!normalizedQuery) return playlistTracks
 
-  return playlistTracks.filter((track) =>
-    [track.title, track.artist, track.album, track.fileName].some((value) =>
-      normalizeSearchText(value).includes(normalizedQuery),
-    ),
-  )
+  return playlistTracks.filter((track) => indexedSearchText(track).includes(normalizedQuery))
 }
 
 export function useTrackFilter(
