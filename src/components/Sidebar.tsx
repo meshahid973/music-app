@@ -50,8 +50,6 @@ export function Sidebar({
 }: SidebarProps) {
   return (
     <aside className="sidebar" onMouseEnter={autoHideEnabled ? onAutoHideEnter : undefined} onMouseLeave={autoHideEnabled ? onAutoHideLeave : undefined}>
-  return (
-    <aside className="sidebar">
       <div className="brand">
         <div className="brand-mark">
           <AudioLinesFilled size={22} />

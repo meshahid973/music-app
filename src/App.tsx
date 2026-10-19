@@ -265,7 +265,6 @@ function App() {
         autoHideEnabled={autoHideSidebar}
         onAutoHideEnter={() => setIsSidebarRevealed(true)}
         onAutoHideLeave={() => setIsSidebarRevealed(false)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       <section className="content">
