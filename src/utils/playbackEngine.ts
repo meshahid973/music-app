@@ -154,16 +154,17 @@ export class PlaybackEngine {
     this.playRequestedAt = Date.now()
     this.lastProgressAt = this.playRequestedAt
     this.lastProgress = this.position()
-    if (this.sound?.state() === 'unloaded') {
+    const wasUnloaded = this.sound?.state() === 'unloaded'
+    if (wasUnloaded) {
       // A previous failed load can leave a non-null but unusable Howl.
-      this.sound.unload()
+      this.sound?.unload()
       this.sound = null
     }
     if (this.sound) {
       this.safePlay(this.sound)
-    } else if (this.phase !== 'loading') {
-      // A pending authorization will honor desired=true; otherwise create a
-      // replacement instead of discarding another user Play gesture.
+    } else if (wasUnloaded || this.phase !== 'loading') {
+      // Distinguish an in-flight permission request (no sound yet) from
+      // a player that reached "unloaded" while its phase was still loading.
       void this.prepare()
     }
     this.watch()
