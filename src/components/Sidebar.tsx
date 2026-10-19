@@ -1,17 +1,10 @@
-import { useRef } from 'react'
-import type { ChangeEvent } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { Download } from 'lucide-react'
 import {
   AudioLinesFilled,
-  CheckFilled,
   DiscFilled,
-  FolderImageFilled,
-  FolderMusicFilled,
   HeartFilled,
   PlaylistFilled,
   PlusFilled,
-  RefreshFilled,
   SettingsFilled,
 } from './icons'
 import { favoritesId, libraryId } from '../store/useMusicStore'
@@ -29,21 +22,12 @@ export type SidebarProps = {
   onRenamePlaylist: (playlist: Playlist) => void
   onDeletePlaylist: (playlist: Playlist) => void
   onOpenAddToPlaylist?: (playlist: Playlist) => void
-  onAddMusicFolder: (e: ChangeEvent<HTMLInputElement>) => void
-  onAddCoverFolder: (e: ChangeEvent<HTMLInputElement>) => void
-  isDesktop?: boolean
-  onNativeMusicFolder?: () => void
-  onNativeCoverFolder?: () => void
-  onRescanMusicFolder?: () => void
-  onRescanCoverFolder?: () => void
-  isScanningMusic?: boolean
-  isScanningCovers?: boolean
-  musicFolderName?: string
-  coverFolderName?: string
-  scanNotice?: string | null
   onOpenSettings?: () => void
   isDownloadsActive?: boolean
   onOpenDownloads?: () => void
+  autoHideEnabled?: boolean
+  onAutoHideEnter?: () => void
+  onAutoHideLeave?: () => void
 }
 
 export function Sidebar({
@@ -57,59 +41,15 @@ export function Sidebar({
   onRenamePlaylist,
   onDeletePlaylist,
   onOpenAddToPlaylist,
-  onAddMusicFolder,
-  onAddCoverFolder,
-  isDesktop = false,
-  onNativeMusicFolder,
-  onNativeCoverFolder,
-  onRescanMusicFolder,
-  onRescanCoverFolder,
-  isScanningMusic = false,
-  isScanningCovers = false,
-  musicFolderName,
-  coverFolderName,
-  scanNotice,
   onOpenSettings,
   isDownloadsActive = false,
   onOpenDownloads,
+  autoHideEnabled = false,
+  onAutoHideEnter,
+  onAutoHideLeave,
 }: SidebarProps) {
-  const musicInputRef = useRef<HTMLInputElement>(null)
-  const coverInputRef = useRef<HTMLInputElement>(null)
-
-  const handleMusicTriggerClick = () => {
-    if (isDesktop && onNativeMusicFolder) {
-      onNativeMusicFolder()
-    } else {
-      musicInputRef.current?.click()
-    }
-  }
-
-  const handleCoverTriggerClick = () => {
-    if (isDesktop && onNativeCoverFolder) {
-      onNativeCoverFolder()
-    } else {
-      coverInputRef.current?.click()
-    }
-  }
-
-  const handleRescanMusicClick = () => {
-    if (onRescanMusicFolder) {
-      onRescanMusicFolder()
-    } else {
-      handleMusicTriggerClick()
-    }
-  }
-
-  const handleRescanCoverClick = () => {
-    if (onRescanCoverFolder) {
-      onRescanCoverFolder()
-    } else {
-      handleCoverTriggerClick()
-    }
-  }
-
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" onMouseEnter={autoHideEnabled ? onAutoHideEnter : undefined} onMouseLeave={autoHideEnabled ? onAutoHideLeave : undefined}>
       <div className="brand">
         <div className="brand-mark">
           <AudioLinesFilled size={22} />
@@ -182,98 +122,6 @@ export function Sidebar({
         </form>
 
 
-        {/* Music Folder row with dedicated Rescan button */}
-        <div className="nav-item nav-folder-row">
-          <button
-            type="button"
-            className="nav-folder-trigger"
-            title={
-              musicFolderName
-                ? `Music folder: ${musicFolderName} (click to change)`
-                : 'Select or import a music folder'
-            }
-            onClick={handleMusicTriggerClick}
-          >
-            <FolderMusicFilled size={18} />
-            <span className="nav-folder-label">
-              {isScanningMusic ? 'Scanning...' : 'Music folder'}
-            </span>
-          </button>
-
-          {!isDesktop && (
-            <input
-              ref={musicInputRef}
-              type="file"
-              multiple
-              onChange={onAddMusicFolder}
-              {...{ webkitdirectory: '', directory: '' }}
-              style={{ display: 'none' }}
-              aria-hidden="true"
-            />
-          )}
-
-          <button
-            type="button"
-            className={`nav-rescan-btn ${isScanningMusic ? 'scanning' : ''}`}
-            title={
-              musicFolderName
-                ? `Rescan "${musicFolderName}" for new songs`
-                : 'Rescan music folder for new songs'
-            }
-            aria-label="Rescan music folder"
-            onClick={handleRescanMusicClick}
-            disabled={isScanningMusic}
-          >
-            <RefreshFilled size={14} className={isScanningMusic ? 'spinning' : ''} />
-          </button>
-        </div>
-
-        {/* Cover Folder row with dedicated Rescan button */}
-        <div className="nav-item nav-folder-row">
-          <button
-            type="button"
-            className="nav-folder-trigger"
-            title={
-              coverFolderName
-                ? `Cover folder: ${coverFolderName} (click to change)`
-                : 'Select or import a cover artwork folder'
-            }
-            onClick={handleCoverTriggerClick}
-          >
-            <FolderImageFilled size={18} />
-            <span className="nav-folder-label">
-              {isScanningCovers ? 'Scanning...' : 'Cover folder'}
-            </span>
-          </button>
-
-          {!isDesktop && (
-            <input
-              ref={coverInputRef}
-              type="file"
-              multiple
-              onChange={onAddCoverFolder}
-              {...{ webkitdirectory: '', directory: '' }}
-              style={{ display: 'none' }}
-              aria-hidden="true"
-            />
-          )}
-
-          <button
-            type="button"
-            className={`nav-rescan-btn ${isScanningCovers ? 'scanning' : ''}`}
-            title={
-              coverFolderName
-                ? `Rescan "${coverFolderName}" for new artwork`
-                : 'Rescan cover folder for new artwork'
-            }
-            aria-label="Rescan cover folder"
-            onClick={handleRescanCoverClick}
-            disabled={isScanningCovers}
-          >
-            <RefreshFilled size={14} className={isScanningCovers ? 'spinning' : ''} />
-          </button>
-        </div>
-
         <button
           type="button"
           className={`nav-item ${isDownloadsActive ? 'active' : ''}`}
@@ -298,21 +146,6 @@ export function Sidebar({
           <span>Settings</span>
         </button>
 
-        <AnimatePresence>
-          {scanNotice && (
-            <motion.div
-              className="sidebar-scan-notice"
-              role="status"
-              initial={{ opacity: 0, y: 6, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.96 }}
-              transition={{ duration: 0.2 }}
-            >
-              <CheckFilled size={14} />
-              <span>{scanNotice}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </nav>
     </aside>
   )

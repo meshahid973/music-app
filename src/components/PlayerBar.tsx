@@ -33,6 +33,9 @@ export type PlayerBarProps = {
   onShuffle: () => void
   onRepeat: () => void
   onVolume: (value: number) => void
+  hoverMode?: boolean
+  onHoverEnter?: () => void
+  onHoverLeave?: () => void
 }
 
 export function PlayerBar({
@@ -50,6 +53,9 @@ export function PlayerBar({
   onShuffle,
   onRepeat,
   onVolume,
+  hoverMode = false,
+  onHoverEnter,
+  onHoverLeave,
 }: PlayerBarProps) {
   const duration = currentTrack?.duration ?? 0
 
@@ -103,7 +109,7 @@ export function PlayerBar({
 
 
   return (
-    <footer className="player-bar">
+    <footer className="player-bar" onMouseEnter={hoverMode ? onHoverEnter : undefined} onMouseLeave={hoverMode ? onHoverLeave : undefined}>
       {/* 1. Track Info on Left */}
       <div className="player-track">
         <div

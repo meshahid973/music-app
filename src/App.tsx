@@ -35,6 +35,8 @@ function App() {
   const [playlistToAddSongs, setPlaylistToAddSongs] = useState<Playlist | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [activeSection, setActiveSection] = useState<'library' | 'downloads'>('library')
+  const [isSidebarRevealed, setIsSidebarRevealed] = useState(false)
+  const [isPlayerBarRevealed, setIsPlayerBarRevealed] = useState(false)
   const [isFirstRunSetupInProgress, setIsFirstRunSetupInProgress] = useState(false)
   const [firstRunSetupStep, setFirstRunSetupStep] = useState<'music' | 'covers'>('music')
   const [firstRunBusyAction, setFirstRunBusyAction] = useState<'music' | 'covers' | null>(null)
@@ -48,6 +50,9 @@ function App() {
   const shuffle = useMusicStore((state) => state.shuffle)
   const repeat = useMusicStore((state) => state.repeat)
   const volume = useMusicStore((state) => state.volume)
+  const keyboardShortcuts = useMusicStore((state) => state.keyboardShortcuts)
+  const playerBarHoverMode = useMusicStore((state) => state.playerBarHoverMode)
+  const autoHideSidebar = useMusicStore((state) => state.autoHideSidebar)
   const isInitialized = useMusicStore((state) => state.isInitialized)
   const configuredMusicFolderPath = useMusicStore((state) => state.musicFolderPath)
   const firstRunSetupCompleted = useMusicStore((state) => state.firstRunSetupCompleted)
@@ -165,6 +170,7 @@ function App() {
   // 5. Global keyboard shortcuts
   const previousVolumeRef = useRef<number>(0.82)
   useKeyboardShortcuts({
+    shortcuts: keyboardShortcuts,
     onTogglePlay: () => togglePlay(visibleTracks[0]?.id, visibleTracks.map((t) => t.id)),
     onPrevious: playPrevious,
     onNext: playNext,
@@ -222,7 +228,22 @@ function App() {
 
   return (
     <main
-      className="app-shell theme-normal"
+      className={[
+        'app-shell', 'theme-normal',
+        autoHideSidebar ? 'auto-hide-sidebar' : '',
+        autoHideSidebar && isSidebarRevealed ? 'sidebar-revealed' : '',
+        playerBarHoverMode ? 'player-bar-hover-mode' : '',
+        playerBarHoverMode && isPlayerBarRevealed ? 'player-bar-revealed' : '',
+      ].filter(Boolean).join(' ')}
+      onMouseMove={(event) => {
+        const bounds = event.currentTarget.getBoundingClientRect()
+        if (autoHideSidebar && event.clientX - bounds.left <= 14) setIsSidebarRevealed(true)
+        if (playerBarHoverMode && bounds.bottom - event.clientY <= 32) setIsPlayerBarRevealed(true)
+      }}
+      onMouseLeave={() => {
+        if (autoHideSidebar) setIsSidebarRevealed(false)
+        if (playerBarHoverMode) setIsPlayerBarRevealed(false)
+      }}
       onContextMenu={(event) => event.preventDefault()}
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
@@ -240,19 +261,10 @@ function App() {
         onOpenAddToPlaylist={setPlaylistToAddSongs}
         playlistName={newPlaylistName}
         setPlaylistName={setNewPlaylistName}
-        onAddMusicFolder={handleMusicFolder}
-        onAddCoverFolder={handleCoverFolder}
-        isDesktop={isDesktop}
-        onNativeMusicFolder={handleNativeMusicFolder}
-        onNativeCoverFolder={handleNativeCoverFolder}
-        onRescanMusicFolder={handleRescanMusicFolder}
-        onRescanCoverFolder={handleRescanCoverFolder}
-        isScanningMusic={isScanningMusic}
-        isScanningCovers={isScanningCovers}
-        musicFolderName={musicFolderName}
-        coverFolderName={coverFolderName}
-        scanNotice={scanNotice}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        autoHideEnabled={autoHideSidebar}
+        onAutoHideEnter={() => setIsSidebarRevealed(true)}
+        onAutoHideLeave={() => setIsSidebarRevealed(false)}
       />
 
       <section className="content">
@@ -399,6 +411,9 @@ function App() {
         onShuffle={toggleShuffle}
         onRepeat={cycleRepeat}
         onVolume={setVolume}
+        hoverMode={playerBarHoverMode}
+        onHoverEnter={() => setIsPlayerBarRevealed(true)}
+        onHoverLeave={() => setIsPlayerBarRevealed(false)}
       />
 
       <AnimatePresence>
@@ -479,6 +494,18 @@ function App() {
           <SettingsModal
             key="settings-modal"
             onClose={() => setIsSettingsOpen(false)}
+            isDesktop={isDesktop}
+            onAddMusicFolder={handleMusicFolder}
+            onAddCoverFolder={handleCoverFolder}
+            onNativeMusicFolder={handleNativeMusicFolder}
+            onNativeCoverFolder={handleNativeCoverFolder}
+            onRescanMusicFolder={handleRescanMusicFolder}
+            onRescanCoverFolder={handleRescanCoverFolder}
+            isScanningMusic={isScanningMusic}
+            isScanningCovers={isScanningCovers}
+            musicFolderName={musicFolderName}
+            coverFolderName={coverFolderName}
+            scanNotice={scanNotice}
           />
         )}
       </AnimatePresence>
