@@ -193,18 +193,20 @@ test('cleanup is case-insensitive about references and survives a missing folder
 
 
 test('custom shortcut bindings normalize safely and format for the settings UI', () => {
-  assert.equal(normalizeShortcutBinding('ctrl+KeyK'), 'Ctrl+KeyK')
+  assert.equal(normalizeShortcutBinding('ctrl+alt+shift+KeyK'), 'Ctrl+Alt+Shift+KeyK')
   assert.equal(normalizeShortcutBinding('KeyM'), 'KeyM')
   assert.equal(normalizeShortcutBinding('Ctrl+KeyR'), null)
+  assert.equal(normalizeShortcutBinding('Ctrl+Shift+KeyN'), null)
+  assert.equal(normalizeShortcutBinding('Alt+ArrowLeft'), null)
   assert.equal(normalizeShortcutBinding('KeyThatDoesNotExist'), null)
   assert.equal(formatShortcut('ArrowLeft'), '←')
-  assert.equal(formatShortcut('Ctrl+KeyK'), 'Ctrl+K')
+  assert.equal(formatShortcut('Ctrl+Alt+Shift+KeyK'), 'Ctrl+Alt+Shift+K')
 })
 
 test('shortcut matching respects modifiers and keeps default playback bindings', () => {
   assert.equal(matchesKeyboardShortcut(key({ key: 'm', code: 'KeyM' }), DEFAULT_KEYBOARD_SHORTCUTS.toggleMute), true)
-  assert.equal(matchesKeyboardShortcut(key({ key: 'k', code: 'KeyK', ctrlKey: true }), 'Ctrl+KeyK'), true)
-  assert.equal(matchesKeyboardShortcut(key({ key: 'k', code: 'KeyK' }), 'Ctrl+KeyK'), false)
+  assert.equal(matchesKeyboardShortcut(key({ key: 'k', code: 'KeyK', ctrlKey: true, altKey: true, shiftKey: true }), 'Ctrl+Alt+Shift+KeyK'), true)
+  assert.equal(matchesKeyboardShortcut(key({ key: 'k', code: 'KeyK' }), 'Ctrl+Alt+Shift+KeyK'), false)
   assert.equal(DEFAULT_KEYBOARD_SHORTCUTS.togglePlay, 'Space')
   assert.equal(DEFAULT_KEYBOARD_SHORTCUTS.previous, 'MediaTrackPrevious')
 })

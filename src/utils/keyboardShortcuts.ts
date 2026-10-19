@@ -67,6 +67,18 @@ export function normalizeShortcutBinding(value: unknown): string | null {
   }
   if (!baseCode || !KEY_CODES.has(baseCode)) return null
   if ((baseCode === 'MediaTrackPrevious' || baseCode === 'MediaTrackNext') && modifiers.size) return null
+
+  // Keep browser/window navigation and editing commands available. Modified shortcuts
+  // remain customizable, but combinations reserved by the browser or operating system do not.
+  const usesBrowserModifier = modifiers.has('Ctrl') || modifiers.has('Meta')
+  if (modifiers.has('Alt') && ['ArrowLeft', 'ArrowRight', 'F4'].includes(baseCode)) return null
+  if (
+    usesBrowserModifier &&
+    ['KeyA', 'KeyB', 'KeyC', 'KeyD', 'KeyE', 'KeyF', 'KeyG', 'KeyH', 'KeyI', 'KeyJ',
+      'KeyK', 'KeyL', 'KeyN', 'KeyO', 'KeyP', 'KeyQ', 'KeyR', 'KeyS', 'KeyT', 'KeyU',
+      'KeyV', 'KeyW', 'KeyX', 'KeyY', 'KeyZ'].includes(baseCode)
+  ) return null
+
   const ordered = MODIFIERS.filter((modifier) => modifiers.has(modifier))
   const canonical = [...ordered, baseCode].join('+')
   return RESERVED_SHORTCUTS.has(canonical) ? null : canonical
