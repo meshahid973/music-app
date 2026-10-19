@@ -1,9 +1,12 @@
 import { Howl } from 'howler'
+import { invoke } from '@tauri-apps/api/core'
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { useMusicStore } from '../store/useMusicStore'
 import { showToast } from '../store/useToastStore'
 import { getExtension } from '../utils/audioFiles'
+import { restoreAudioAssetAccess } from '../utils/audioAccess'
+import { isDesktopApp } from '../utils/platform'
 import { revokeOwnedObjectUrls } from '../utils/objectUrls'
 import type { PlaybackQueue } from '../utils/queue'
 
@@ -36,62 +39,78 @@ export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
   useEffect(() => () => revokeOwnedObjectUrls(), [])
 
   useEffect(() => {
+    // The library can be hydrated before asset permissions are restored.
+    // A rescan triggers the dialog's scope grant, but playback must work on
+    // the first launch without making the user rescan the folder.
     audioRef.current?.stop()
     audioRef.current?.unload()
     audioRef.current = null
+    setSeek(0)
+
     if (!currentAudioUrl) return
 
-    const shouldAutoplay = useMusicStore.getState().isPlaying
-    const currentFileName = useMusicStore
-      .getState()
-      .tracks.find((t) => t.id === currentId)?.fileName
-    const ext = getExtension(currentFileName ?? '') || 'mp3'
-    const howl = new Howl({
-      src: [currentAudioUrl],
-      format: [ext],
-      html5: true,
-      autoplay: shouldAutoplay,
-      volume: volumeRef.current,
-      onend: () => playNextRef.current(),
-      onload: () => {
-        setSeek(0)
-        if (useMusicStore.getState().isPlaying && !howl.playing()) {
-          try {
-            howl.play()
-          } catch {
-            // ignore
-          }
-        }
-      },
-      onloaderror: (_id, err) => {
-        console.warn('Audio load error:', err)
-        // Without this the UI kept showing "playing" for a file that is missing or unsupported.
-        if (audioRef.current !== howl) return
-        useMusicStore.getState().setIsPlaying(false)
-        const name = useMusicStore.getState().tracks.find((t) => t.id === currentId)?.title
-        showToast(
-          `${name ? `“${name}”` : 'This track'} could not be played. The file may have been moved, deleted or is not supported.`,
-          { title: 'Playback Error', type: 'error' },
-        )
-      },
-      onplayerror: (_id, err) => {
-        console.warn('Audio play error:', err)
-        howl.once('unlock', () => {
-          try {
-            howl.play()
-          } catch {
-            // ignore
-          }
-        })
-      },
+    let cancelled = false
+    let howl: Howl | null = null
+    const selectedFilePath = currentTrack?.filePath
+    const ext = getExtension(currentTrack?.fileName ?? '') || 'mp3'
+
+    const showPlaybackError = (message: string) => {
+      if (cancelled) return
+      useMusicStore.getState().setIsPlaying(false)
+      showToast(message, { title: 'Playback Error', type: 'error' })
+    }
+
+    const prepare = async () => {
+      await restoreAudioAssetAccess(selectedFilePath, isDesktopApp(), (path) =>
+        invoke<void>('authorize_audio_path', { path }),
+      )
+      if (cancelled) return
+
+      const next = new Howl({
+        src: [currentAudioUrl],
+        format: [ext],
+        html5: true,
+        autoplay: false,
+        volume: volumeRef.current,
+        onend: () => {
+          if (!cancelled && audioRef.current === next) playNextRef.current()
+        },
+        onload: () => {
+          if (!cancelled && audioRef.current === next) setSeek(0)
+        },
+        onloaderror: (_id, error) => {
+          if (cancelled || audioRef.current !== next) return
+          console.warn('Audio load error:', error)
+          showPlaybackError('This track could not be loaded. Check its path and audio format.')
+        },
+        onplayerror: (_id, error) => {
+          if (cancelled || audioRef.current !== next) return
+          console.warn('Audio play error:', error)
+          showPlaybackError('Playback failed. Try playing again or check the audio format.')
+        },
+      })
+      howl = next
+      audioRef.current = next
+      // A user may press Play while access is still being restored. Honor
+      // the latest requested state instead of discarding that first click.
+      if (useMusicStore.getState().isPlaying) next.play()
+    }
+
+    void prepare().catch((error) => {
+      if (cancelled) return
+      console.warn('Cannot restore saved audio access:', error)
+      showPlaybackError(
+        'Could not open this song. Select the Music folder again if its access was revoked.',
+      )
     })
-    audioRef.current = howl
+
     return () => {
-      howl.stop()
-      howl.unload()
+      cancelled = true
+      howl?.stop()
+      howl?.unload()
       if (audioRef.current === howl) audioRef.current = null
     }
-  }, [currentAudioUrl, currentId])
+  }, [currentAudioUrl, currentId, currentTrack?.filePath, currentTrack?.fileName])
 
   useEffect(() => {
     const howl = audioRef.current

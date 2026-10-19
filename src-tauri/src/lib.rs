@@ -382,13 +382,35 @@ async fn inspect_media_url(app: tauri::AppHandle, url: String) -> Result<String,
         .map_err(|error| format!("The inspection task stopped unexpectedly: {error}"))?
 }
 
+/// Restore WebView access to a previously authorized music file. The selected
+/// file or its parent folder must already be in the filesystem dialog scope.
+#[tauri::command]
+fn authorize_audio_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let file = Path::new(&path);
+    if !file.is_absolute()
+        || !file.extension().and_then(OsStr::to_str).is_some_and(|extension| {
+            matches!(extension.to_ascii_lowercase().as_str(),
+                "mp3" | "wav" | "ogg" | "flac" | "m4a" | "aac" | "opus" |
+                "webm" | "wma" | "alac" | "aiff")
+        })
+        || !app.fs_scope().is_allowed(file)
+        || !file.is_file()
+    {
+        return Err("This song is unavailable or its folder is no longer authorized. Choose the Music folder again.".into());
+    }
+    app.asset_protocol_scope()
+        .allow_file(file)
+        .map_err(|err| format!("Could not allow this audio file: {err}"))?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
-        .invoke_handler(tauri::generate_handler![download_audio, inspect_media_url, cancel_download])
+        .invoke_handler(tauri::generate_handler![download_audio, inspect_media_url, cancel_download, authorize_audio_path])
         .run(tauri::generate_context!())
         .expect("error while running Resonance native music player");
 }
