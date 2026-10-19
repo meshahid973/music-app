@@ -8,6 +8,7 @@ import { uniqueTracks, tracksFromFiles } from '../src/utils/library.ts'
 import { syncTracksWithCovers } from '../src/utils/covers.ts'
 import { getVisibleTracks, normalizeSearchText } from '../src/hooks/useTrackFilter.ts'
 import { restoreAudioAssetAccess } from '../src/utils/audioAccess.ts'
+import { startPlayback } from '../src/utils/playbackTransport.ts'
 import {
   parseId3Header,
   readBoundedMetadataFromReader,
@@ -1573,8 +1574,11 @@ test('startup audio restore is enabled without opening the Music folder picker',
   assert.match(rust, /app\.fs_scope\(\)\.is_allowed\(file\)/)
   assert.match(rust, /app\.asset_protocol_scope\(\)[\s\S]*?\.allow_file\(file\)/)
   assert.match(rust, /authorize_audio_path\]/)
-  assert.match(player, /restoreAudioAssetAccess\(selectedFilePath, isDesktopApp\(\)/)
-  assert.match(player, /if \(useMusicStore\.getState\(\)\.isPlaying\) next\.play\(\)/)
+  assert.match(player, /const howl = new Howl\(/)
+  assert.match(player, /startPlayback\(audioRef\.current,/)
+  assert.match(player, /onplay: \(\) => \{[\s\S]*?setIsPlaying\(true\)/)
+  assert.match(player, /onloaderror: \(_id, error\) => \{[\s\S]*?restoreAudioAssetAccess\(filePath, true,/)
+  assert.doesNotMatch(player, /await restoreAudioAssetAccess\(selectedFilePath/)
 })
 
 test('native scanner caps concurrent reads and returns stable sorted results', async () => {
@@ -1613,4 +1617,37 @@ test('Add to Playlist keeps a bounded DOM window for large libraries', () => {
   assert.match(modal, /filteredTracks\.slice\(visibleRange\.start, visibleRange\.end\)/)
   assert.match(modal, /className="add-playlist-track-spacer"/)
   assert.match(css, /\.add-playlist-track-spacer\s*\{[\s\S]*?position: relative/)
+})
+
+
+test('first bottom-bar Play controls the real Howl even if the UI says paused', () => {
+  const events = []
+  const media = {
+    playing: () => false,
+    state: () => 'loaded',
+    play: () => { events.push('play') },
+  }
+  startPlayback(media, () => events.push('rebuild'))
+  assert.deepEqual(events, ['play'])
+})
+
+test('transport play does not restart an already playing song', () => {
+  let calls = 0
+  startPlayback({
+    playing: () => true,
+    state: () => 'loaded',
+    play: () => { calls += 1 },
+  }, () => { calls += 1 })
+  assert.equal(calls, 0)
+})
+
+test('a failed or missing player is recreated rather than faking playback state', () => {
+  let rebuilds = 0
+  startPlayback(null, () => { rebuilds += 1 })
+  startPlayback({
+    playing: () => false,
+    state: () => 'unloaded',
+    play: () => { throw new Error('unloaded player must not play') },
+  }, () => { rebuilds += 1 })
+  assert.equal(rebuilds, 2)
 })
