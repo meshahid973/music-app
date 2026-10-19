@@ -5,6 +5,7 @@ import { assignCoversToTracks, syncTracksWithCovers, uniqueTracks } from '../uti
 import { loadDesktopLibrary, saveDesktopLibrary } from '../utils/desktopDatabase.ts'
 import { hydrateTracksArtwork, sanitizeTracksForPersistence } from '../utils/artworkStorage.ts'
 import { isDesktopApp } from '../utils/platform.ts'
+import { mergeHydratedLibraryTracks, restorePlayableTrackId } from '../utils/libraryHydration.ts'
 import { DEFAULT_KEYBOARD_SHORTCUTS, sanitizeKeyboardShortcutBindings, type KeyboardShortcutBindings } from '../utils/keyboardShortcuts.ts'
 
 type MusicState = {
@@ -175,20 +176,9 @@ export const useMusicStore = create<MusicState>()(
             const loaded = await loadDesktopLibrary()
             if (loaded) {
               set((state) => {
-                // 1. Safely merge tracks: loaded tracks + any tracks concurrently added to state
-                const trackMap = new Map<string, Track>()
-                for (const t of loaded.tracks) {
-                  trackMap.set(t.id, t)
-                }
-                for (const t of state.tracks) {
-                  const existing = trackMap.get(t.id)
-                  if (existing) {
-                    trackMap.set(t.id, { ...existing, ...t })
-                  } else {
-                    trackMap.set(t.id, t)
-                  }
-                }
-                const mergedTracks = Array.from(trackMap.values())
+                // AppData wins for existing native tracks. Browser legacy state
+                // may contain expired blob/asset URLs from an earlier build.
+                const mergedTracks = mergeHydratedLibraryTracks(loaded.tracks, state.tracks)
 
                 // 2. Safely merge playlists: loaded playlists + any playlists concurrently created/updated
                 const playlistMap = new Map<string, Playlist>()
@@ -217,8 +207,11 @@ export const useMusicStore = create<MusicState>()(
                     ? libraryId
                     : requestedActivePlaylistId
 
-                const currentTrackId =
-                  state.currentTrackId || loaded.currentTrackId || mergedTracks[0]?.id
+                const currentTrackId = restorePlayableTrackId(
+                  mergedTracks,
+                  loaded.currentTrackId,
+                  state.currentTrackId,
+                )
 
                 const nextState = {
                   tracks: mergedTracks,
