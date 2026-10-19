@@ -382,8 +382,46 @@ async fn inspect_media_url(app: tauri::AppHandle, url: String) -> Result<String,
         .map_err(|error| format!("The inspection task stopped unexpectedly: {error}"))?
 }
 
-/// Restore WebView access to a previously authorized music file. The selected
-/// file or its parent folder must already be in the filesystem dialog scope.
+/// A file already present in the saved library represents a prior user
+/// selection. Older installs can have this AppData record without a persisted
+/// Tauri filesystem scope. Never accept an arbitrary path from the renderer.
+fn saved_library_contains_file(json: &str, requested: &Path) -> bool {
+    let Ok(value) = serde_json::from_str::<Value>(json) else {
+        return false;
+    };
+    value.get("tracks")
+        .and_then(Value::as_array)
+        .is_some_and(|tracks| tracks.iter().any(|track| {
+            track.get("filePath")
+                .and_then(Value::as_str)
+                .is_some_and(|saved| Path::new(saved) == requested)
+        }))
+}
+
+fn saved_audio_file(app: &tauri::AppHandle, requested: &Path) -> bool {
+    const MAX_LIBRARY_JSON_BYTES: u64 = 128 * 1024 * 1024;
+    let Ok(app_data) = app.path().app_data_dir() else {
+        return false;
+    };
+    for name in ["resonance_library.json", "resonance_library.json.bak"] {
+        let path = app_data.join(name);
+        if !fs::metadata(&path)
+            .is_ok_and(|metadata| metadata.is_file() && metadata.len() <= MAX_LIBRARY_JSON_BYTES)
+        {
+            continue;
+        }
+        if let Ok(json) = fs::read_to_string(path) {
+            if saved_library_contains_file(&json, requested) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Restore access to music previously imported by the user. Dialog grants
+/// handle fresh imports; saved library membership covers older installations
+/// where those dialog grants were not persisted across restarts.
 #[tauri::command]
 fn authorize_audio_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
     let file = Path::new(&path);
@@ -393,15 +431,47 @@ fn authorize_audio_path(app: tauri::AppHandle, path: String) -> Result<(), Strin
                 "mp3" | "wav" | "ogg" | "flac" | "m4a" | "aac" | "opus" |
                 "webm" | "wma" | "alac" | "aiff")
         })
-        || !app.fs_scope().is_allowed(file)
         || !file.is_file()
     {
-        return Err("This song is unavailable or its folder is no longer authorized. Choose the Music folder again.".into());
+        return Err("The saved audio file is missing or unsupported.".into());
+    }
+    if !app.fs_scope().is_allowed(file) {
+        if !saved_audio_file(&app, file) {
+            return Err("This song has no saved permission. Choose the file or Music folder again.".into());
+        }
+        // Restore only this previously imported song; do not add its parent
+        // directory or broaden the static asset protocol allowlist.
+        app.fs_scope().allow_file(file)
+            .map_err(|err| format!("Cannot restore saved audio access: {err}"))?;
     }
     app.asset_protocol_scope()
         .allow_file(file)
-        .map_err(|err| format!("Could not allow this audio file: {err}"))?;
+        .map_err(|err| format!("Could not authorize this audio file: {err}"))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod startup_audio_tests {
+    use super::*;
+
+    #[test]
+    fn recognizes_a_previously_imported_track_only() {
+        let payload = r#"{"version":2,"tracks":[
+            {"id":"saved","filePath":"/music/album/song.mp3"},
+            {"id":"no-file","title":"metadata only"}
+        ],"playlists":[]}"#;
+        assert!(saved_library_contains_file(payload, Path::new("/music/album/song.mp3")));
+        assert!(!saved_library_contains_file(payload, Path::new("/music/album/secret.mp3")));
+        assert!(!saved_library_contains_file(payload, Path::new("/music/album")));
+    }
+
+    #[test]
+    fn ignores_invalid_or_unrelated_saved_library_data() {
+        let file = Path::new("/music/song.mp3");
+        assert!(!saved_library_contains_file("{broken json", file));
+        assert!(!saved_library_contains_file(r#"{"tracks":"not a list"}"#, file));
+        assert!(!saved_library_contains_file(r#"{"tracks":[{"id":"x","filePath":12}]}"#, file));
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

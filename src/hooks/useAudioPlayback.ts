@@ -100,7 +100,9 @@ export function useAudioPlayback(queueRef: RefObject<PlaybackQueue>) {
       if (cancelled) return
       console.warn('Cannot restore saved audio access:', error)
       showPlaybackError(
-        'Could not open this song. Select the Music folder again if its access was revoked.',
+        typeof error === 'string' && error.trim()
+          ? error
+          : 'Could not open this song. Select its Music folder again if access was revoked.',
       )
     })
 
