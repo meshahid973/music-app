@@ -1514,9 +1514,9 @@ test('docked player bar stays square and above the auto-hide panel with an acryl
   assert.ok(dockedSidebarRule)
   assert.match(dockedSidebarRule, /z-index:\s*4;/)
 
-  const fallbackRule = css.match(/\.app-shell\.auto-hide-sidebar > \.sidebar\s*\{([^}]*)\}/)?.[1]
+  const sidebarRules = [...css.matchAll(/\.app-shell\.auto-hide-sidebar > \.sidebar\s*\{([^}]*)\}/g)].map((match) => match[1])
+  const fallbackRule = sidebarRules.find((rule) => /background:\s*rgba\(14,\s*16,\s*17,\s*0\.9\);/.test(rule))
   assert.ok(fallbackRule)
-  assert.match(fallbackRule, /background:\s*rgba\(14,\s*16,\s*17,\s*0\.9\);/)
   assert.match(fallbackRule, /backdrop-filter:\s*none;/)
   assert.match(fallbackRule, /-webkit-backdrop-filter:\s*none;/)
 
