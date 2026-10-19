@@ -51,7 +51,10 @@ export class PlaybackEngine {
   private checkTimer: ReturnType<typeof setInterval> | null = null
   private phase: PlaybackPhase = 'idle'
 
-  constructor(private readonly options: PlaybackEngineOptions) {
+  private readonly options: PlaybackEngineOptions
+
+  constructor(options: PlaybackEngineOptions) {
+    this.options = options
     if (options.source) void this.prepare()
   }
 
