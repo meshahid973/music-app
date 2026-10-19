@@ -116,7 +116,7 @@ export class PlaybackEngine {
           console.warn('Audio play blocked, waiting for media unlock:', error)
           this.transition('buffering')
           sound?.once('unlock', () => {
-            if (this.current(nonce, sound) && this.desired) {
+            if (sound && this.current(nonce, sound) && this.desired) {
               this.playRequestedAt = Date.now()
               this.safePlay(sound)
             }
