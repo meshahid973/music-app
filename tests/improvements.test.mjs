@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { findMissingTrackIds, isPathInside, normalizePathForCompare } from '../src/utils/missingTracks.ts'
 import { shouldIgnoreShortcut } from '../src/utils/shortcutGuard.ts'
+import { DEFAULT_KEYBOARD_SHORTCUTS, formatShortcut, matchesKeyboardShortcut, normalizeShortcutBinding, sanitizeKeyboardShortcutBindings } from '../src/utils/keyboardShortcuts.ts'
 import { createLibrarySaver } from '../src/utils/desktopDatabase.ts'
 import { pruneOrphanArtwork, referencedArtworkNames, statFingerprint } from '../src/utils/artworkStorage.ts'
 
@@ -188,4 +189,33 @@ test('cleanup is case-insensitive about references and survives a missing folder
     remove: async (name) => { if (name === 'a.jpg') throw new Error('in use') },
   }
   assert.equal(await pruneOrphanArtwork(new Set(), flaky, now), 1) // b.jpg still removed
+})
+
+
+test('custom shortcut bindings normalize safely and format for the settings UI', () => {
+  assert.equal(normalizeShortcutBinding('ctrl+KeyK'), 'Ctrl+KeyK')
+  assert.equal(normalizeShortcutBinding('KeyM'), 'KeyM')
+  assert.equal(normalizeShortcutBinding('Ctrl+KeyR'), null)
+  assert.equal(normalizeShortcutBinding('KeyThatDoesNotExist'), null)
+  assert.equal(formatShortcut('ArrowLeft'), '←')
+  assert.equal(formatShortcut('Ctrl+KeyK'), 'Ctrl+K')
+})
+
+test('shortcut matching respects modifiers and keeps default playback bindings', () => {
+  assert.equal(matchesKeyboardShortcut(key({ key: 'm', code: 'KeyM' }), DEFAULT_KEYBOARD_SHORTCUTS.toggleMute), true)
+  assert.equal(matchesKeyboardShortcut(key({ key: 'k', code: 'KeyK', ctrlKey: true }), 'Ctrl+KeyK'), true)
+  assert.equal(matchesKeyboardShortcut(key({ key: 'k', code: 'KeyK' }), 'Ctrl+KeyK'), false)
+  assert.equal(DEFAULT_KEYBOARD_SHORTCUTS.togglePlay, 'Space')
+  assert.equal(DEFAULT_KEYBOARD_SHORTCUTS.previous, 'MediaTrackPrevious')
+})
+
+test('persisted shortcut preferences are sanitized and duplicate bindings are reset safely', () => {
+  const saved = sanitizeKeyboardShortcutBindings({
+    ...DEFAULT_KEYBOARD_SHORTCUTS,
+    togglePlay: 'KeyM',
+    toggleMute: 'KeyM',
+    cycleRepeat: 'Ctrl+KeyR',
+  })
+  assert.equal(new Set(Object.values(saved)).size, Object.values(saved).length)
+  assert.equal(saved.cycleRepeat, DEFAULT_KEYBOARD_SHORTCUTS.cycleRepeat)
 })

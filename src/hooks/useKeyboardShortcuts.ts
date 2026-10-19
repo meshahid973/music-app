@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import { shouldIgnoreShortcut } from '../utils/shortcutGuard.ts'
+import { matchesKeyboardShortcut, SHORTCUT_DEFINITIONS, type KeyboardShortcutBindings, type ShortcutAction } from '../utils/keyboardShortcuts.ts'
 
 export interface KeyboardShortcutHandlers {
+  shortcuts: KeyboardShortcutBindings
   onTogglePlay: () => void
   onPrevious: () => void
   onNext: () => void
@@ -25,42 +27,22 @@ export function useKeyboardShortcuts({
   onToggleMute,
   onToggleShuffle,
   onCycleRepeat,
+  shortcuts,
 }: KeyboardShortcutHandlers) {
   useEffect(() => {
+    const handlers: Record<ShortcutAction, (() => void) | undefined> = {
+      togglePlay: onTogglePlay, previous: onPrevious, next: onNext,
+      seekBackward: onSeekBackward, seekForward: onSeekForward,
+      volumeUp: onVolumeUp, volumeDown: onVolumeDown, toggleMute: onToggleMute,
+      toggleShuffle: onToggleShuffle, cycleRepeat: onCycleRepeat,
+    }
     function handleKeyDown(event: KeyboardEvent) {
-      if (shouldIgnoreShortcut(event)) return
-
-      if (event.code === 'Space') {
-        event.preventDefault()
-        onTogglePlay()
-      } else if (event.key === 'ArrowLeft') {
-        event.preventDefault()
-        onSeekBackward?.()
-      } else if (event.key === 'ArrowRight') {
-        event.preventDefault()
-        onSeekForward?.()
-      } else if (event.key === 'ArrowUp') {
-        event.preventDefault()
-        onVolumeUp?.()
-      } else if (event.key === 'ArrowDown') {
-        event.preventDefault()
-        onVolumeDown?.()
-      } else if (event.key === 'm' || event.key === 'M') {
-        event.preventDefault()
-        onToggleMute?.()
-      } else if (event.key === 's' || event.key === 'S') {
-        event.preventDefault()
-        onToggleShuffle?.()
-      } else if (event.key === 'r' || event.key === 'R') {
-        event.preventDefault()
-        onCycleRepeat?.()
-      } else if (event.key === 'MediaTrackPrevious') {
-        event.preventDefault()
-        onPrevious()
-      } else if (event.key === 'MediaTrackNext') {
-        event.preventDefault()
-        onNext()
-      }
+      const matched = SHORTCUT_DEFINITIONS.find(({ id }) => matchesKeyboardShortcut(event, shortcuts[id]))
+      if (!matched || shouldIgnoreShortcut(event, { allowModifiers: true })) return
+      const handler = handlers[matched.id]
+      if (!handler) return
+      event.preventDefault()
+      handler()
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -68,6 +50,7 @@ export function useKeyboardShortcuts({
       window.removeEventListener('keydown', handleKeyDown)
     }
   }, [
+    shortcuts,
     onTogglePlay,
     onPrevious,
     onNext,

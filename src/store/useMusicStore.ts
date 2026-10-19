@@ -5,6 +5,7 @@ import { assignCoversToTracks, syncTracksWithCovers, uniqueTracks } from '../uti
 import { loadDesktopLibrary, saveDesktopLibrary } from '../utils/desktopDatabase.ts'
 import { hydrateTracksArtwork, sanitizeTracksForPersistence } from '../utils/artworkStorage.ts'
 import { isDesktopApp } from '../utils/platform.ts'
+import { DEFAULT_KEYBOARD_SHORTCUTS, sanitizeKeyboardShortcutBindings, type KeyboardShortcutBindings } from '../utils/keyboardShortcuts.ts'
 
 type MusicState = {
   tracks: Track[]
@@ -17,6 +18,9 @@ type MusicState = {
   shuffle: boolean
   repeat: RepeatMode
   themeMode: ThemeMode
+  keyboardShortcuts: KeyboardShortcutBindings
+  playerBarHoverMode: boolean
+  autoHideSidebar: boolean
   volume: number
   musicFolderPath?: string
   coverFolderPath?: string
@@ -43,6 +47,9 @@ type MusicState = {
   toggleShuffle: () => void
   cycleRepeat: () => void
   setThemeMode: (themeMode: ThemeMode) => void
+  setKeyboardShortcuts: (shortcuts: KeyboardShortcutBindings) => void
+  setPlayerBarHoverMode: (enabled: boolean) => void
+  setAutoHideSidebar: (enabled: boolean) => void
   setVolume: (volume: number) => void
   updateTrack: (trackId: string, updates: Partial<Track>) => void
 }
@@ -92,6 +99,9 @@ function queueSave(state: MusicState) {
       shuffle: state.shuffle,
       repeat: state.repeat,
       themeMode: state.themeMode,
+      keyboardShortcuts: state.keyboardShortcuts,
+      playerBarHoverMode: state.playerBarHoverMode,
+      autoHideSidebar: state.autoHideSidebar,
       musicFolderPath: state.musicFolderPath,
       coverFolderPath: state.coverFolderPath,
       musicFolderName: state.musicFolderName,
@@ -120,6 +130,9 @@ export const useMusicStore = create<MusicState>()(
       shuffle: false,
       repeat: 'off',
       themeMode: 'normal',
+      keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
+      playerBarHoverMode: false,
+      autoHideSidebar: false,
       volume: 0.82,
       musicFolderPath: undefined,
       coverFolderPath: undefined,
@@ -216,6 +229,9 @@ export const useMusicStore = create<MusicState>()(
                   shuffle: typeof loaded.shuffle === 'boolean' ? loaded.shuffle : state.shuffle,
                   repeat: loaded.repeat || state.repeat,
                   themeMode: loaded.themeMode || state.themeMode,
+                  keyboardShortcuts: sanitizeKeyboardShortcutBindings(loaded.keyboardShortcuts ?? state.keyboardShortcuts),
+                  playerBarHoverMode: loaded.playerBarHoverMode ?? state.playerBarHoverMode,
+                  autoHideSidebar: loaded.autoHideSidebar ?? state.autoHideSidebar,
                   musicFolderPath: state.musicFolderPath || loaded.musicFolderPath,
                   coverFolderPath: state.coverFolderPath || loaded.coverFolderPath,
                   musicFolderName: state.musicFolderName || loaded.musicFolderName,
@@ -252,6 +268,7 @@ export const useMusicStore = create<MusicState>()(
               tracks: hydrateTracksArtwork(state.tracks),
               playlists,
               themeMode: 'normal' as const,
+              keyboardShortcuts: sanitizeKeyboardShortcutBindings(state.keyboardShortcuts),
               firstRunSetupCompleted: state.firstRunSetupCompleted || state.tracks.length > 0,
               isInitialized: true,
             }
@@ -460,6 +477,22 @@ export const useMusicStore = create<MusicState>()(
         queueSave(get())
       },
 
+      setKeyboardShortcuts: (keyboardShortcuts) => {
+        const normalized = sanitizeKeyboardShortcutBindings(keyboardShortcuts)
+        set({ keyboardShortcuts: normalized })
+        queueSave(get())
+      },
+
+      setPlayerBarHoverMode: (playerBarHoverMode) => {
+        set({ playerBarHoverMode })
+        queueSave(get())
+      },
+
+      setAutoHideSidebar: (autoHideSidebar) => {
+        set({ autoHideSidebar })
+        queueSave(get())
+      },
+
       setVolume: (volume) => {
         set({ volume })
         queueSave(get())
@@ -503,6 +536,9 @@ export const useMusicStore = create<MusicState>()(
           shuffle: typeof persisted.shuffle === 'boolean' ? persisted.shuffle : false,
           repeat: persisted.repeat ?? 'off',
           themeMode: persisted.themeMode ?? 'normal',
+          keyboardShortcuts: sanitizeKeyboardShortcutBindings(persisted.keyboardShortcuts),
+          playerBarHoverMode: persisted.playerBarHoverMode ?? false,
+          autoHideSidebar: persisted.autoHideSidebar ?? false,
           musicFolderPath: persisted.musicFolderPath,
           coverFolderPath: persisted.coverFolderPath,
           musicFolderName: persisted.musicFolderName,
@@ -558,6 +594,9 @@ export const useMusicStore = create<MusicState>()(
           shuffle: state.shuffle,
           repeat: state.repeat,
           themeMode: state.themeMode,
+          keyboardShortcuts: state.keyboardShortcuts,
+          playerBarHoverMode: state.playerBarHoverMode,
+          autoHideSidebar: state.autoHideSidebar,
           musicFolderPath: state.musicFolderPath,
           coverFolderPath: state.coverFolderPath,
           musicFolderName: state.musicFolderName,

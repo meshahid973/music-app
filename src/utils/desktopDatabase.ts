@@ -2,6 +2,7 @@ import { BaseDirectory, exists, mkdir, readTextFile, rename, writeTextFile } fro
 import { isDesktopApp } from './platform.ts'
 import { hydrateTracksArtwork, sanitizeTracksForPersistence } from './artworkStorage.ts'
 import type { Playlist, RepeatMode, ThemeMode, Track } from '../types.ts'
+import { sanitizeKeyboardShortcutBindings, type KeyboardShortcutBindings } from './keyboardShortcuts.ts'
 
 export interface DesktopLibraryPayload {
   version?: number
@@ -13,6 +14,9 @@ export interface DesktopLibraryPayload {
   shuffle: boolean
   repeat: RepeatMode
   themeMode?: ThemeMode
+  keyboardShortcuts?: KeyboardShortcutBindings
+  playerBarHoverMode?: boolean
+  autoHideSidebar?: boolean
   musicFolderPath?: string
   coverFolderPath?: string
   musicFolderName?: string
@@ -84,6 +88,9 @@ export function migrateDesktopLibraryPayload(raw: unknown): DesktopLibraryPayloa
     shuffle,
     repeat,
     themeMode,
+    keyboardShortcuts: sanitizeKeyboardShortcutBindings(raw.keyboardShortcuts),
+    playerBarHoverMode: normalizeBoolean(raw.playerBarHoverMode, false),
+    autoHideSidebar: normalizeBoolean(raw.autoHideSidebar, false),
     musicFolderPath: normalizeString(raw.musicFolderPath),
     coverFolderPath: normalizeString(raw.coverFolderPath),
     musicFolderName: normalizeString(raw.musicFolderName),
